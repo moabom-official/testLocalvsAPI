@@ -1,0 +1,101 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CommentClassificationResult",
+  "description": "YouTube 댓글 분류 결과",
+  "type": "object",
+  "required": [
+    "label",
+    "confidence",
+    "rationale_short",
+    "needs_recheck",
+    "mentioned_product_features",
+    "is_product_related"
+  ],
+  "properties": {
+    "label": {
+      "type": "string",
+      "enum": [
+        "PRODUCT_OPINION",
+        "VIDEO_REACTION",
+        "CHATTER",
+        "QUESTION",
+        "OFF_TOPIC"
+      ],
+      "description": "댓글의 분류 라벨"
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "분류의 확신도 (0.0~1.0)"
+    },
+    "rationale_short": {
+      "type": "string",
+      "maxLength": 200,
+      "description": "분류 이유 (한 줄 설명)"
+    },
+    "needs_recheck": {
+      "type": "boolean",
+      "description": "애매해서 재확인이 필요한지 여부"
+    },
+    "mentioned_product_features": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "언급된 제품 특성 리스트 (예: 발열, 배터리, 성능)",
+      "examples": [
+        ["발열", "성능"],
+        ["배터리"],
+        []
+      ]
+    },
+    "is_product_related": {
+      "type": "boolean",
+      "description": "제품과 관련이 있는지 여부"
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "label": "PRODUCT_OPINION",
+      "confidence": 0.95,
+      "rationale_short": "제품의 발열과 성능에 대한 직접적인 평가",
+      "needs_recheck": false,
+      "mentioned_product_features": ["발열", "성능"],
+      "is_product_related": true
+    },
+    {
+      "label": "VIDEO_REACTION",
+      "confidence": 0.97,
+      "rationale_short": "영상 자체에 대한 긍정적 반응",
+      "needs_recheck": false,
+      "mentioned_product_features": [],
+      "is_product_related": false
+    },
+    {
+      "label": "QUESTION",
+      "confidence": 0.99,
+      "rationale_short": "제품의 게임 성능에 대한 질문",
+      "needs_recheck": false,
+      "mentioned_product_features": ["게임", "성능"],
+      "is_product_related": true
+    },
+    {
+      "label": "CHATTER",
+      "confidence": 0.65,
+      "rationale_short": "맥락 없는 짧은 긍정 반응",
+      "needs_recheck": true,
+      "mentioned_product_features": [],
+      "is_product_related": false
+    },
+    {
+      "label": "OFF_TOPIC",
+      "confidence": 0.99,
+      "rationale_short": "제품과 무관한 배경음악 질문",
+      "needs_recheck": false,
+      "mentioned_product_features": [],
+      "is_product_related": false
+    }
+  ]
+}

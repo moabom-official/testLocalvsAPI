@@ -1,0 +1,146 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ product.name }} - Product Details</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        h1 { color: #333; }
+        .product-info { background: #f5f5f5; padding: 15px; border-radius: 4px; margin-bottom: 20px; }
+        .product-info p { margin: 5px 0; }
+        .sync-btn { padding: 12px 24px; background: #28a745; color: white; border: none; cursor: pointer; border-radius: 4px; font-size: 16px; }
+        .sync-btn:hover { background: #218838; }
+        .sync-btn:disabled { background: #ccc; cursor: not-allowed; }
+        .videos-section { margin-top: 30px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #007bff; color: white; }
+        tr:hover { background: #f5f5f5; }
+        .video-title a { color: #007bff; text-decoration: none; }
+        .video-title a:hover { text-decoration: underline; }
+        .video-thumb { width: 80px; height: 45px; object-fit: cover; border-radius: 3px; }
+        .back-link { margin-bottom: 20px; }
+        .back-link a { color: #007bff; }
+        .sync-row { display: flex; align-items: center; gap: 12px; }
+        .sync-progress { width: 280px; height: 8px; background: #e9ecef; border-radius: 999px; overflow: hidden; display: none; }
+        .sync-progress.show { display: block; }
+        .sync-progress-fill { width: 0%; height: 100%; background: linear-gradient(90deg, #17a2b8, #28a745); transition: width 0.2s ease; }
+        .sync-status { font-size: 0.95em; color: #444; min-height: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="back-link">
+            <a href="/products">← Back to Products</a>
+        </div>
+        
+        <h1>{{ product.name }}</h1>
+        
+        <div class="product-info">
+            <p><strong>Brand:</strong> {{ product.brand or 'N/A' }}</p>
+            <p><strong>Category:</strong> {{ product.category or 'N/A' }}</p>
+            <p><strong>Created:</strong> {{ product.created_at }}</p>
+        </div>
+        
+        <div class="sync-row">
+            <button class="sync-btn" onclick="syncVideos()" id="syncBtn">🔄 Sync Videos from YouTube</button>
+            <div id="syncProgress" class="sync-progress" aria-hidden="true">
+                <div id="syncProgressFill" class="sync-progress-fill"></div>
+            </div>
+            <span id="syncStatus" class="sync-status"></span>
+        </div>
+        
+        <div class="videos-section">
+            <h2>Videos ({{ videos|length }})</h2>
+            {% if videos %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Thumbnail</th>
+                            <th>Title</th>
+                            <th>Views</th>
+                            <th>Likes</th>
+                            <th>Comments</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for video in videos %}
+                            <tr>
+                                <td>
+                                    {% if video.thumbnail_url %}
+                                        <img src="{{ video.thumbnail_url }}" alt="thumbnail" class="video-thumb">
+                                    {% endif %}
+                                </td>
+                                <td class="video-title">
+                                    <a href="/products/{{ product.product_id }}/videos/{{ video.video_id }}">
+                                        {{ video.title[:50] }}...
+                                    </a>
+                                </td>
+                                <td>{{ video.view_count }}</td>
+                                <td>{{ video.like_count }}</td>
+                                <td>{{ video.comment_count }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>No videos yet. Click "Sync Videos from YouTube" to fetch them.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        async function syncVideos() {
+            const btn = document.getElementById('syncBtn');
+            const status = document.getElementById('syncStatus');
+            const progress = document.getElementById('syncProgress');
+            const progressFill = document.getElementById('syncProgressFill');
+            let progressValue = 8;
+            let timer = null;
+            
+            btn.disabled = true;
+            progress.classList.add('show');
+            progressFill.style.width = progressValue + '%';
+            status.textContent = 'Syncing...';
+
+            // Simulated progress while waiting for server response.
+            timer = setInterval(() => {
+                if (progressValue < 90) {
+                    progressValue += 4;
+                    progressFill.style.width = progressValue + '%';
+                }
+            }, 400);
+            
+            try {
+                const response = await fetch('/products/{{ product.product_id }}/sync', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    progressFill.style.width = '100%';
+                    status.textContent = '✓ Synced! Videos: ' + result.videos_count + ', Comments: ' + result.comments_count;
+                    setTimeout(() => location.reload(), 700);
+                } else {
+                    status.textContent = 'Error during sync';
+                }
+            } catch (error) {
+                status.textContent = 'Error: ' + error;
+            } finally {
+                if (timer) {
+                    clearInterval(timer);
+                }
+                if (!status.textContent.startsWith('✓')) {
+                    progress.classList.remove('show');
+                    progressFill.style.width = '0%';
+                }
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>

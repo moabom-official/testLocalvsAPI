@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ video.title }} - Video Analysis</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        h1 { color: #333; }
+        .video-info { background: #f5f5f5; padding: 15px; border-radius: 4px; margin-bottom: 20px; }
+        .video-info p { margin: 8px 0; }
+        .youtube-link { color: #ff0000; text-decoration: none; font-weight: bold; }
+        .youtube-link:hover { text-decoration: underline; }
+        .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px; }
+        .stat-box { background: #007bff; color: white; padding: 15px; border-radius: 4px; text-align: center; }
+        .stat-box .label { font-size: 0.9em; opacity: 0.9; }
+        .stat-box .value { font-size: 1.8em; font-weight: bold; }
+        .sentiment-section { margin-top: 30px; }
+        .sentiment-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
+        .sentiment-box { padding: 15px; border-radius: 4px; text-align: center; cursor: pointer; transition: all 0.2s; }
+        .sentiment-box.positive { background: #28a745; color: white; }
+        .sentiment-box.neutral { background: #ffc107; color: black; }
+        .sentiment-box.negative { background: #dc3545; color: white; }
+        .sentiment-box:hover { opacity: 0.8; }
+        .sentiment-box.active { opacity: 1; box-shadow: 0 0 8px rgba(0,0,0,0.3); }
+        .sentiment-box .label { font-size: 0.9em; opacity: 0.9; }
+        .sentiment-box .value { font-size: 1.5em; font-weight: bold; }
+        .comments-section { margin-top: 30px; }
+        .comment-item { background: #f9f9f9; padding: 12px; margin-bottom: 10px; border-radius: 4px; border-left: 4px solid #ddd; }
+        .comment-item.positive { border-left-color: #28a745; }
+        .comment-item.negative { border-left-color: #dc3545; }
+        .comment-item.neutral { border-left-color: #ffc107; }
+        .comment-text { margin-bottom: 5px; }
+        .comment-meta { font-size: 0.85em; color: #666; }
+        .back-link { margin-bottom: 20px; }
+        .back-link a { color: #007bff; }
+        .pagination { margin-top: 20px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .pagination a, .pagination span { padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; text-decoration: none; }
+        .pagination a { color: #007bff; }
+        .pagination a:hover { background: #f2f6ff; }
+        .pagination .current { background: #007bff; color: #fff; border-color: #007bff; }
+        .pagination .disabled { color: #999; }
+        .transcript-section { margin-top: 36px; }
+        .comment-sentiment-section { margin-top: 36px; }
+        .transcript-meta { color: #555; font-size: 0.9em; margin-bottom: 10px; }
+        .report-box {
+            background: #f7fbff;
+            border: 1px solid #d9e8f8;
+            border-radius: 6px;
+            padding: 14px;
+            white-space: pre-wrap;
+            line-height: 1.45;
+            font-family: Consolas, "Courier New", monospace;
+            font-size: 0.92em;
+        }
+        .pdf-download-btn {
+            display: inline-block;
+            margin-top: 12px;
+            padding: 9px 14px;
+            background: #0d6efd;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+        }
+        .pdf-download-btn:hover { background: #0b5ed7; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="back-link">
+            <a href="/products/{{ product_id }}">← Back to Product</a>
+        </div>
+        
+        <h1>{{ video.title }}</h1>
+        
+        <div class="video-info">
+            <p><strong>YouTube:</strong> <a href="https://www.youtube.com/watch?v={{ video.video_id }}" target="_blank" class="youtube-link">Watch Video</a></p>
+            <p><strong>Published:</strong> {{ video.published_at }}</p>
+        </div>
+        
+        <div class="stats">
+            <div class="stat-box">
+                <div class="label">Views</div>
+                <div class="value">{{ video.view_count }}</div>
+            </div>
+            <div class="stat-box">
+                <div class="label">Likes</div>
+                <div class="value">{{ video.like_count }}</div>
+            </div>
+            <div class="stat-box">
+                <div class="label">Comments</div>
+                <div class="value">{{ video.comment_count }}</div>
+            </div>
+            <div class="stat-box">
+                <div class="label">Product-Related</div>
+                <div class="value">{{ product_related_count }}</div>
+            </div>
+        </div>
+        
+        <div class="sentiment-section">
+            <h2>Sentiment Analysis</h2>
+            <div class="sentiment-summary">
+                <div class="sentiment-box positive {% if current_sentiment == 'positive' %}active{% endif %}" onclick="filterBySentiment('positive')" id="box-positive">
+                    <div class="label">Positive</div>
+                    <div class="value">{{ sentiment_positive }}</div>
+                </div>
+                <div class="sentiment-box neutral {% if current_sentiment == 'neutral' %}active{% endif %}" onclick="filterBySentiment('neutral')" id="box-neutral">
+                    <div class="label">Neutral</div>
+                    <div class="value">{{ sentiment_neutral }}</div>
+                </div>
+                <div class="sentiment-box negative {% if current_sentiment == 'negative' %}active{% endif %}" onclick="filterBySentiment('negative')" id="box-negative">
+                    <div class="label">Negative</div>
+                    <div class="value">{{ sentiment_negative }}</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="comments-section">
+            <h2>Product-Related Comments ({{ product_related_count }} total)</h2>
+            {% if comments %}
+                {% for comment in comments %}
+                    <div class="comment-item {% if comment.sentiment_label %}{{ comment.sentiment_label }}{% else %}neutral{% endif %}">
+                        <div class="comment-text">{{ comment.text_raw }}</div>
+                        <div class="comment-meta">
+                            {% if comment.sentiment_label %}
+                                Sentiment: <strong>{{ comment.sentiment_label|upper }}</strong> ({{ comment.sentiment_score }})
+                            {% else %}
+                                Sentiment: <strong>UNANALYZED</strong>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+
+                {% if total_pages > 1 %}
+                    <div class="pagination">
+                        {% if current_page > 1 %}
+                            <a href="?page={{ current_page - 1 }}{% if current_sentiment %}&sentiment={{ current_sentiment }}{% endif %}">Prev</a>
+                        {% else %}
+                            <span class="disabled">Prev</span>
+                        {% endif %}
+
+                        <span class="current">Page {{ current_page }} / {{ total_pages }}</span>
+
+                        {% if current_page < total_pages %}
+                            <a href="?page={{ current_page + 1 }}{% if current_sentiment %}&sentiment={{ current_sentiment }}{% endif %}">Next</a>
+                        {% else %}
+                            <span class="disabled">Next</span>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            {% else %}
+                <p>No product-related comments found.</p>
+            {% endif %}
+        </div>
+
+        <div class="transcript-section">
+            <h2>Transcript Report</h2>
+            {% if transcript_row %}
+                <div class="transcript-meta">
+                    Language: {{ transcript_row.language_code or 'unknown' }} |
+                    Segments: {{ transcript_row.segment_count or 0 }} |
+                    Updated: {{ transcript_row.updated_at }}
+                </div>
+                <div class="report-box">{{ transcript_report }}</div>
+                <a class="pdf-download-btn" href="/products/{{ product_id }}/videos/{{ video.video_id }}/transcript-report.pdf">
+                    Download PDF Report
+                </a>
+            {% else %}
+                <p>Transcript report is unavailable for this video. This usually means the video has no accessible subtitles/captions, or subtitle access is restricted by YouTube.</p>
+            {% endif %}
+        </div>
+
+        <div class="comment-sentiment-section">
+            <h2>📊 Comment Reaction Analysis</h2>
+            {% if comment_sentiment_report %}
+                <div class="report-box">{{ comment_sentiment_report }}</div>
+                <a class="pdf-download-btn" href="/products/{{ product_id }}/videos/{{ video.video_id }}/comment-report.pdf">
+                    Download PDF Report
+                </a>
+            {% else %}
+                <p>Comment reaction analysis is unavailable. This may occur if there are insufficient product-related comments or if the analysis service is temporarily unavailable.</p>
+            {% endif %}
+        </div>
+
+        <div class="comment-sentiment-section">
+            <h2>🔗 Integrated Analysis: Reviewer vs. Consumer Feedback</h2>
+            {% if integrated_analysis %}
+                <div class="report-box">{{ integrated_analysis }}</div>
+                <a class="pdf-download-btn" href="/products/{{ product_id }}/videos/{{ video.video_id }}/integrated-analysis.pdf">
+                    Download PDF Report
+                </a>
+            {% else %}
+                <p>Integrated analysis is unavailable. Please ensure both transcript and comment reports are generated.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        function filterBySentiment(sentiment) {
+            // Get current URL parameters
+            const urlParams = new URLSearchParams(window.location.search);
+            const currentSentiment = urlParams.get('sentiment');
+            
+            // Toggle: if same sentiment clicked, remove filter
+            if (currentSentiment === sentiment) {
+                urlParams.delete('sentiment');
+            } else {
+                urlParams.set('sentiment', sentiment);
+            }
+            
+            // Always reset to page 1 when filtering
+            urlParams.set('page', '1');
+            
+            // Reload with new parameters
+            window.location.search = urlParams.toString();
+        }
+    </script>
+</body>
+</html>
