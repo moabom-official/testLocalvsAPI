@@ -270,11 +270,19 @@ class OptimizedBatchClassifier:
                 # 재판단 대상
                 text = next(text for id, text in [(f"c{start_index + i}", comments[i]) for i in range(len(comments))] if id == cid)
                 recheck_comments.append((cid, text))
+        print(
+            "[AGENT][CLASSIFIER] Recheck candidates: "
+            f"{len(recheck_comments)}/{len(comments)} "
+            f"(threshold={self.confidence_threshold})"
+        )
         
         # 재판단 수행 (개별 호출, few-shot 포함)
         if recheck_comments:
             recheck_results = self._recheck_comments(recheck_comments)
             all_results.update(recheck_results)
+            print(f"[AGENT][CLASSIFIER] Recheck applied: {len(recheck_results)} comments")
+        else:
+            print("[AGENT][CLASSIFIER] Recheck applied: 0 comments")
         
         # 6. ClassificationResult 객체로 변환
         results = []

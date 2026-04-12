@@ -9,6 +9,8 @@ from scripts.youtube.video_service import fetch_product_videos
 from scripts.youtube.comment_service import fetch_video_comments  # Fallback용 항상 import
 from scripts.config import YOUTUBE_API_KEY, GROQ_API_KEY, DATABASE_URL  # 항상 import
 import uuid
+import random
+import re
 from datetime import datetime
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -25,6 +27,160 @@ try:
 except ImportError as e:
     print(f"[WARN] Comment filtering agent not available: {e}")
     AGENT_AVAILABLE = False
+
+
+DAILY_TOKEN_BUDGET = 60000
+TOKEN_BUDGET_PER_VIDEO = 2000
+MAX_COMMENT_CHARS = 140
+MAX_LLM_COMMENTS = 20
+CLASSIFICATION_BATCH_SIZE = 8
+
+
+def _normalize_comment_text(text: str) -> str:
+    if not text:
+        return ""
+    cleaned = text.lower()
+    cleaned = re.sub(r"[^0-9a-zA-Z가-힣\s]", " ", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned
+
+
+def _deduplicate_comments(raw_comments):
+    seen = set()
+    deduped = []
+    for c in raw_comments:
+        normalized = _normalize_comment_text(c.text_original)
+        if not normalized:
+            continue
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        c.text_original = normalized
+        deduped.append(c)
+    return deduped
+
+
+def _keyword_hit_count(comment_text: str, product_name: str) -> int:
+    text = _normalize_comment_text(comment_text)
+    common_keywords = ["좋다", "나쁘다", "발열", "배터리", "성능", "디자인", "가격", "추천", "실망"]
+    product_tokens = [t for t in _normalize_comment_text(product_name).split() if t]
+    return sum(1 for kw in (common_keywords + product_tokens) if kw and kw in text)
+
+
+def _to_timestamp(value) -> float:
+    if not value:
+        return 0.0
+    if isinstance(value, datetime):
+        return value.timestamp()
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00")).timestamp()
+    except Exception:
+        return 0.0
+
+
+def _normalize_feature(value: float, min_value: float, max_value: float) -> float:
+    if max_value <= min_value:
+        return 0.0
+    return (value - min_value) / (max_value - min_value)
+
+
+def _select_comments_multicriteria(comment_items, product_name: str):
+    if not comment_items:
+        return [], {
+            "entry_count": 0,
+            "primary_pool_count": 0,
+            "secondary_pool_count": 0,
+            "primary_selected_count": 0,
+            "secondary_selected_count": 0,
+        }
+
+    per_source = min(20, len(comment_items))
+    by_like = sorted(comment_items, key=lambda x: (x["like_count"], x["reply_count"]), reverse=True)[:per_source]
+    by_reply = sorted(comment_items, key=lambda x: (x["reply_count"], x["like_count"]), reverse=True)[:per_source]
+    by_length = sorted(comment_items, key=lambda x: len(x["comment_text"]), reverse=True)[:per_source]
+    by_new = sorted(comment_items, key=lambda x: x["published_ts"], reverse=True)[:per_source]
+    by_old = sorted(comment_items, key=lambda x: x["published_ts"])[:per_source]
+    by_random = random.sample(comment_items, k=per_source)
+
+    source_groups = {
+        "like": by_like,
+        "many": by_reply,
+        "long": by_length,
+        "new": by_new,
+        "old": by_old,
+        "random": by_random,
+    }
+
+    meta = {}
+    for source_name, group in source_groups.items():
+        for item in group:
+            cid = item["comment_id"]
+            if cid not in meta:
+                meta[cid] = {"item": item, "sources": set()}
+            meta[cid]["sources"].add(source_name)
+
+    entries = []
+    for v in meta.values():
+        item = v["item"]
+        sources = v["sources"]
+        entries.append({
+            "item": item,
+            "hit_count": len(sources),
+            "sources": sorted(sources),
+            "secondary_score": 0.0,
+        })
+
+    primary = [e for e in entries if e["hit_count"] >= 2]
+    primary.sort(
+        key=lambda e: (
+            e["hit_count"],
+            e["item"]["like_count"],
+            e["item"]["reply_count"],
+            len(e["item"]["comment_text"])
+        ),
+        reverse=True
+    )
+
+    secondary_pool = [e for e in entries if e["hit_count"] == 1]
+
+    if len(primary) >= MAX_LLM_COMMENTS:
+        selected = primary[:MAX_LLM_COMMENTS]
+        return selected, {
+            "entry_count": len(entries),
+            "primary_pool_count": len(primary),
+            "secondary_pool_count": len(secondary_pool),
+            "primary_selected_count": len(selected),
+            "secondary_selected_count": 0,
+        }
+
+    if secondary_pool:
+        likes = [e["item"]["like_count"] for e in secondary_pool]
+        replies = [e["item"]["reply_count"] for e in secondary_pool]
+        min_like, max_like = min(likes), max(likes)
+        min_reply, max_reply = min(replies), max(replies)
+
+        for e in secondary_pool:
+            item = e["item"]
+            normalized_like = _normalize_feature(item["like_count"], min_like, max_like)
+            normalized_reply = _normalize_feature(item["reply_count"], min_reply, max_reply)
+            keyword_hits = _keyword_hit_count(item["comment_text"], product_name)
+            e["secondary_score"] = normalized_like + normalized_reply + keyword_hits
+
+        secondary_pool.sort(
+            key=lambda e: (e["secondary_score"], len(e["item"]["comment_text"])),
+            reverse=True
+        )
+
+    needed = MAX_LLM_COMMENTS - len(primary)
+    selected = primary + secondary_pool[:max(0, needed)]
+    selected = selected[:MAX_LLM_COMMENTS]
+    return selected, {
+        "entry_count": len(entries),
+        "primary_pool_count": len(primary),
+        "secondary_pool_count": len(secondary_pool),
+        "primary_selected_count": sum(1 for e in selected if e["hit_count"] >= 2),
+        "secondary_selected_count": sum(1 for e in selected if e["hit_count"] == 1),
+    }
 
 
 def process_comments_with_agent(video_id, product_name):
@@ -49,7 +205,7 @@ def process_comments_with_agent(video_id, product_name):
     from comment_filtering_agent.analyzers.models import AnalyzerConfig
     classifier = OptimizedBatchClassifier(
         api_key=GROQ_API_KEY,
-        batch_size=10,
+        batch_size=CLASSIFICATION_BATCH_SIZE,
         confidence_threshold=0.75
     )
     
@@ -63,6 +219,8 @@ def process_comments_with_agent(video_id, product_name):
         "collected": 0,
         "rule_passed": 0,
         "rule_rejected": 0,
+        "selected_pre_llm": 0,
+        "selected_post_llm": 0,
         "analyzed": 0,
         "excluded": 0,
         "errors": 0
@@ -74,9 +232,13 @@ def process_comments_with_agent(video_id, product_name):
         raw_comments = collector.collect_comments(video_id, max_results=100)
         stats["collected"] = len(raw_comments)
         print(f"[AGENT] Collected {len(raw_comments)} comments")
-        
+
         if not raw_comments:
             return stats
+
+        # Preprocessing: normalization + deduplication only (no hard filtering)
+        raw_comments = _deduplicate_comments(raw_comments)
+        print(f"[AGENT] After deduplication: {len(raw_comments)} comments")
         
         # Step 2: Save to comments table and process through pipeline
         conn = psycopg2.connect(DATABASE_URL)
@@ -110,10 +272,8 @@ def process_comments_with_agent(video_id, product_name):
                     comment_data.parent_comment_id  # 답글 관계 추가
                 ))
                 
-                # Step 3: Rule-based filter (1차)
+                # Soft filtering strategy: always PASS to preserve representativeness
                 filter_result = rule_filter.filter_single(comment_text)
-                
-                # Save filter result
                 cur.execute("""
                     INSERT INTO rule_filter_results (
                         comment_id, filter_status, rejected_by_rule, 
@@ -126,21 +286,18 @@ def process_comments_with_agent(video_id, product_name):
                         filtered_at = EXCLUDED.filtered_at
                 """, (
                     comment_id,
-                    'PASS' if filter_result.is_passed else 'REJECT',
-                    ','.join(filter_result.matched_rules) if not filter_result.is_passed else None,
-                    ','.join(filter_result.reject_reason_codes) if not filter_result.is_passed else None,
+                    'PASS',
+                    ','.join(filter_result.matched_rules) if filter_result.matched_rules else None,
+                    ','.join([r.value for r in filter_result.reject_reason_codes]) if filter_result.reject_reason_codes else None,
                     datetime.now()
                 ))
-                
-                if not filter_result.is_passed:
-                    stats["rule_rejected"] += 1
-                    conn.commit()
-                    continue
-                
                 stats["rule_passed"] += 1
                 passed_comments.append({
                     "comment_id": comment_id,
-                    "comment_text": comment_text,
+                    "comment_text": comment_text[:MAX_COMMENT_CHARS],
+                    "like_count": comment_data.like_count or 0,
+                    "reply_count": comment_data.reply_count or 0,
+                    "published_ts": _to_timestamp(comment_data.published_at),
                     "filter_result": filter_result
                 })
                 conn.commit()
@@ -153,20 +310,80 @@ def process_comments_with_agent(video_id, product_name):
                 traceback.print_exc()
                 continue
 
-        # Step 4: LLM Classification (2차) - optimized batch path
+        # Step 4: Multi-criteria extraction + overlap priority + token budget
         if passed_comments:
+            selected_meta, selection_diag = _select_comments_multicriteria(passed_comments, product_name)
+            selected_items = [m["item"] for m in selected_meta]
+            print(
+                "[AGENT] Selection summary: "
+                f"entries={selection_diag['entry_count']}, "
+                f"primary_pool(hit>=2)={selection_diag['primary_pool_count']}, "
+                f"secondary_pool(hit=1)={selection_diag['secondary_pool_count']}, "
+                f"primary_selected={selection_diag['primary_selected_count']}, "
+                f"secondary_selected={selection_diag['secondary_selected_count']}, "
+                f"selected_total={len(selected_items)}"
+            )
+            approx_tokens = sum(max(10, len(i["comment_text"]) // 3) for i in selected_items)
+            if approx_tokens > TOKEN_BUDGET_PER_VIDEO:
+                before_trim_count = len(selected_meta)
+                selected_meta = sorted(
+                    selected_meta,
+                    key=lambda m: (
+                        m["hit_count"],
+                        m["secondary_score"],
+                        m["item"]["like_count"],
+                        m["item"]["reply_count"]
+                    ),
+                    reverse=True
+                )
+                while selected_meta and sum(max(10, len(m["item"]["comment_text"]) // 3) for m in selected_meta) > TOKEN_BUDGET_PER_VIDEO:
+                    selected_meta.pop()
+                selected_items = [m["item"] for m in selected_meta]
+                after_trim_count = len(selected_meta)
+                print(
+                    "[AGENT] Token budget trim: "
+                    f"before={before_trim_count}, after={after_trim_count}, "
+                    f"trimmed={before_trim_count - after_trim_count}, "
+                    f"budget={TOKEN_BUDGET_PER_VIDEO}"
+                )
+            else:
+                print(
+                    "[AGENT] Token budget trim: "
+                    f"before={len(selected_meta)}, after={len(selected_meta)}, "
+                    f"trimmed=0, budget={TOKEN_BUDGET_PER_VIDEO}"
+                )
+
+            if not selected_items:
+                print("[AGENT] No comments selected after token budget check")
+                return stats
+
+            stats["selected_pre_llm"] = len(selected_items)
+            print(f"[AGENT] Selected comments detail ({len(selected_meta)}):")
+            for rank, meta in enumerate(selected_meta, start=1):
+                item = meta["item"]
+                preview = (item["comment_text"][:60] + "...") if len(item["comment_text"]) > 60 else item["comment_text"]
+                print(
+                    f"[AGENT]   #{rank:02d} "
+                    f"comment_id={item['comment_id']} "
+                    f"hit_count={meta['hit_count']} "
+                    f"sources={','.join(meta['sources'])} "
+                    f"secondary_score={meta['secondary_score']:.3f} "
+                    f"likes={item['like_count']} replies={item['reply_count']} "
+                    f"text='{preview}'"
+                )
+
             classification_results = classifier.classify_batch(
-                [c["comment_text"] for c in passed_comments],
+                [c["comment_text"] for c in selected_items],
                 start_index=0
             )
-            if len(classification_results) != len(passed_comments):
+            if len(classification_results) != len(selected_items):
                 raise Exception(
                     f"Batch classification result size mismatch: "
-                    f"{len(classification_results)} != {len(passed_comments)}"
+                    f"{len(classification_results)} != {len(selected_items)}"
                 )
 
             # Step 5/6: Agent decision + sentiment/aspect
-            for i, item in enumerate(passed_comments):
+            for i, item in enumerate(selected_items):
                 try:
                     comment_id = item["comment_id"]
                     comment_text = item["comment_text"]
@@ -274,6 +491,7 @@ def process_comments_with_agent(video_id, product_name):
                     import traceback
                     traceback.print_exc()
                     continue
+            stats["selected_post_llm"] = stats["analyzed"]
         
         conn.commit()
         cur.close()
@@ -360,6 +578,8 @@ def register_sync_routes(app):
             videos_count = 0
             comments_count = 0
             transcripts_count = 0
+            llm_selected_pre_count = 0
+            llm_selected_post_count = 0
             
             for video in videos:
                 print(f"[SYNC] Processing video: {video['video_id']}")
@@ -382,6 +602,8 @@ def register_sync_routes(app):
                     try:
                         comment_stats = process_comments_with_agent(video["video_id"], product["name"])
                         comments_count += comment_stats.get("collected", 0)
+                        llm_selected_pre_count += comment_stats.get("selected_pre_llm", 0)
+                        llm_selected_post_count += comment_stats.get("selected_post_llm", 0)
                         print(f"[SYNC]   Agent stats: {comment_stats}")
                     except Exception as e:
                         print(f"[SYNC]   Agent processing failed: {e}, falling back to simple collection")
@@ -390,7 +612,11 @@ def register_sync_routes(app):
                         for comment in comments:
                             execute_update(
                                 """INSERT INTO comments (comment_id, video_id, text_raw, is_product_related)
-                                   VALUES (%s, %s, %s, %s)""",
+                                   VALUES (%s, %s, %s, %s)
+                                   ON CONFLICT (comment_id) DO UPDATE SET
+                                       video_id = EXCLUDED.video_id,
+                                       text_raw = EXCLUDED.text_raw,
+                                       is_product_related = EXCLUDED.is_product_related""",
                                 (comment["comment_id"], video["video_id"], comment["text_raw"], True)
                             )
                             comments_count += 1
@@ -404,7 +630,11 @@ def register_sync_routes(app):
                         # Insert raw comment
                         execute_update(
                             """INSERT INTO comments (comment_id, video_id, text_raw, is_product_related)
-                               VALUES (%s, %s, %s, %s)""",
+                               VALUES (%s, %s, %s, %s)
+                               ON CONFLICT (comment_id) DO UPDATE SET
+                                   video_id = EXCLUDED.video_id,
+                                   text_raw = EXCLUDED.text_raw,
+                                   is_product_related = EXCLUDED.is_product_related""",
                             (comment["comment_id"], video["video_id"], comment["text_raw"], True)
                         )
                         comments_count += 1
@@ -454,12 +684,17 @@ def register_sync_routes(app):
                 # Transcripts will be fetched on-demand when user views the video page
                 print(f"[SYNC]   Skipping transcript (will fetch on-demand when viewing video)")
             
-            print(f"[SYNC] COMPLETE: videos={videos_count}, comments={comments_count}, transcripts={transcripts_count}")
+            print(
+                f"[SYNC] COMPLETE: videos={videos_count}, comments={comments_count}, transcripts={transcripts_count}, "
+                f"llm_selected_pre={llm_selected_pre_count}, llm_selected_post={llm_selected_post_count}"
+            )
             return {
                 "status": "success",
                 "videos_count": videos_count,
                 "comments_count": comments_count,
                 "transcripts_count": transcripts_count,
+                "llm_selected_pre_count": llm_selected_pre_count,
+                "llm_selected_post_count": llm_selected_post_count,
             }
         except Exception as e:
             print(f"[SYNC] ERROR: {type(e).__name__}: {e}")
