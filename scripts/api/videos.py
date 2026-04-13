@@ -40,8 +40,9 @@ def register_video_routes(app):
         per_page = 10
         offset = (page - 1) * per_page
         
-        # Build WHERE clause for sentiment filter
-        where_clause = "c.video_id = %s AND c.is_product_related = true"
+        # Build WHERE clause for final analyzed comments
+        # (LLM+Agent final_action=ANALYZE and sentiment already computed)
+        where_clause = "c.video_id = %s AND ad.final_action = 'ANALYZE'"
         query_params = [video_id]
         
         if sentiment in ['positive', 'neutral', 'negative']:
@@ -51,30 +52,36 @@ def register_video_routes(app):
         else:
             print(f"[FILTER] No sentiment filter (sentiment={sentiment})")
         
-        # Get product-related comments with sentiment (paginated, optionally filtered)
+        # Get final analyzed comments with sentiment (paginated, optionally filtered)
         comments = query_all(
             f"""SELECT c.comment_id, c.text_raw, cs.sentiment_label, cs.sentiment_score
-               FROM comments c
-               LEFT JOIN comment_sentiments cs ON c.comment_id = cs.comment_id
+                FROM comments c
+               INNER JOIN agent_decisions ad ON c.comment_id = ad.comment_id
+               INNER JOIN comment_sentiments cs ON c.comment_id = cs.comment_id
                WHERE {where_clause}
-               ORDER BY c.created_at DESC LIMIT %s OFFSET %s""",
+                ORDER BY c.created_at DESC LIMIT %s OFFSET %s""",
             tuple(query_params + [per_page, offset])
         )
         
-        # Count total product-related comments (filtered)
-        product_related_count = query_one(
-            f"SELECT COUNT(*) as count FROM comments c LEFT JOIN comment_sentiments cs ON c.comment_id = cs.comment_id WHERE {where_clause}",
+        # Count total final analyzed comments (filtered)
+        analyzed_count_row = query_one(
+            f"""SELECT COUNT(*) as count
+                FROM comments c
+                INNER JOIN agent_decisions ad ON c.comment_id = ad.comment_id
+                INNER JOIN comment_sentiments cs ON c.comment_id = cs.comment_id
+                WHERE {where_clause}""",
             tuple(query_params)
         )
-        total_comments = product_related_count["count"] if product_related_count else 0
+        total_comments = analyzed_count_row["count"] if analyzed_count_row else 0
         total_pages = (total_comments + per_page - 1) // per_page
         
         # Count sentiment distribution
         sentiment_counts = query_all(
             """SELECT cs.sentiment_label, COUNT(*) as count
                FROM comments c
-               LEFT JOIN comment_sentiments cs ON c.comment_id = cs.comment_id
-               WHERE c.video_id = %s AND c.is_product_related = true
+               INNER JOIN agent_decisions ad ON c.comment_id = ad.comment_id
+               INNER JOIN comment_sentiments cs ON c.comment_id = cs.comment_id
+               WHERE c.video_id = %s AND ad.final_action = 'ANALYZE'
                GROUP BY cs.sentiment_label""",
             (video_id,)
         )
@@ -140,6 +147,7 @@ def register_video_routes(app):
             "video": video,
             "comments": comments,
             "product_related_count": total_comments,
+            "analyzed_comment_count": total_comments,
             "current_page": page,
             "total_pages": total_pages,
             "per_page": per_page,

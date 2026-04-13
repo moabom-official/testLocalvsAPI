@@ -129,7 +129,7 @@
         </div>
         
         <div class="comments-section">
-            <h2>Product-Related Comments ({{ product_related_count }} total)</h2>
+            <h2>Final Analyzed Comments ({{ analyzed_comment_count }} total)</h2>
             {% if comments %}
                 {% for comment in comments %}
                     <div class="comment-item {% if comment.sentiment_label %}{{ comment.sentiment_label }}{% else %}neutral{% endif %}">
@@ -162,7 +162,7 @@
                     </div>
                 {% endif %}
             {% else %}
-                <p>No product-related comments found.</p>
+                <p>No final analyzed comments found.</p>
             {% endif %}
         </div>
 
