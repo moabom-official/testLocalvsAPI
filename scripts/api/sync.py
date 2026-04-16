@@ -24,6 +24,7 @@ from psycopg2.extras import RealDictCursor
 try:
     from comment_filtering_agent.services.comment_collector import YouTubeCommentCollector
     from comment_filtering_agent.filters.rule_based_filter import RuleBasedFilter
+    from comment_filtering_agent.filters.models import RuleConfig
     from comment_filtering_agent.classifiers.optimized_batch_classifier import OptimizedBatchClassifier
     from comment_filtering_agent.core.agent import AgentDecisionEngine
     from comment_filtering_agent.core.models import AgentAction
@@ -166,11 +167,36 @@ def _spark_preprocess_comments(raw_comments, video_id: str):
         }
 
 
+# ABSA(Aspect-Based Sentiment Analysis) product aspect category 기반 키워드
+# 소비자 전자제품 리뷰에서 공통적으로 등장하는 제품 속성(attribute) 키워드
+# 감정어(좋다/나쁘다/추천 등)는 의도적으로 제외 — 영상 반응 댓글과 구분 불가
+PRODUCT_ASPECT_KEYWORDS = [
+    # 성능/처리
+    "성능", "속도", "처리", "발열", "온도", "쿨링",
+    # 배터리
+    "배터리", "충전", "배터리수명", "전력",
+    # 디스플레이
+    "화면", "디스플레이", "해상도", "밝기",
+    # 디자인/외형
+    "디자인", "무게", "크기", "마감", "색상", "두께",
+    # 카메라
+    "카메라", "화질", "사진",
+    # 가격/가성비
+    "가격", "가성비", "성가비",
+    # 소프트웨어/UI
+    "소프트웨어", "앱", "업데이트", "버그",
+    # 내구성/서비스
+    "내구성", "AS", "서비스", "품질",
+    # 음향
+    "소리", "음질", "스피커",
+]
+
+
 def _keyword_hit_count(comment_text: str, product_name: str) -> int:
     text = _normalize_comment_text(comment_text)
-    common_keywords = ["좋다", "나쁘다", "발열", "배터리", "성능", "디자인", "가격", "추천", "실망"]
     product_tokens = [t for t in _normalize_comment_text(product_name).split() if t]
-    return sum(1 for kw in (common_keywords + product_tokens) if kw and kw in text)
+    all_keywords = PRODUCT_ASPECT_KEYWORDS + product_tokens
+    return sum(1 for kw in all_keywords if kw and kw in text)
 
 
 def _to_timestamp(value) -> float:
@@ -294,13 +320,27 @@ def _preprocess_candidate_pool(comment_items, product_name: str):
     if not comment_items:
         return [], {"input_count": 0, "output_count": 0, "trimmed_count": 0}
 
+    # engagement 정규화를 위해 최대값 먼저 계산
+    max_engagement = max(
+        float(item["like_count"]) + (0.7 * float(item["reply_count"]))
+        for item in comment_items
+    ) or 1.0  # 0 나누기 방지
+
     scored = []
     for item in comment_items:
         text = item["comment_text"]
         engagement = float(item["like_count"]) + (0.7 * float(item["reply_count"]))
         keyword_hits = _keyword_hit_count(text, product_name)
+
+        # 제품 키워드 신호 (3개 이상 언급 시 포화, 0→1)
+        keyword_score = min(keyword_hits / 3.0, 1.0)
+        # 텍스트 길이 (길수록 의견 있을 가능성 높음, 0→1)
         length_score = min(len(text), MAX_COMMENT_CHARS) / float(MAX_COMMENT_CHARS)
-        score = engagement + (2.0 * keyword_hits) + length_score
+        # 참여도 정규화 (전체 후보 기준 상대값, 0→1)
+        normalized_eng = engagement / max_engagement
+
+        # 제품 키워드 > 길이 > 참여도 우선순위
+        score = (keyword_score * 4.0) + (length_score * 2.0) + (normalized_eng * 1.0)
         scored.append((score, item))
 
     scored.sort(key=lambda x: x[0], reverse=True)
@@ -339,7 +379,11 @@ def process_comments_with_agent(video_id, product_name):
     
     # Initialize components
     collector = YouTubeCommentCollector(api_key=YOUTUBE_API_KEY)
-    rule_filter = RuleBasedFilter()
+    rule_filter = RuleBasedFilter(config=RuleConfig(
+        enable_url_check=False,        # URL 포함 댓글도 LLM 판단에 맡김
+        enable_duplicate_check=False,  # Spark에서 이미 exact dedup 처리
+        max_repeated_char_ratio=0.7,   # ㅋㅋㅋ 혼합 댓글도 통과 (0.5 → 0.7)
+    ))
     
     # Optimized batch classifier + analyzer config
     from comment_filtering_agent.analyzers.models import AnalyzerConfig
@@ -448,23 +492,22 @@ def process_comments_with_agent(video_id, product_name):
                 ))
                 if filter_result.is_passed:
                     stats["rule_passed"] += 1
+                    candidate_comments.append({
+                        "comment_id": comment_id,
+                        "comment_text": comment_text[:MAX_COMMENT_CHARS],
+                        "like_count": row["like_count"] or 0,
+                        "reply_count": row["reply_count"] or 0,
+                        "published_ts": _to_timestamp(row["published_at"]),
+                        "filter_result": filter_result,
+                        "spark_flags": {
+                            "char_count": int(row.get("char_count", len(comment_text))),
+                            "is_short": bool(row.get("is_short", False)),
+                            "has_url": bool(row.get("has_url", False)),
+                            "is_repetitive": bool(row.get("is_repetitive", False)),
+                        }
+                    })
                 else:
                     stats["rule_rejected"] += 1
-
-                candidate_comments.append({
-                    "comment_id": comment_id,
-                    "comment_text": comment_text[:MAX_COMMENT_CHARS],
-                    "like_count": row["like_count"] or 0,
-                    "reply_count": row["reply_count"] or 0,
-                    "published_ts": _to_timestamp(row["published_at"]),
-                    "filter_result": filter_result,
-                    "spark_flags": {
-                        "char_count": int(row.get("char_count", len(comment_text))),
-                        "is_short": bool(row.get("is_short", False)),
-                        "has_url": bool(row.get("has_url", False)),
-                        "is_repetitive": bool(row.get("is_repetitive", False)),
-                    }
-                })
                 conn.commit()
                 
             except Exception as e:
