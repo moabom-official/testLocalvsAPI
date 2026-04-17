@@ -3,7 +3,8 @@
 """
 import os
 from typing import Optional
-from groq import Groq
+from langchain_groq import ChatGroq
+from langchain_core.messages import SystemMessage, HumanMessage
 
 from .base_analyzer import BaseAspectSentimentAnalyzer
 from .models import AnalyzerConfig
@@ -34,8 +35,14 @@ class GroqAspectSentimentAnalyzer(BaseAspectSentimentAnalyzer):
                 "Set it via environment variable or pass it to constructor."
             )
         
-        # Groq 클라이언트 생성
-        self.client = Groq(api_key=self.api_key)
+        # LangChain ChatGroq 클라이언트 생성
+        self.llm = ChatGroq(
+            model=self.config.model_name,
+            api_key=self.api_key,
+            temperature=self.config.temperature,
+            max_tokens=self.config.max_tokens,
+            model_kwargs={"response_format": {"type": "json_object"}},
+        )
     
     def _call_llm(
         self,
@@ -45,35 +52,22 @@ class GroqAspectSentimentAnalyzer(BaseAspectSentimentAnalyzer):
         max_tokens: int = 1000
     ) -> str:
         """
-        Groq API 호출
-        
+        LangChain ChatGroq 호출
+        (temperature / max_tokens 은 __init__ 에서 chain 생성 시 적용된 값 사용)
+
         Args:
             system_prompt: 시스템 프롬프트
             user_prompt: 사용자 프롬프트
-            temperature: 온도
-            max_tokens: 최대 토큰 수
-            
+
         Returns:
-            LLM 응답 텍스트
+            LLM 응답 텍스트 (JSON 문자열)
         """
-        # 메시지 구성
         messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=user_prompt),
         ]
-        
-        # Groq API 호출
-        response = self.client.chat.completions.create(
-            model=self.config.model_name,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            response_format={"type": "json_object"}  # JSON 모드
-        )
-        
-        # 응답 추출
-        content = response.choices[0].message.content
-        return content
+        response = self.llm.invoke(messages)
+        return response.content
 
 
 # 편의 함수

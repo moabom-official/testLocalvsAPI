@@ -228,7 +228,7 @@ def build_transcript_report(transcript_text: str) -> str:
             prompt = base_prompt if attempt == 0 else (base_prompt + retry_prompt)
             response = client.chat.completions.create(
                 model=GROQ_MODEL,
-                max_tokens=800,
+                max_tokens=2000,
                 messages=[
                     {"role": "user", "content": prompt}
                 ]
