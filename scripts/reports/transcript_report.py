@@ -218,14 +218,18 @@ def build_transcript_report(transcript_text: str) -> str:
         )
         base_prompt = build_transcript_report_prompt(normalized)
         max_attempts = 3
+        char_limit = 1000
 
         for attempt in range(max_attempts):
-            retry_prompt = (
-                "\n\n이전 응답이 형식 조건을 충족하지 않았습니다. "
-                "이번에는 반드시 본문 1000자 이내로 작성하고, "
-                "마지막 줄 단독 [END]를 지켜 다시 작성하세요."
-            )
-            prompt = base_prompt if attempt == 0 else (base_prompt + retry_prompt)
+            if attempt == 0:
+                prompt = base_prompt
+            else:
+                retry_prompt = (
+                    f"\n\n이전 응답이 형식 조건을 충족하지 않았습니다. "
+                    f"이번에는 반드시 본문 {char_limit}자 이내로 작성하고, "
+                    "마지막 줄 단독 [END]를 지켜 다시 작성하세요."
+                )
+                prompt = base_prompt + retry_prompt
             response = client.chat.completions.create(
                 model=GROQ_MODEL,
                 max_tokens=2000,
@@ -238,9 +242,10 @@ def build_transcript_report(transcript_text: str) -> str:
             if validated:
                 fixed_text = fix_encoding(validated)
                 return f"[자막 기반 제품 분석 보고서]\n\n{fixed_text}"
+            char_limit -= 100
             print(
                 f"[WARN] Transcript analysis format invalid at attempt {attempt + 1}/{max_attempts} "
-                "(requested<=1000, validation_max=1500)"
+                f"(requested<={char_limit + 100}, validation_max=1500) → next limit: {char_limit}"
             )
 
         error_msg = "[ERROR] Transcript analysis output format invalid after 3 attempts"
