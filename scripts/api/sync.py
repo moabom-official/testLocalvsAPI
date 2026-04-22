@@ -7,7 +7,7 @@ from scripts.database.queries import query_one, query_all, execute_update, execu
 from scripts.database.connection import get_connection
 from scripts.youtube.video_service import fetch_product_videos
 from scripts.youtube.comment_service import fetch_video_comments  # Fallback용 항상 import
-from scripts.config import YOUTUBE_API_KEY, GROQ_API_KEY, DATABASE_URL  # 항상 import
+from scripts.config import YOUTUBE_API_KEY, GROQ_API_KEY, GROQ_MODEL, DATABASE_URL  # 항상 import
 from scripts.analysis.confidence_weights import (
     get_analysis_weight,
     LOW_CONFIDENCE_WARNING_THRESHOLD,
@@ -17,6 +17,7 @@ import random
 import re
 from datetime import datetime
 from typing import Dict, List
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
@@ -44,6 +45,7 @@ RAW_COMMENT_FETCH_LIMIT = 1000
 PREPROCESS_CANDIDATE_MIN = 250
 PREPROCESS_CANDIDATE_MAX = 300
 TOP_PER_SOURCE = 30
+PARALLEL_WORKERS = 3  # 영상 병렬 처리 수. Groq 무료(12K TPM): 2 권장, 유료 전환 시 올릴 것
 
 
 def _normalize_comment_text(text: str) -> str:
@@ -70,13 +72,12 @@ def _deduplicate_comments(raw_comments):
     return deduped
 
 
-def _spark_preprocess_comments(raw_comments, video_id: str):
+def _preprocess_comments(raw_comments, video_id: str):
     """
-    Spark-first preprocessing (with safe Python fallback):
-    1) Remove only technical invalid rows (null/blank)
+    Python preprocessing:
+    1) Remove null/blank rows
     2) Drop exact duplicates by (video_id, author, text)
-    3) Keep text with trim-only normalization
-    4) Attach flags for downstream scoring/LLM reference (no hard-drop by flags)
+    3) Attach flags for downstream scoring/LLM reference (no hard-drop by flags)
     """
     base_rows: List[Dict] = []
     for c in raw_comments:
@@ -96,75 +97,38 @@ def _spark_preprocess_comments(raw_comments, video_id: str):
     if not base_rows:
         return [], {"input_count": 0, "output_count": 0, "removed_null_blank": 0, "removed_duplicates": 0}
 
-    # Try Spark path first
-    try:
-        from pyspark.sql import SparkSession, functions as F
+    valid_rows = []
+    for r in base_rows:
+        text = r.get("text")
+        if text is None:
+            continue
+        if not str(text).strip():
+            continue
+        valid_rows.append(r)
 
-        spark = SparkSession.builder.master("local[*]").appName("comment-preprocess").getOrCreate()
-        df = spark.createDataFrame(base_rows)
+    seen = set()
+    dedup_rows = []
+    for r in valid_rows:
+        key = (r["video_id"], r["author"], r["text"])
+        if key in seen:
+            continue
+        seen.add(key)
+        dedup_rows.append(r)
 
-        input_count = df.count()
-        valid_df = (
-            df
-            .filter(F.col("text").isNotNull())
-            .filter(F.trim(F.col("text")) != "")
-        )
-        valid_count = valid_df.count()
+    for r in dedup_rows:
+        cleaned = str(r["text"]).strip()
+        r["text_cleaned"] = cleaned
+        r["char_count"] = len(cleaned)
+        r["is_short"] = len(cleaned) < 5
+        r["has_url"] = bool(re.search(r"https?://|www\.", cleaned))
+        r["is_repetitive"] = bool(re.match(r"^(.)\1{9,}$", cleaned))
 
-        dedup_df = valid_df.dropDuplicates(["video_id", "author", "text"])
-        output_count = dedup_df.count()
-
-        processed_df = (
-            dedup_df
-            .withColumn("text_cleaned", F.trim(F.col("text")))
-            .withColumn("char_count", F.length(F.col("text_cleaned")))
-            .withColumn("is_short", F.length(F.col("text_cleaned")) < 5)
-            .withColumn("has_url", F.col("text_cleaned").rlike(r"https?://|www\\."))
-            .withColumn("is_repetitive", F.col("text_cleaned").rlike(r"^(.)\\1{9,}$"))
-        )
-
-        rows = [r.asDict(recursive=True) for r in processed_df.collect()]
-        spark.stop()
-        return rows, {
-            "input_count": input_count,
-            "output_count": output_count,
-            "removed_null_blank": max(0, input_count - valid_count),
-            "removed_duplicates": max(0, valid_count - output_count),
-        }
-    except Exception:
-        # Fallback: same semantics in Python
-        valid_rows = []
-        for r in base_rows:
-            text = r.get("text")
-            if text is None:
-                continue
-            if not str(text).strip():
-                continue
-            valid_rows.append(r)
-
-        seen = set()
-        dedup_rows = []
-        for r in valid_rows:
-            key = (r["video_id"], r["author"], r["text"])
-            if key in seen:
-                continue
-            seen.add(key)
-            dedup_rows.append(r)
-
-        for r in dedup_rows:
-            cleaned = str(r["text"]).strip()
-            r["text_cleaned"] = cleaned
-            r["char_count"] = len(cleaned)
-            r["is_short"] = len(cleaned) < 5
-            r["has_url"] = bool(re.search(r"https?://|www\.", cleaned))
-            r["is_repetitive"] = bool(re.match(r"^(.)\1{9,}$", cleaned))
-
-        return dedup_rows, {
-            "input_count": len(base_rows),
-            "output_count": len(dedup_rows),
-            "removed_null_blank": max(0, len(base_rows) - len(valid_rows)),
-            "removed_duplicates": max(0, len(valid_rows) - len(dedup_rows)),
-        }
+    return dedup_rows, {
+        "input_count": len(base_rows),
+        "output_count": len(dedup_rows),
+        "removed_null_blank": max(0, len(base_rows) - len(valid_rows)),
+        "removed_duplicates": max(0, len(valid_rows) - len(dedup_rows)),
+    }
 
 
 # ABSA(Aspect-Based Sentiment Analysis) product aspect category 기반 키워드
@@ -396,7 +360,7 @@ def process_comments_with_agent(video_id, product_name):
     agent = AgentDecisionEngine()
     
     analyzer_config = AnalyzerConfig()
-    analyzer_config.model_name = "llama-3.3-70b-versatile"
+    analyzer_config.model_name = GROQ_MODEL
     sentiment_analyzer = GroqAspectSentimentAnalyzer(api_key=GROQ_API_KEY, config=analyzer_config)
     
     stats = {
@@ -426,12 +390,12 @@ def process_comments_with_agent(video_id, product_name):
         if not raw_comments:
             return stats
 
-        # Spark-style preprocessing: technical cleanup + dedup + flags
-        print("[AGENT] Step 2: Spark preprocess (technical cleanup + dedup + flags)...")
-        spark_rows, spark_diag = _spark_preprocess_comments(raw_comments, video_id)
+        # Preprocessing: technical cleanup + dedup + flags
+        print("[AGENT] Step 2: Preprocess (null/blank removal + dedup + flags)...")
+        spark_rows, spark_diag = _preprocess_comments(raw_comments, video_id)
         deduped_count = len(spark_rows)
         print(
-            "[AGENT] Spark preprocess summary: "
+            "[AGENT] Preprocess summary: "
             f"input={spark_diag['input_count']}, output={spark_diag['output_count']}, "
             f"removed_null_blank={spark_diag['removed_null_blank']}, "
             f"removed_duplicates={spark_diag['removed_duplicates']}"
@@ -858,10 +822,11 @@ def register_sync_routes(app):
             llm_selected_pre_count = 0
             llm_selected_post_count = 0
             
+            # Phase 1: 영상 메타데이터 INSERT (순차 — DB FK 정합성 보장)
+            inserted_videos = []
             for video in videos:
-                print(f"[SYNC] Processing video: {video['video_id']}")
-                
-                # INSERT new video
+                vid = video["video_id"]
+                print(f"[SYNC] [{vid}] Inserting video metadata...")
                 execute_update(
                     """INSERT INTO videos (video_id, product_id, title, description, published_at,
                        thumbnail_url, view_count, like_count, comment_count)
@@ -870,22 +835,58 @@ def register_sync_routes(app):
                      video["published_at"], video["thumbnail_url"], video["view_count"],
                      video["like_count"], video["comment_count"])
                 )
+                inserted_videos.append(video)
                 videos_count += 1
-                print(f"[SYNC]   Video inserted")
-                
-                # Fetch and process comments with Agent
-                print(f"[SYNC]   Processing comments with Agent...")
-                if AGENT_AVAILABLE:
+                print(f"[SYNC] [{vid}] Video inserted")
+
+            # Phase 2: 댓글 처리 병렬 실행 (PARALLEL_WORKERS 값 하나로 동시 실행 수 조정)
+            print(
+                f"[SYNC] Starting parallel comment processing: "
+                f"videos={len(inserted_videos)}, workers={PARALLEL_WORKERS}"
+            )
+            if AGENT_AVAILABLE:
+                with ThreadPoolExecutor(max_workers=PARALLEL_WORKERS) as executor:
+                    futures = {
+                        executor.submit(
+                            process_comments_with_agent, v["video_id"], product["name"]
+                        ): v["video_id"]
+                        for v in inserted_videos
+                    }
+                    for future in as_completed(futures):
+                        vid = futures[future]
+                        try:
+                            comment_stats = future.result()
+                            comments_count += comment_stats.get("collected", 0)
+                            llm_selected_pre_count += comment_stats.get("selected_pre_llm", 0)
+                            llm_selected_post_count += comment_stats.get("selected_post_llm", 0)
+                            print(f"[SYNC] [{vid}] Agent complete: {comment_stats}")
+                        except Exception as e:
+                            print(f"[SYNC] [{vid}] Agent failed: {e}, falling back to simple collection")
+                            import traceback
+                            traceback.print_exc()
+                            try:
+                                comments = fetch_video_comments(vid, max_pages=2)
+                                for comment in comments:
+                                    execute_update(
+                                        """INSERT INTO comments (comment_id, video_id, text_raw, is_product_related)
+                                           VALUES (%s, %s, %s, %s)
+                                           ON CONFLICT (comment_id) DO UPDATE SET
+                                               video_id = EXCLUDED.video_id,
+                                               text_raw = EXCLUDED.text_raw,
+                                               is_product_related = EXCLUDED.is_product_related""",
+                                        (comment["comment_id"], vid, comment["text_raw"], True)
+                                    )
+                                    comments_count += 1
+                            except Exception as fallback_e:
+                                print(f"[SYNC] [{vid}] Fallback also failed: {fallback_e}")
+            else:
+                # Agent 없을 때 fallback: 순차 단순 수집
+                for video in inserted_videos:
+                    vid = video["video_id"]
+                    print(f"[SYNC] [{vid}] Using fallback comment collection (agent unavailable)...")
                     try:
-                        comment_stats = process_comments_with_agent(video["video_id"], product["name"])
-                        comments_count += comment_stats.get("collected", 0)
-                        llm_selected_pre_count += comment_stats.get("selected_pre_llm", 0)
-                        llm_selected_post_count += comment_stats.get("selected_post_llm", 0)
-                        print(f"[SYNC]   Agent stats: {comment_stats}")
-                    except Exception as e:
-                        print(f"[SYNC]   Agent processing failed: {e}, falling back to simple collection")
-                        # Fallback to simple comment collection
-                        comments = fetch_video_comments(video["video_id"], max_pages=2)
+                        comments = fetch_video_comments(vid, max_pages=2)
+                        print(f"[SYNC] [{vid}] Got {len(comments)} comments")
                         for comment in comments:
                             execute_update(
                                 """INSERT INTO comments (comment_id, video_id, text_raw, is_product_related)
@@ -894,72 +895,46 @@ def register_sync_routes(app):
                                        video_id = EXCLUDED.video_id,
                                        text_raw = EXCLUDED.text_raw,
                                        is_product_related = EXCLUDED.is_product_related""",
-                                (comment["comment_id"], video["video_id"], comment["text_raw"], True)
+                                (comment["comment_id"], vid, comment["text_raw"], True)
                             )
                             comments_count += 1
-                else:
-                    # Fallback: Use old comment collection
-                    print(f"[SYNC]   Using fallback comment collection...")
-                    comments = fetch_video_comments(video["video_id"], max_pages=2)
-                    print(f"[SYNC]   Got {len(comments)} comments")
-                    
-                    for comment in comments:
-                        # Insert raw comment
-                        execute_update(
-                            """INSERT INTO comments (comment_id, video_id, text_raw, is_product_related)
-                               VALUES (%s, %s, %s, %s)
-                               ON CONFLICT (comment_id) DO UPDATE SET
-                                   video_id = EXCLUDED.video_id,
-                                   text_raw = EXCLUDED.text_raw,
-                                   is_product_related = EXCLUDED.is_product_related""",
-                            (comment["comment_id"], video["video_id"], comment["text_raw"], True)
-                        )
-                        comments_count += 1
-                        
-                        # Simple sentiment analysis
-                        comment_text = comment["text_raw"].lower()
-                        positive_keywords = {
-                            "좋다", "훌륭", "추천", "완벽", "최고", "멋진", "빠르다", "빠른", "강력", "강력한",
-                            "좋은", "좋습니다", "훌륭합니다", "amazing", "great", "excellent", "awesome",
-                            "best", "love", "perfect", "worth", "impressed", "beautiful", "fast", "powerful"
-                        }
-                        
-                        negative_keywords = {
-                            "나쁘다", "문제", "느리다", "느린", "비싸다", "비싼", "약하다", "약한", "못쓸",
-                            "망했", "실망", "후회", "환불", "bad", "terrible", "poor", "awful", "slow",
-                            "expensive", "waste", "regret", "disappointing", "broken", "fragile"
-                        }
-                        
-                        pos_count = sum(1 for kw in positive_keywords if kw in comment_text)
-                        neg_count = sum(1 for kw in negative_keywords if kw in comment_text)
-                        
-                        if pos_count > neg_count:
-                            sentiment_label = "positive"
-                            sentiment_score = 0.7
-                        elif neg_count > pos_count:
-                            sentiment_label = "negative"
-                            sentiment_score = 0.3
-                        else:
-                            sentiment_label = "neutral"
-                            sentiment_score = 0.5
-                        
-                        # Save sentiment to DB
-                        try:
-                            conn = get_connection()
-                            cur = conn.cursor()
-                            cur.execute("DELETE FROM comment_sentiments WHERE comment_id = %s", (comment["comment_id"],))
-                            cur.execute("""
-                                INSERT INTO comment_sentiments (comment_id, sentiment_label, sentiment_score, analysis_weight, created_at)
-                                VALUES (%s, %s, %s, %s, NOW())
-                            """, (comment["comment_id"], sentiment_label, sentiment_score, 1.0))
-                            conn.commit()
-                            cur.close()
-                            conn.close()
-                        except Exception as e:
-                            print(f"[SYNC] Warning: Could not save sentiment for {comment['comment_id']}: {e}")
 
-                # Transcripts will be fetched on-demand when user views the video page
-                print(f"[SYNC]   Skipping transcript (will fetch on-demand when viewing video)")
+                            comment_text = comment["text_raw"].lower()
+                            positive_keywords = {
+                                "좋다", "훌륭", "추천", "완벽", "최고", "멋진", "빠르다", "빠른", "강력", "강력한",
+                                "좋은", "좋습니다", "훌륭합니다", "amazing", "great", "excellent", "awesome",
+                                "best", "love", "perfect", "worth", "impressed", "beautiful", "fast", "powerful"
+                            }
+                            negative_keywords = {
+                                "나쁘다", "문제", "느리다", "느린", "비싸다", "비싼", "약하다", "약한", "못쓸",
+                                "망했", "실망", "후회", "환불", "bad", "terrible", "poor", "awful", "slow",
+                                "expensive", "waste", "regret", "disappointing", "broken", "fragile"
+                            }
+                            pos_count = sum(1 for kw in positive_keywords if kw in comment_text)
+                            neg_count = sum(1 for kw in negative_keywords if kw in comment_text)
+                            if pos_count > neg_count:
+                                sentiment_label, sentiment_score = "positive", 0.7
+                            elif neg_count > pos_count:
+                                sentiment_label, sentiment_score = "negative", 0.3
+                            else:
+                                sentiment_label, sentiment_score = "neutral", 0.5
+                            try:
+                                conn_fb = get_connection()
+                                cur_fb = conn_fb.cursor()
+                                cur_fb.execute("DELETE FROM comment_sentiments WHERE comment_id = %s", (comment["comment_id"],))
+                                cur_fb.execute("""
+                                    INSERT INTO comment_sentiments (comment_id, sentiment_label, sentiment_score, analysis_weight, created_at)
+                                    VALUES (%s, %s, %s, %s, NOW())
+                                """, (comment["comment_id"], sentiment_label, sentiment_score, 1.0))
+                                conn_fb.commit()
+                                cur_fb.close()
+                                conn_fb.close()
+                            except Exception as e:
+                                print(f"[SYNC] [{vid}] Warning: Could not save sentiment: {e}")
+                    except Exception as e:
+                        print(f"[SYNC] [{vid}] Fallback collection failed: {e}")
+
+            print("[SYNC] Transcripts will be fetched on-demand when viewing video pages")
             
             print(
                 f"[SYNC] COMPLETE: videos={videos_count}, comments={comments_count}, transcripts={transcripts_count}, "

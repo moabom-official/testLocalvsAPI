@@ -16,6 +16,8 @@ from dataclasses import dataclass
 from datetime import datetime
 import os
 
+_GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+
 try:
     from langchain_groq import ChatGroq
     from langchain_core.prompts import ChatPromptTemplate
@@ -204,7 +206,7 @@ class OptimizedBatchClassifier:
         self.max_concurrent = max_concurrent
         self.cache = ClassificationCache()
 
-        self.model = "llama-3.3-70b-versatile"
+        self.model = _GROQ_MODEL
         self.max_retries = 3
         self.timeout = 30
 
@@ -452,7 +454,7 @@ class AsyncOptimizedBatchClassifier:
         self.prompt_version = prompt_version
         self.cache = ClassificationCache()
         
-        self.model = "llama-3.3-70b-versatile"
+        self.model = _GROQ_MODEL
         self.max_retries = 3
         self.timeout = 30
     

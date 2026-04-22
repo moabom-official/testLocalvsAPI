@@ -14,6 +14,7 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localho
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.1-70b-versatile")
+HF_TOKEN = os.getenv("HF_TOKEN", "")
 
 # Server
 PORT = int(os.getenv("PORT", 8000))
