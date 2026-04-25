@@ -105,11 +105,15 @@ class SentimentAnalysisResult:
         self.negative_aspects = sum(1 for asp in self.aspects if asp.sentiment == SentimentType.NEGATIVE)
 
 
+import os as _os
+_GROQ_MODEL = _os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+
+
 @dataclass
 class AnalyzerConfig:
     """분석기 설정"""
     # 모델 설정
-    model_name: str = "llama-3.3-70b-versatile"
+    model_name: str = _os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
     temperature: float = 0.1
     max_tokens: int = 1000
     

@@ -11,18 +11,22 @@
 import asyncio
 import hashlib
 import json
-import time
 from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass
 from datetime import datetime
 import os
 
+_GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+
 try:
-    from groq import AsyncGroq
-    ASYNC_GROQ_AVAILABLE = True
+    from langchain_groq import ChatGroq
+    from langchain_core.prompts import ChatPromptTemplate
+    from langchain_core.messages import SystemMessage
+    from langchain_core.output_parsers import JsonOutputParser
+    LANGCHAIN_GROQ_AVAILABLE = True
 except ImportError:
-    ASYNC_GROQ_AVAILABLE = False
-    print("Warning: Install groq for async support")
+    LANGCHAIN_GROQ_AVAILABLE = False
+    print("Warning: Install langchain-groq: pip install langchain-groq")
 
 from comment_filtering_agent.classifiers.models import (
     ClassificationResult,
@@ -178,7 +182,8 @@ class OptimizedBatchClassifier:
         api_key: Optional[str] = None,
         batch_size: int = 10,
         confidence_threshold: float = 0.75,
-        prompt_version: str = "compact_v1"
+        prompt_version: str = "compact_v1",
+        max_concurrent: int = 3
     ):
         """
         Args:
@@ -186,25 +191,41 @@ class OptimizedBatchClassifier:
             batch_size: 배치 크기
             confidence_threshold: 재판단 임계값
             prompt_version: 프롬프트 버전
+            max_concurrent: 최대 동시 배치 요청 수
         """
         self.api_key = api_key or os.getenv("GROQ_API_KEY")
         if not self.api_key:
             raise ValueError("GROQ_API_KEY required")
         
-        try:
-            from groq import Groq
-            self.client = Groq(api_key=self.api_key)
-        except ImportError:
-            raise ImportError("Install groq: pip install groq")
-        
+        if not LANGCHAIN_GROQ_AVAILABLE:
+            raise ImportError("Install langchain-groq: pip install langchain-groq")
+
         self.batch_size = batch_size
         self.confidence_threshold = confidence_threshold
         self.prompt_version = prompt_version
+        self.max_concurrent = max_concurrent
         self.cache = ClassificationCache()
-        
-        self.model = "llama-3.3-70b-versatile"
+
+        self.model = _GROQ_MODEL
         self.max_retries = 3
         self.timeout = 30
+
+        # LangChain chain: SystemMessage로 직접 삽입해 COMPACT_SYSTEM_PROMPT 내 {} 이스케이프 불필요
+        llm = ChatGroq(
+            model=self.model,
+            api_key=self.api_key,
+            temperature=0.1,
+            max_tokens=5000,
+            timeout=self.timeout,
+        )
+        self.chain = (
+            ChatPromptTemplate.from_messages([
+                SystemMessage(content=COMPACT_SYSTEM_PROMPT),
+                ("human", "{user_prompt}"),
+            ])
+            | llm
+            | JsonOutputParser()
+        ).with_retry(stop_after_attempt=self.max_retries, wait_exponential_jitter=True)
     
     def classify_batch(
         self,
@@ -234,11 +255,38 @@ class OptimizedBatchClassifier:
             else:
                 uncached_comments.append((comment_id, text))
         
-        # 2. 캐시되지 않은 댓글만 LLM 호출
+        # 2. 캐시되지 않은 댓글만 LLM 호출 (배치 분할 + 병렬)
         llm_results = {}
         if uncached_comments:
-            llm_results = self._classify_batch_llm(uncached_comments)
-            
+            batches: List[List[Tuple[str, str]]] = [
+                uncached_comments[i:i + self.batch_size]
+                for i in range(0, len(uncached_comments), self.batch_size)
+            ]
+
+            batch_inputs = [
+                {"user_prompt": generate_batch_prompt(batch, include_examples=False)}
+                for batch in batches
+            ]
+            batch_outputs = self.chain.batch(
+                batch_inputs,
+                config={"max_concurrency": self.max_concurrent},
+                return_exceptions=True,
+            )
+            for batch, result_or_error in zip(batches, batch_outputs):
+                if isinstance(result_or_error, Exception):
+                    print(f"Warning: Batch classification failed: {result_or_error}")
+                    for cid, _ in batch:
+                        llm_results[cid] = {"label": "CHATTER", "confidence": 0.0, "needs_recheck": True}
+                else:
+                    for item in (result_or_error if isinstance(result_or_error, list) else []):
+                        cid = item.get("id")
+                        if cid:
+                            llm_results[cid] = {
+                                "label": item.get("label", "CHATTER"),
+                                "confidence": float(item.get("confidence", 0.5)),
+                                "needs_recheck": item.get("needs_recheck", False)
+                            }
+
             # 3. 결과를 캐시에 저장
             for cid, text in uncached_comments:
                 if cid in llm_results:
@@ -254,11 +302,19 @@ class OptimizedBatchClassifier:
                 # 재판단 대상
                 text = next(text for id, text in [(f"c{start_index + i}", comments[i]) for i in range(len(comments))] if id == cid)
                 recheck_comments.append((cid, text))
+        print(
+            "[AGENT][CLASSIFIER] Recheck candidates: "
+            f"{len(recheck_comments)}/{len(comments)} "
+            f"(threshold={self.confidence_threshold})"
+        )
         
         # 재판단 수행 (개별 호출, few-shot 포함)
         if recheck_comments:
             recheck_results = self._recheck_comments(recheck_comments)
             all_results.update(recheck_results)
+            print(f"[AGENT][CLASSIFIER] Recheck applied: {len(recheck_results)} comments")
+        else:
+            print("[AGENT][CLASSIFIER] Recheck applied: 0 comments")
         
         # 6. ClassificationResult 객체로 변환
         results = []
@@ -308,67 +364,29 @@ class OptimizedBatchClassifier:
         """
         if not comments:
             return {}
-        
-        # 프롬프트 생성
-        prompt = generate_batch_prompt(comments, include_examples=include_examples)
-        
-        # Retry 로직
-        last_error = None
-        for attempt in range(self.max_retries):
-            try:
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=[
-                        {"role": "system", "content": COMPACT_SYSTEM_PROMPT},
-                        {"role": "user", "content": prompt}
-                    ],
-                    temperature=0.1,
-                    max_tokens=500 * len(comments),
-                    timeout=self.timeout
-                )
-                
-                response_text = response.choices[0].message.content.strip()
-                
-                # JSON 파싱
-                if response_text.startswith("```json"):
-                    response_text = response_text[7:]
-                if response_text.endswith("```"):
-                    response_text = response_text[:-3]
-                response_text = response_text.strip()
-                
-                result_array = json.loads(response_text)
-                
-                # comment_id 기반 매핑
-                results = {}
-                for item in result_array:
-                    cid = item.get("id")
-                    if cid:
-                        results[cid] = {
-                            "label": item.get("label", "CHATTER"),
-                            "confidence": float(item.get("confidence", 0.5)),
-                            "needs_recheck": item.get("needs_recheck", False)
-                        }
-                
-                return results
-                
-            except json.JSONDecodeError as e:
-                last_error = f"JSON 파싱 실패: {e}"
-                if attempt < self.max_retries - 1:
-                    time.sleep(1)
-                continue
-                
-            except Exception as e:
-                last_error = f"LLM 호출 실패: {e}"
-                if attempt < self.max_retries - 1:
-                    time.sleep(2 ** attempt)
-                continue
-        
-        # 실패 시 fallback
-        print(f"Warning: Batch classification failed: {last_error}")
-        return {
-            cid: {"label": "CHATTER", "confidence": 0.0, "needs_recheck": True}
-            for cid, _ in comments
-        }
+
+        user_prompt = generate_batch_prompt(comments, include_examples=include_examples)
+
+        try:
+            result_array = self.chain.invoke({"user_prompt": user_prompt})
+
+            results = {}
+            for item in (result_array if isinstance(result_array, list) else []):
+                cid = item.get("id")
+                if cid:
+                    results[cid] = {
+                        "label": item.get("label", "CHATTER"),
+                        "confidence": float(item.get("confidence", 0.5)),
+                        "needs_recheck": item.get("needs_recheck", False)
+                    }
+            return results
+
+        except Exception as e:
+            print(f"Warning: Batch classification failed: {e}")
+            return {
+                cid: {"label": "CHATTER", "confidence": 0.0, "needs_recheck": True}
+                for cid, _ in comments
+            }
     
     def _recheck_comments(
         self,
@@ -424,21 +442,19 @@ class AsyncOptimizedBatchClassifier:
             confidence_threshold: 재판단 임계값
             prompt_version: 프롬프트 버전
         """
-        if not ASYNC_GROQ_AVAILABLE:
-            raise ImportError("Install groq for async support")
-        
+        if not LANGCHAIN_GROQ_AVAILABLE:
+            raise ImportError("Install langchain-groq: pip install langchain-groq")
+
         self.api_key = api_key or os.getenv("GROQ_API_KEY")
         if not self.api_key:
             raise ValueError("GROQ_API_KEY required")
-        
-        self.client = AsyncGroq(api_key=self.api_key)
         self.batch_size = batch_size
         self.max_concurrent = max_concurrent
         self.confidence_threshold = confidence_threshold
         self.prompt_version = prompt_version
         self.cache = ClassificationCache()
         
-        self.model = "llama-3.3-70b-versatile"
+        self.model = _GROQ_MODEL
         self.max_retries = 3
         self.timeout = 30
     
