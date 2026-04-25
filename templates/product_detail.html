@@ -213,16 +213,25 @@
             const status = document.getElementById('selStatus');
 
             btn.disabled = true;
-            status.textContent = 'YouTube 후보 수집 + 스코어링 + LLM 평가 중... (최대 60초)';
+            // Custom flow의 첫 호출은 후보 미리보기만 — 댓글 분석은 확정 후로 미룬다.
+            const isCustomPreview = (mode === 'custom');
+            status.textContent = isCustomPreview
+                ? 'YouTube 후보 수집 + 스코어링 + LLM 평가 중... (최대 60초)'
+                : 'YouTube 후보 수집 → AI 영상 선정 → 댓글 수집·분석 중... (최대 5분)';
 
             try {
-                // Custom mode: first call with mode=auto (to fetch + score + get candidates), then show preview for selection.
-                // Auto mode: call once with mode=auto.
-                const firstMode = mode === 'custom' ? 'auto' : 'auto';
+                // 두 모드 모두 첫 호출은 mode=auto로 후보를 가져온다.
+                // - Auto:   바로 댓글 파이프라인까지 돌려 보고서 3종을 채운다.
+                // - Custom: 미리보기만 받기 위해 process_comments=false 로 스킵.
                 const response = await fetch('/products/' + PRODUCT_ID + '/select-videos', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ mode: firstMode, k: k, candidate_pool_size: pool }),
+                    body: JSON.stringify({
+                        mode: 'auto',
+                        k: k,
+                        candidate_pool_size: pool,
+                        process_comments: !isCustomPreview,
+                    }),
                 });
                 if (!response.ok) {
                     const err = await response.text();
@@ -341,7 +350,7 @@
             const pool = parseInt(document.getElementById('poolSlider').value, 10);
             const btn = document.getElementById('confirmSelBtn');
             btn.disabled = true;
-            btn.textContent = '확정 중...';
+            btn.textContent = '확정 + 댓글 분석 중... (최대 5분)';
             try {
                 const response = await fetch('/products/' + PRODUCT_ID + '/select-videos', {
                     method: 'POST',
@@ -351,6 +360,7 @@
                         k: k,
                         candidate_pool_size: pool,
                         selected_video_ids: ids,
+                        process_comments: true,
                     }),
                 });
                 if (!response.ok) {

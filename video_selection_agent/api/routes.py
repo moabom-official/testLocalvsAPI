@@ -3,11 +3,14 @@
 POST /products/{product_id}/select-videos
 GET  /products/{product_id}/selection-runs/{run_id}
 
-Phase-1: 목업 응답 (agent는 빈 결과 반환). 기존 /sync는 손대지 않음.
+선정된 영상에 대해 댓글 수집·필터링 파이프라인까지 동기 실행해서 댓글/통합
+보고서가 빈 채로 표시되지 않도록 한다 (Custom UI의 첫 번째 미리보기 호출은
+`process_comments=false`로 스킵 가능).
 """
 from __future__ import annotations
 
-from typing import Any, Literal, Optional
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Any, Iterable, Literal, Optional
 from uuid import UUID
 
 from fastapi import FastAPI, HTTPException
@@ -26,6 +29,46 @@ class SelectVideosRequest(BaseModel):
     candidate_pool_size: int = Field(30, ge=25, le=50)
     selected_video_ids: Optional[list[str]] = None
     weights_override: Optional[dict[str, float]] = None
+    # Custom UI의 미리보기 호출에서는 false로 두어 댓글 파이프라인을 건너뛴다.
+    # 그 외(Auto-only, Custom 확정)에서는 반드시 true 여야 댓글/통합 보고서가 채워짐.
+    process_comments: bool = True
+
+
+def _process_comments_for_videos(product_name: str, video_ids: Iterable[str]) -> None:
+    """선정된 영상들에 대해 댓글 수집·LLM 분류·감정 분석 파이프라인을 병렬 실행."""
+    ids = [vid for vid in video_ids if vid]
+    if not ids:
+        return
+
+    try:
+        from scripts.api.sync import (
+            AGENT_AVAILABLE,
+            PARALLEL_WORKERS,
+            process_comments_with_agent,
+        )
+    except ImportError as exc:
+        print(f"[SELECT] Comment agent module unavailable: {exc}")
+        return
+
+    if not AGENT_AVAILABLE:
+        print("[SELECT] Comment filtering agent not available; skipping comment processing")
+        return
+
+    print(
+        f"[SELECT] Comment processing start: videos={len(ids)}, parallel={PARALLEL_WORKERS}"
+    )
+    with ThreadPoolExecutor(max_workers=PARALLEL_WORKERS) as executor:
+        futures = {
+            executor.submit(process_comments_with_agent, vid, product_name): vid
+            for vid in ids
+        }
+        for future in as_completed(futures):
+            vid = futures[future]
+            try:
+                stats = future.result()
+                print(f"[SELECT] [{vid}] Comments processed: {stats}")
+            except Exception as exc:  # noqa: BLE001 - log and continue per-video
+                print(f"[SELECT] [{vid}] Comment processing failed: {exc}")
 
 
 def _decision_to_response(decision: Any) -> dict:
@@ -125,6 +168,13 @@ def register_selection_routes(app: FastAPI) -> None:
             for c in decision.candidates_preview
         }
         save_selection(decision, all_scores=all_scores, candidate_lookup=candidate_lookup)
+
+        if request.process_comments:
+            _process_comments_for_videos(
+                product_name=context.name,
+                video_ids=[v.video_id for v in decision.selected],
+            )
+
         return _decision_to_response(decision)
 
     @app.get("/products/{product_id}/selection-runs/{run_id}")
