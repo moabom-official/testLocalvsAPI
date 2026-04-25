@@ -199,6 +199,7 @@
     <script>
         const PRODUCT_ID = {{ product.product_id }};
         let lastSelection = null;
+        let lastModalMode = null;
 
         function toggleSelectConfig() {
             document.getElementById('selectConfig').classList.toggle('show');
@@ -295,6 +296,7 @@
         }
 
         function openSelectModal(result, uiMode) {
+            lastModalMode = uiMode;
             document.getElementById('selModalTitle').textContent =
                 uiMode === 'custom' ? 'Custom 모드: 후보에서 직접 선택' : 'Auto 모드: AI 자동 선택 결과';
             document.getElementById('selDiversity').textContent = renderDiversity(result);
@@ -307,16 +309,25 @@
                 candDiv.innerHTML = renderCandidateCheckboxes(result, result.selected.length);
                 confirmBtn.style.display = 'inline-block';
                 confirmBtn.textContent = 'Custom 선택으로 확정';
+                confirmBtn.onclick = confirmSelection;
             } else {
+                // Auto mode: backend already persisted selection; reload to populate videos table.
                 candDiv.style.display = 'none';
                 candDiv.innerHTML = '';
-                confirmBtn.style.display = 'none';
+                confirmBtn.style.display = 'inline-block';
+                confirmBtn.textContent = '✓ 확정 (영상 목록으로 이동)';
+                confirmBtn.onclick = function () { location.reload(); };
             }
             document.getElementById('selectModal').classList.add('show');
         }
 
         function closeSelectModal() {
             document.getElementById('selectModal').classList.remove('show');
+            // Auto mode persists on the server side; ensure user lands on the refreshed
+            // video list regardless of how they dismiss the modal.
+            if (lastModalMode === 'auto' && lastSelection) {
+                location.reload();
+            }
         }
 
         async function confirmSelection() {
