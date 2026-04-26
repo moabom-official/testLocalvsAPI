@@ -17,3 +17,4 @@ langchain-core>=0.3.0
 langchain-groq>=0.2.0,<1.0.0
 groq>=0.4.0
 emoji>=2.0.0
+google-api-python-client>=2.0.0
