@@ -16,17 +16,21 @@ from dataclasses import dataclass
 from datetime import datetime
 import os
 
-_GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+# Azure OpenAI 설정 (.env 에서 로드, scripts.config 와 동일한 환경변수)
+_AZURE_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT", "")
+_AZURE_API_KEY = os.getenv("AZURE_OPENAI_API_KEY", "")
+_AZURE_DEPLOYMENT = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4.1-mini")
+_AZURE_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2025-01-01-preview")
 
 try:
-    from langchain_groq import ChatGroq
+    from langchain_openai import AzureChatOpenAI
     from langchain_core.prompts import ChatPromptTemplate
     from langchain_core.messages import SystemMessage
     from langchain_core.output_parsers import JsonOutputParser
-    LANGCHAIN_GROQ_AVAILABLE = True
+    LANGCHAIN_AZURE_AVAILABLE = True
 except ImportError:
-    LANGCHAIN_GROQ_AVAILABLE = False
-    print("Warning: Install langchain-groq: pip install langchain-groq")
+    LANGCHAIN_AZURE_AVAILABLE = False
+    print("Warning: Install langchain-openai: pip install langchain-openai")
 
 from comment_filtering_agent.classifiers.models import (
     ClassificationResult,
@@ -187,33 +191,37 @@ class OptimizedBatchClassifier:
     ):
         """
         Args:
-            api_key: Groq API 키
+            api_key: 호환을 위해 받아두지만 사용하지 않음 (Azure는 환경변수로 인증)
             batch_size: 배치 크기
             confidence_threshold: 재판단 임계값
             prompt_version: 프롬프트 버전
             max_concurrent: 최대 동시 배치 요청 수
         """
-        self.api_key = api_key or os.getenv("GROQ_API_KEY")
-        if not self.api_key:
-            raise ValueError("GROQ_API_KEY required")
-        
-        if not LANGCHAIN_GROQ_AVAILABLE:
-            raise ImportError("Install langchain-groq: pip install langchain-groq")
+        if not LANGCHAIN_AZURE_AVAILABLE:
+            raise ImportError("Install langchain-openai: pip install langchain-openai")
+        if not _AZURE_ENDPOINT or not _AZURE_API_KEY:
+            raise ValueError(
+                "Azure OpenAI 가 구성되지 않았습니다. "
+                "AZURE_OPENAI_ENDPOINT / AZURE_OPENAI_API_KEY 환경변수를 확인하세요."
+            )
 
+        self.api_key = _AZURE_API_KEY
         self.batch_size = batch_size
         self.confidence_threshold = confidence_threshold
         self.prompt_version = prompt_version
         self.max_concurrent = max_concurrent
         self.cache = ClassificationCache()
 
-        self.model = _GROQ_MODEL
+        self.model = _AZURE_DEPLOYMENT
         self.max_retries = 3
         self.timeout = 30
 
         # LangChain chain: SystemMessage로 직접 삽입해 COMPACT_SYSTEM_PROMPT 내 {} 이스케이프 불필요
-        llm = ChatGroq(
-            model=self.model,
-            api_key=self.api_key,
+        llm = AzureChatOpenAI(
+            azure_endpoint=_AZURE_ENDPOINT,
+            api_key=_AZURE_API_KEY,
+            api_version=_AZURE_API_VERSION,
+            azure_deployment=_AZURE_DEPLOYMENT,
             temperature=0.1,
             max_tokens=5000,
             timeout=self.timeout,
@@ -338,7 +346,7 @@ class OptimizedBatchClassifier:
                 classifier_type="optimized_batch",
                 model_name=self.model,
                 prompt_version=self.prompt_version,
-                llm_provider="groq",
+                llm_provider="azure_openai",
                 latency_ms=0,
                 raw_response=result_dict,
                 classified_at=datetime.now()
@@ -436,25 +444,25 @@ class AsyncOptimizedBatchClassifier:
     ):
         """
         Args:
-            api_key: Groq API 키
+            api_key: 호환용 (Azure는 환경변수 사용)
             batch_size: 배치 크기
             max_concurrent: 최대 동시 요청 수
             confidence_threshold: 재판단 임계값
             prompt_version: 프롬프트 버전
         """
-        if not LANGCHAIN_GROQ_AVAILABLE:
-            raise ImportError("Install langchain-groq: pip install langchain-groq")
+        if not LANGCHAIN_AZURE_AVAILABLE:
+            raise ImportError("Install langchain-openai: pip install langchain-openai")
+        if not _AZURE_ENDPOINT or not _AZURE_API_KEY:
+            raise ValueError("Azure OpenAI not configured")
 
-        self.api_key = api_key or os.getenv("GROQ_API_KEY")
-        if not self.api_key:
-            raise ValueError("GROQ_API_KEY required")
+        self.api_key = _AZURE_API_KEY
         self.batch_size = batch_size
         self.max_concurrent = max_concurrent
         self.confidence_threshold = confidence_threshold
         self.prompt_version = prompt_version
         self.cache = ClassificationCache()
-        
-        self.model = _GROQ_MODEL
+
+        self.model = _AZURE_DEPLOYMENT
         self.max_retries = 3
         self.timeout = 30
     

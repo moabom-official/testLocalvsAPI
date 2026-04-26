@@ -7,7 +7,7 @@ from scripts.database.queries import query_one, query_all, execute_update, execu
 from scripts.database.connection import get_connection
 from scripts.youtube.video_service import fetch_product_videos
 from scripts.youtube.comment_service import fetch_video_comments  # Fallback용 항상 import
-from scripts.config import YOUTUBE_API_KEY, GROQ_API_KEY, GROQ_MODEL, DATABASE_URL  # 항상 import
+from scripts.config import YOUTUBE_API_KEY, DATABASE_URL, AZURE_OPENAI_API_KEY  # 항상 import
 from scripts.analysis.confidence_weights import (
     get_analysis_weight,
     LOW_CONFIDENCE_WARNING_THRESHOLD,
@@ -335,33 +335,30 @@ def process_comments_with_agent(video_id, product_name):
     if not AGENT_AVAILABLE:
         raise Exception("Comment filtering agent is not available")
     
-    if not GROQ_API_KEY or not YOUTUBE_API_KEY:
-        raise Exception("Missing API keys (YOUTUBE_API_KEY or GROQ_API_KEY)")
-    
+    if not AZURE_OPENAI_API_KEY or not YOUTUBE_API_KEY:
+        raise Exception("Missing API keys (YOUTUBE_API_KEY or AZURE_OPENAI_API_KEY)")
+
     print(f"[AGENT] Starting comment processing for video: {video_id}")
     batch_id = str(uuid.uuid4())
-    
-    # Initialize components
+
+    # Initialize components — 분류기/분석기는 환경변수에서 Azure 설정을 직접 읽는다.
     collector = YouTubeCommentCollector(api_key=YOUTUBE_API_KEY)
     rule_filter = RuleBasedFilter(config=RuleConfig(
         enable_url_check=False,        # URL 포함 댓글도 LLM 판단에 맡김
         enable_duplicate_check=False,  # Spark에서 이미 exact dedup 처리
         max_repeated_char_ratio=0.7,   # ㅋㅋㅋ 혼합 댓글도 통과 (0.5 → 0.7)
     ))
-    
-    # Optimized batch classifier + analyzer config
+
     from comment_filtering_agent.analyzers.models import AnalyzerConfig
     classifier = OptimizedBatchClassifier(
-        api_key=GROQ_API_KEY,
         batch_size=CLASSIFICATION_BATCH_SIZE,
-        confidence_threshold=0.75
+        confidence_threshold=0.75,
     )
-    
+
     agent = AgentDecisionEngine()
-    
+
     analyzer_config = AnalyzerConfig()
-    analyzer_config.model_name = GROQ_MODEL
-    sentiment_analyzer = GroqAspectSentimentAnalyzer(api_key=GROQ_API_KEY, config=analyzer_config)
+    sentiment_analyzer = GroqAspectSentimentAnalyzer(config=analyzer_config)
     
     stats = {
         "collected": 0,

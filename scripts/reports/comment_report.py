@@ -1,11 +1,16 @@
 """
-Comment sentiment report generation service
+Comment sentiment report generation service (Azure OpenAI / GPT-4.1-mini)
 """
 from typing import Optional
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from scripts.config import GROQ_API_KEY, GROQ_MODEL, DATABASE_URL
-from scripts.reports.transcript_report import fix_encoding, _extract_validated_report
+from scripts.config import DATABASE_URL
+from scripts.reports.transcript_report import (
+    fix_encoding,
+    _extract_validated_report,
+    get_report_llm_client,
+    REPORT_LLM_DEPLOYMENT,
+)
 
 
 def _compute_weighted_sentiment_metrics(comments):
@@ -51,12 +56,6 @@ def _compute_weighted_sentiment_metrics(comments):
         "low_confidence_ratio": low_conf_ratio,
     }
 
-try:
-    from openai import OpenAI
-except ImportError:
-    OpenAI = None
-
-
 def build_comment_sentiment_report(video_id: str, product_name: str = "제품") -> Optional[str]:
     """
     Build comment sentiment analysis report using cached sentiment data.
@@ -91,8 +90,10 @@ def build_comment_sentiment_report(video_id: str, product_name: str = "제품") 
         
         total = len(comments)
         
-        if OpenAI is None or not GROQ_API_KEY:
-            error_msg = "[ERROR] Comment report generation failed: Groq Llama not configured."
+        try:
+            client = get_report_llm_client()
+        except ValueError as e:
+            error_msg = f"[ERROR] Comment report generation failed: {e}"
             print(error_msg)
             return error_msg
 
@@ -139,11 +140,6 @@ def build_comment_sentiment_report(video_id: str, product_name: str = "제품") 
 한국어로 전문적이고 객관적인 톤으로 분석해주세요.
 본문은 1000자 이내로 작성하고, 마지막 줄에 반드시 [END]만 단독 출력하세요.
 """
-        
-        client = OpenAI(
-            api_key=GROQ_API_KEY,
-            base_url="https://api.groq.com/openai/v1"
-        )
 
         max_attempts = 3
         for attempt in range(max_attempts):
@@ -153,7 +149,7 @@ def build_comment_sentiment_report(video_id: str, product_name: str = "제품") 
             )
             prompt = llama_prompt if attempt == 0 else (llama_prompt + retry_prompt)
             response = client.chat.completions.create(
-                model=GROQ_MODEL,
+                model=REPORT_LLM_DEPLOYMENT,
                 max_tokens=800,
                 messages=[{"role": "user", "content": prompt}]
             )

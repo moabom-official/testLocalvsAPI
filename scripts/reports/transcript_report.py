@@ -1,17 +1,25 @@
 """
-자막 기반 제품 핵심 인사이트 보고서 생성
+자막 기반 제품 핵심 인사이트 보고서 생성 (Azure OpenAI / GPT-4.1-mini)
 
 - 중앙화 프롬프트(`scripts.utils.prompt_manager.build_transcript_report_prompt`) 사용
 - `[END]` 마커 + 본문 길이 검증 후 최대 3회 재시도
 - 자막이 매우 길 경우(150,000자 초과) 청킹 후 청크별 중간 요약 → 최종 보고서로 합성
+- get_report_llm_client / REPORT_LLM_DEPLOYMENT: comment_report.py /
+  integrated_report.py 가 동일 클라이언트를 재사용하도록 export
 """
 import re
-from scripts.config import GROQ_API_KEY, GROQ_MODEL
+from openai import AzureOpenAI
+
+from scripts.config import (
+    AZURE_OPENAI_API_KEY,
+    AZURE_OPENAI_API_VERSION,
+    AZURE_OPENAI_DEPLOYMENT,
+    AZURE_OPENAI_ENDPOINT,
+)
 from scripts.utils.prompt_manager import build_transcript_report_prompt
-from openai import OpenAI
 
 # ── 청킹 기준 ──────────────────────────────────────────────────
-# llama-3.3-70b-versatile 128K 컨텍스트 기준
+# GPT-4.1-mini 128K 컨텍스트 기준
 CHUNK_THRESHOLD = 150_000
 CHUNK_SIZE = 100_000
 CHUNK_OVERLAP = 3_000
@@ -22,20 +30,32 @@ INITIAL_CHAR_LIMIT = 1000
 CHAR_LIMIT_DECREMENT = 100
 VALIDATION_MAX_CHARS = 1500
 
+# 보고서가 사용하는 Azure 배포 이름 (모듈 표면에 export)
+REPORT_LLM_DEPLOYMENT = AZURE_OPENAI_DEPLOYMENT
+
 # ── LLM 클라이언트 ──────────────────────────────────────────────
 _client = None
 
 
-def _get_client() -> OpenAI:
+def get_report_llm_client() -> AzureOpenAI:
+    """보고서 3종이 공유하는 Azure OpenAI lazy 싱글턴."""
     global _client
     if _client is None:
-        if not GROQ_API_KEY:
-            raise ValueError("GROQ_API_KEY 환경변수가 설정되지 않았습니다.")
-        _client = OpenAI(
-            api_key=GROQ_API_KEY,
-            base_url="https://api.groq.com/openai/v1",
+        if not AZURE_OPENAI_ENDPOINT or not AZURE_OPENAI_API_KEY:
+            raise ValueError(
+                "Azure OpenAI 가 구성되지 않았습니다. "
+                "AZURE_OPENAI_ENDPOINT / AZURE_OPENAI_API_KEY 를 확인하세요."
+            )
+        _client = AzureOpenAI(
+            azure_endpoint=AZURE_OPENAI_ENDPOINT,
+            api_key=AZURE_OPENAI_API_KEY,
+            api_version=AZURE_OPENAI_API_VERSION,
         )
     return _client
+
+
+def _get_client() -> AzureOpenAI:  # 내부 호환 alias
+    return get_report_llm_client()
 
 
 # ── 검증 / 인코딩 보정 ─────────────────────────────────────────
@@ -93,7 +113,7 @@ def _call_llm_validated(prompt: str) -> str:
             full_prompt = prompt + retry_instruction
 
         response = client.chat.completions.create(
-            model=GROQ_MODEL,
+            model=REPORT_LLM_DEPLOYMENT,
             max_tokens=2000,
             messages=[{"role": "user", "content": full_prompt}],
         )
@@ -125,8 +145,8 @@ def build_transcript_report(transcript_text: str) -> str:
     if not normalized:
         return "No transcript content available."
 
-    if not GROQ_API_KEY:
-        error_msg = "[ERROR] Transcript report generation failed: GROQ_API_KEY not configured."
+    if not AZURE_OPENAI_API_KEY:
+        error_msg = "[ERROR] Transcript report generation failed: AZURE_OPENAI_API_KEY not configured."
         print(error_msg)
         return error_msg
 
