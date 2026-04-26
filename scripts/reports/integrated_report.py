@@ -1,33 +1,34 @@
 """
-Integrated analysis report generation service
+Integrated analysis report generation service (Azure OpenAI / GPT-4.1-mini)
 Compares reviewer (transcript) vs consumer (comments) opinions
 """
 from typing import Optional
-from scripts.config import GROQ_API_KEY, GROQ_MODEL
-from scripts.reports.transcript_report import fix_encoding, _extract_validated_report
-
-try:
-    from openai import OpenAI
-except ImportError:
-    OpenAI = None
+from scripts.reports.transcript_report import (
+    fix_encoding,
+    _extract_validated_report,
+    get_report_llm_client,
+    REPORT_LLM_DEPLOYMENT,
+)
 
 
 def build_integrated_analysis_report(video_id: str, product_name: str, transcript_report: str, comment_sentiment_report: str) -> Optional[str]:
     """
     통합 분석: 리뷰어(자막) + 사람들의 반응(댓글) 비교
-    Llama를 사용해 의견 유사도 계산
+    Azure OpenAI (GPT-4.1-mini) 로 의견 유사도 계산
     """
     if not transcript_report or not comment_sentiment_report:
         print(f"[DEBUG] build_integrated_analysis_report: Missing reports - transcript: {bool(transcript_report)}, comment: {bool(comment_sentiment_report)}")
         return None
-    
-    if OpenAI is None or not GROQ_API_KEY:
-        error_msg = "[ERROR] Integrated analysis generation failed: Groq Llama not configured."
+
+    try:
+        client = get_report_llm_client()
+    except ValueError as e:
+        error_msg = f"[ERROR] Integrated analysis generation failed: {e}"
         print(error_msg)
         return error_msg
 
     try:
-        print(f"[DEBUG] build_integrated_analysis_report: Starting Llama call for {product_name}")
+        print(f"[DEBUG] build_integrated_analysis_report: Starting Azure OpenAI call for {product_name}")
         integration_prompt = f"""
 당신은 시장 분석 전문가입니다. 다음 두 분석을 비교하여 통합 보고서를 작성해주세요.
 
@@ -76,13 +77,8 @@ def build_integrated_analysis_report(video_id: str, product_name: str, transcrip
 
 보고서를 작성해주세요.
 """
-            
-        client = OpenAI(
-            api_key=GROQ_API_KEY,
-            base_url="https://api.groq.com/openai/v1"
-        )
 
-        print(f"[DEBUG] Sending request to Groq...")
+        print(f"[DEBUG] Sending request to Azure OpenAI ({REPORT_LLM_DEPLOYMENT})...")
         max_attempts = 3
         for attempt in range(max_attempts):
             retry_prompt = (
@@ -91,7 +87,7 @@ def build_integrated_analysis_report(video_id: str, product_name: str, transcrip
             )
             prompt = integration_prompt if attempt == 0 else (integration_prompt + retry_prompt)
             response = client.chat.completions.create(
-                model=GROQ_MODEL,
+                model=REPORT_LLM_DEPLOYMENT,
                 max_tokens=1200,
                 messages=[{"role": "user", "content": prompt}]
             )
@@ -100,7 +96,7 @@ def build_integrated_analysis_report(video_id: str, product_name: str, transcrip
                 validated = _extract_validated_report(llm_report or "")
                 if validated:
                     fixed_report = fix_encoding(validated)
-                    print(f"[DEBUG] Received response from Groq, length: {len(llm_report)}")
+                    print(f"[DEBUG] Received response from Azure, length: {len(llm_report)}")
                     header = f"[{product_name} 리뷰어-댓글 통합 분석 보고서]\n\n"
                     return header + fixed_report
             print(

@@ -1,36 +1,59 @@
 """
-자막 기반 제품 핵심 인사이트 보고서 생성
+자막 기반 제품 핵심 인사이트 보고서 생성 (Azure OpenAI / GPT-4.1-mini)
 
 - Few-shot 2개 (수치 풍부 / 수치 부족 케이스) 기반 프롬프트
 - 128K 컨텍스트 활용: 150,000자 초과 시에만 청킹
 - fix_encoding: integrated_report.py / comment_report.py 에서 import
 - _extract_validated_report: comment_report.py / integrated_report.py 가 자체적으로
   [END] 마커 검증을 위해 import — 이 모듈에서는 사용하지 않지만 호환을 위해 유지
+- get_report_llm_client: comment_report.py / integrated_report.py 가 동일한 Azure
+  클라이언트를 재사용하도록 export
 """
-from scripts.config import GROQ_API_KEY, GROQ_MODEL
-from openai import OpenAI
+from openai import AzureOpenAI
+
+from scripts.config import (
+    AZURE_OPENAI_API_KEY,
+    AZURE_OPENAI_API_VERSION,
+    AZURE_OPENAI_DEPLOYMENT,
+    AZURE_OPENAI_ENDPOINT,
+)
 
 # ── 청킹 기준 ──────────────────────────────────────────────────
-# llama-3.3-70b-versatile 128K 컨텍스트 기준
+# GPT-4.1-mini 128K 컨텍스트 기준
 # 시스템 프롬프트 + few-shot 예시 공간 확보를 위해 150,000자 기준
 CHUNK_THRESHOLD = 150_000
 CHUNK_SIZE = 100_000
 CHUNK_OVERLAP = 3_000
 
+# ── 보고서 생성에 사용하는 Azure 배포 이름 (모듈 표면에 export) ──
+REPORT_LLM_DEPLOYMENT = AZURE_OPENAI_DEPLOYMENT
+
 # ── LLM 클라이언트 ──────────────────────────────────────────────
 _client = None
 
 
-def _get_client() -> OpenAI:
+def get_report_llm_client() -> AzureOpenAI:
+    """보고서 3종(transcript/comment/integrated) 가 공유하는 Azure OpenAI 클라이언트.
+
+    Lazy 싱글턴: 첫 호출 시 환경변수를 검증하고 인스턴스를 만든다.
+    """
     global _client
     if _client is None:
-        if not GROQ_API_KEY:
-            raise ValueError("GROQ_API_KEY 환경변수가 설정되지 않았습니다.")
-        _client = OpenAI(
-            api_key=GROQ_API_KEY,
-            base_url="https://api.groq.com/openai/v1",
+        if not AZURE_OPENAI_ENDPOINT or not AZURE_OPENAI_API_KEY:
+            raise ValueError(
+                "Azure OpenAI 가 구성되지 않았습니다. .env 의 "
+                "AZURE_OPENAI_ENDPOINT / AZURE_OPENAI_API_KEY 를 확인하세요."
+            )
+        _client = AzureOpenAI(
+            azure_endpoint=AZURE_OPENAI_ENDPOINT,
+            api_key=AZURE_OPENAI_API_KEY,
+            api_version=AZURE_OPENAI_API_VERSION,
         )
     return _client
+
+
+def _get_client() -> AzureOpenAI:  # 내부 호환 alias
+    return get_report_llm_client()
 
 
 # ── 프롬프트 ────────────────────────────────────────────────────
@@ -242,14 +265,14 @@ def _split_chunks(text: str) -> list:
 
 
 def _call_llm(prompt: str, system_prompt: str = "", temperature: float = 0.3) -> str:
-    client = _get_client()
+    client = get_report_llm_client()
     messages = []
     if system_prompt:
         messages.append({"role": "system", "content": system_prompt})
     messages.append({"role": "user", "content": prompt})
 
     response = client.chat.completions.create(
-        model=GROQ_MODEL,
+        model=REPORT_LLM_DEPLOYMENT,
         messages=messages,
         temperature=temperature,
         max_tokens=4096,
