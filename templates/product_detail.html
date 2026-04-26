@@ -129,6 +129,7 @@
 
         .video-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
         .video-card {
+            position: relative;
             background: var(--surface);
             border: 1px solid var(--border);
             border-radius: 14px;
@@ -259,6 +260,84 @@
             .modal { padding: 22px; border-radius: 14px; }
             .select-btn, .btn-primary { width: 100%; }
         }
+
+        /* ── Selection progress overlay (Target #1) ────────── */
+        .sel-overlay {
+            position: fixed; inset: 0; z-index: 1000;
+            background: rgba(31, 28, 46, 0.55); backdrop-filter: blur(4px);
+            display: none; align-items: center; justify-content: center;
+        }
+        .sel-overlay.show { display: flex; }
+        .sel-overlay-card {
+            background: var(--surface); border-radius: 16px; padding: 32px 36px;
+            box-shadow: var(--shadow-strong); min-width: 420px; max-width: 520px;
+            text-align: center;
+        }
+        .sel-overlay-card h3 { margin: 0 0 8px; font-size: 18px; font-weight: 700; }
+        .sel-overlay-card .sub { color: var(--muted); font-size: 14px; margin-bottom: 20px; }
+        .sel-spinner {
+            width: 28px; height: 28px; border: 3px solid var(--border);
+            border-top-color: var(--primary); border-radius: 50%;
+            animation: sel-spin 0.8s linear infinite; margin: 0 auto 20px;
+        }
+        @keyframes sel-spin { to { transform: rotate(360deg); } }
+        .sel-step {
+            display: flex; align-items: center; gap: 12px; padding: 10px 0;
+            font-size: 14px; color: var(--muted); text-align: left;
+        }
+        .sel-step .icon {
+            width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
+            display: inline-flex; align-items: center; justify-content: center;
+            background: var(--border-soft); color: var(--muted); font-size: 12px;
+            font-weight: 600; transition: all 0.25s ease;
+        }
+        .sel-step.active { color: var(--text); font-weight: 600; }
+        .sel-step.active .icon { background: var(--primary); color: white; }
+        .sel-step.done { color: var(--text); }
+        .sel-step.done .icon { background: #4ade80; color: white; }
+        .sel-step .icon-spin {
+            width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.4);
+            border-top-color: white; border-radius: 50%;
+            animation: sel-spin 0.7s linear infinite;
+        }
+        @media (max-width: 520px) {
+            .sel-overlay-card { min-width: 0; width: calc(100vw - 32px); padding: 24px; }
+        }
+
+        /* ── Per-card inline progress bar + badge ──────────── */
+        .video-card .vc-progress {
+            position: absolute; top: 0; left: 0; right: 0; height: 3px;
+            overflow: hidden; pointer-events: none;
+            opacity: 0; transition: opacity 0.15s;
+            z-index: 3; border-top-left-radius: 14px; border-top-right-radius: 14px;
+        }
+        .video-card.loading .vc-progress { opacity: 1; }
+        .video-card .vc-progress::after {
+            content: ''; position: absolute; left: -40%; width: 40%; height: 100%;
+            background: linear-gradient(90deg, transparent, var(--primary), var(--accent), transparent);
+            animation: top-slide 1.1s ease-in-out infinite;
+        }
+        @keyframes top-slide {
+            0% { left: -40%; }
+            100% { left: 100%; }
+        }
+
+        .video-card .vc-badge {
+            position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+            background: rgba(31, 28, 46, 0.88); color: white;
+            padding: 8px 14px; border-radius: 999px;
+            font-size: 12px; font-weight: 600; white-space: nowrap;
+            display: inline-flex; align-items: center; gap: 8px;
+            opacity: 0; transition: opacity 0.2s;
+            z-index: 3; pointer-events: none;
+            box-shadow: 0 4px 12px rgba(31, 28, 46, 0.3);
+        }
+        .video-card.loading .vc-badge { opacity: 1; }
+        .video-card .vc-badge .vc-dot {
+            width: 8px; height: 8px; border-radius: 50%; background: white;
+            animation: vc-pulse 1.2s ease-in-out infinite;
+        }
+        @keyframes vc-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
     </style>
 </head>
 <body>
@@ -337,6 +416,18 @@
         </section>
     </div>
 
+    <!-- AI selection progress overlay -->
+    <div id="selOverlay" class="sel-overlay" aria-hidden="true">
+        <div class="sel-overlay-card">
+            <div class="sel-spinner"></div>
+            <h3 id="selOverlayTitle">AI 영상 선택 진행 중</h3>
+            <div class="sub" id="selOverlaySub">최대 5분 정도 소요됩니다. 창을 닫지 마세요.</div>
+            <div class="sel-step" data-step="1"><span class="icon">1</span><span>YouTube 후보 영상 수집</span></div>
+            <div class="sel-step" data-step="2"><span class="icon">2</span><span>AI 영상 선정 + 다양성 평가</span></div>
+            <div class="sel-step" data-step="3"><span class="icon">3</span><span>댓글 수집 및 감성 분석</span></div>
+        </div>
+    </div>
+
     <!-- Selection result modal -->
     <div id="selectModal" class="modal-backdrop" onclick="if(event.target===this) closeSelectModal()">
         <div class="modal">
@@ -373,6 +464,53 @@
             document.getElementById('selectConfig').classList.toggle('show');
         }
 
+        // ── Selection progress overlay helpers ─────────────
+        let selStepTimers = [];
+        function showSelOverlay(steps, estimatedMs, title, sub) {
+            const overlay = document.getElementById('selOverlay');
+            if (title) document.getElementById('selOverlayTitle').textContent = title;
+            if (sub) document.getElementById('selOverlaySub').textContent = sub;
+
+            const stepEls = overlay.querySelectorAll('.sel-step');
+            stepEls.forEach(s => {
+                s.classList.remove('active', 'done');
+                s.querySelector('.icon').textContent = s.dataset.step;
+                s.style.display = (parseInt(s.dataset.step, 10) <= steps) ? 'flex' : 'none';
+            });
+            overlay.classList.add('show');
+
+            activateStep(stepEls[0]);
+            const stepDuration = estimatedMs / steps;
+            selStepTimers.forEach(clearTimeout);
+            selStepTimers = [];
+            for (let i = 1; i < steps; i++) {
+                selStepTimers.push(setTimeout(() => {
+                    completeStep(stepEls[i - 1]);
+                    activateStep(stepEls[i]);
+                }, stepDuration * i));
+            }
+        }
+        function activateStep(el) {
+            if (!el) return;
+            el.classList.add('active');
+            el.querySelector('.icon').innerHTML = '<span class="icon-spin"></span>';
+        }
+        function completeStep(el) {
+            if (!el) return;
+            el.classList.remove('active');
+            el.classList.add('done');
+            el.querySelector('.icon').textContent = '✓';
+        }
+        function hideSelOverlay() {
+            selStepTimers.forEach(clearTimeout);
+            selStepTimers = [];
+            const overlay = document.getElementById('selOverlay');
+            overlay.querySelectorAll('.sel-step').forEach(s => {
+                if (s.style.display !== 'none') completeStep(s);
+            });
+            setTimeout(() => overlay.classList.remove('show'), 600);
+        }
+
         async function runSelection() {
             const mode = document.querySelector('input[name="selMode"]:checked').value;
             const k = parseInt(document.getElementById('kSlider').value, 10);
@@ -385,6 +523,12 @@
             status.textContent = isCustomPreview
                 ? 'YouTube 후보 수집 + 스코어링 + LLM 평가 중... (최대 60초)'
                 : 'YouTube 후보 수집 → AI 영상 선정 → 댓글 수집·분석 중... (최대 5분)';
+
+            if (isCustomPreview) {
+                showSelOverlay(2, 60_000, 'AI 영상 후보 평가 중', '최대 1분 정도 소요됩니다. 창을 닫지 마세요.');
+            } else {
+                showSelOverlay(3, 240_000, 'AI 영상 선택 진행 중', '최대 5분 정도 소요됩니다. 창을 닫지 마세요.');
+            }
 
             try {
                 const response = await fetch('/products/' + PRODUCT_ID + '/select-videos', {
@@ -410,6 +554,7 @@
                 status.textContent = '에러: ' + error;
             } finally {
                 btn.disabled = false;
+                hideSelOverlay();
             }
         }
 
@@ -512,6 +657,7 @@
             const btn = document.getElementById('confirmSelBtn');
             btn.disabled = true;
             btn.textContent = '확정 + 댓글 분석 중... (최대 5분)';
+            showSelOverlay(3, 240_000, 'Custom 선택 확정 진행 중', '댓글 수집·분석까지 최대 5분 소요됩니다.');
             try {
                 const response = await fetch('/products/' + PRODUCT_ID + '/select-videos', {
                     method: 'POST',
@@ -537,6 +683,7 @@
             } finally {
                 btn.disabled = false;
                 btn.textContent = 'Custom 선택으로 확정';
+                hideSelOverlay();
             }
         }
 
@@ -596,6 +743,32 @@
                 '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
             })[c]);
         }
+
+        // ── Video card click → inline progress bar + badge on the clicked card
+        document.querySelectorAll('.video-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+                e.preventDefault();
+                const href = card.getAttribute('href');
+
+                if (!card.querySelector('.vc-progress')) {
+                    const bar = document.createElement('div');
+                    bar.className = 'vc-progress';
+                    const badge = document.createElement('div');
+                    badge.className = 'vc-badge';
+                    badge.innerHTML = '<span class="vc-dot"></span>영상 분석 결과 불러오는 중…';
+                    card.appendChild(bar);
+                    card.appendChild(badge);
+                }
+                card.classList.add('loading');
+
+                document.querySelectorAll('.video-card').forEach(c => {
+                    if (c !== card) c.style.pointerEvents = 'none';
+                });
+
+                setTimeout(() => { window.location.href = href; }, 50);
+            });
+        });
     </script>
 </body>
 </html>
