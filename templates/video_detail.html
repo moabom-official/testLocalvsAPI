@@ -217,12 +217,391 @@
             border-radius: 14px; padding: 24px; color: var(--muted); font-size: 14px;
         }
 
+        /* ── Transcript report visualizations (.tr-*) ─────────────── */
+        .tr-hero {
+            display: grid;
+            grid-template-columns: 1fr 280px;
+            gap: 18px;
+            margin: 4px 0 22px;
+            padding: 20px 22px;
+            background: linear-gradient(135deg, #f8f4ff 0%, #fff5f8 100%);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            box-shadow: var(--shadow);
+        }
+        .tr-hero-main { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+        .tr-mood-headline {
+            display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+        }
+        .tr-mood-label-strong {
+            font-size: 22px; font-weight: 800; letter-spacing: -0.02em;
+        }
+        .tr-mood-pct {
+            font-size: 14px; font-weight: 600; color: var(--muted);
+        }
+        .tr-mood-bar-wrap { position: relative; padding: 10px 0 4px; }
+        .tr-mood-bar {
+            position: relative;
+            height: 14px; border-radius: 999px;
+            background: linear-gradient(90deg,
+                #e35d6a 0%, #ff9b4a 25%, #f5d34a 50%, #94d860 75%, #20c997 100%);
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.08);
+        }
+        .tr-mood-marker {
+            position: absolute; top: 50%;
+            width: 22px; height: 22px;
+            background: #ffffff;
+            border: 3px solid var(--text);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.18);
+            transition: left 0.4s ease;
+        }
+        .tr-mood-scale {
+            display: flex; justify-content: space-between;
+            font-size: 11px; color: var(--muted); margin-top: 6px;
+            font-weight: 500;
+        }
+        .tr-verdict {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--primary);
+            border-radius: 10px;
+            padding: 12px 14px;
+            font-size: 14px; line-height: 1.55;
+            color: var(--text);
+        }
+        .tr-verdict-label {
+            color: var(--primary-strong); font-weight: 700; margin-right: 6px;
+        }
+        .tr-reliability-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px 16px;
+            display: flex; flex-direction: column; gap: 6px;
+        }
+        .tr-reliability-title { font-size: 12px; color: var(--muted); font-weight: 600; }
+        .tr-reliability-pct-row {
+            display: flex; align-items: baseline; gap: 6px;
+        }
+        .tr-reliability-pct {
+            font-size: 26px; font-weight: 800; letter-spacing: -0.02em;
+            background: linear-gradient(135deg, var(--primary), var(--primary-strong));
+            -webkit-background-clip: text; background-clip: text; color: transparent;
+        }
+        .tr-reliability-badge {
+            display: inline-block; padding: 2px 8px; border-radius: 999px;
+            font-size: 11px; font-weight: 700;
+        }
+        .tr-reliability-badge.good { background: var(--positive-soft); color: #0d6e4f; }
+        .tr-reliability-badge.mid { background: var(--neutral-soft); color: #8a5a00; }
+        .tr-reliability-badge.low { background: #eee; color: #555; }
+        .tr-reliability-list {
+            list-style: none; margin: 4px 0 0; padding: 0;
+            display: flex; flex-direction: column; gap: 4px;
+            font-size: 12.5px;
+        }
+        .tr-reliability-list li {
+            display: flex; align-items: center; gap: 6px;
+            color: var(--text);
+        }
+        .tr-reliability-list li.miss { color: var(--muted); text-decoration: line-through; opacity: 0.7; }
+
+        /* ── #2 Balance diagram ────────────────────── */
+        .tr-balance {
+            margin: 6px 0 18px;
+            padding: 16px 18px;
+            background: var(--surface-soft);
+            border: 1px solid var(--border-soft);
+            border-radius: 12px;
+        }
+        .tr-balance-title {
+            font-size: 13px; font-weight: 700; color: var(--muted);
+            margin-bottom: 10px; letter-spacing: 0.02em;
+        }
+        .tr-balance-row {
+            display: grid;
+            grid-template-columns: 56px 1fr 60px;
+            align-items: center;
+            gap: 10px;
+            margin: 6px 0;
+        }
+        .tr-balance-label {
+            font-size: 13px; font-weight: 700;
+        }
+        .tr-balance-label.pos { color: #0d6e4f; }
+        .tr-balance-label.neg { color: #b3303c; }
+        .tr-balance-track {
+            height: 26px; background: var(--border-soft);
+            border-radius: 999px; position: relative; overflow: hidden;
+        }
+        .tr-balance-fill {
+            height: 100%; border-radius: 999px;
+            display: flex; align-items: center;
+            padding: 0 8px;
+            gap: 4px;
+            font-size: 13px;
+            transition: width 0.5s ease;
+        }
+        .tr-balance-fill.pos {
+            background: linear-gradient(90deg, #20c997, #2db98c);
+            color: #fff;
+        }
+        .tr-balance-fill.neg {
+            background: linear-gradient(90deg, #e35d6a, #d04a57);
+            color: #fff;
+        }
+        .tr-balance-icons { display: inline-flex; gap: 2px; }
+        .tr-balance-score {
+            font-size: 13px; font-weight: 700; text-align: right;
+        }
+        .tr-balance-score.pos { color: #0d6e4f; }
+        .tr-balance-score.neg { color: #b3303c; }
+
+        /* ── #3 Category heatmap ─────────────────── */
+        .tr-heatmap {
+            margin: 8px 0 18px;
+        }
+        .tr-heatmap-title {
+            font-size: 13px; font-weight: 700; color: var(--muted);
+            margin-bottom: 10px; letter-spacing: 0.02em;
+        }
+        .tr-heatmap-grid {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 8px;
+        }
+        .tr-heatmap-cell {
+            position: relative;
+            aspect-ratio: 1 / 1;
+            min-height: 70px;
+            border-radius: 10px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 4px;
+            cursor: default;
+            transition: transform 0.12s ease, box-shadow 0.15s ease;
+            border: 1px solid transparent;
+        }
+        .tr-heatmap-cell:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            z-index: 2;
+        }
+        .tr-heatmap-cell .icon { font-size: 22px; line-height: 1; }
+        .tr-heatmap-cell .label { font-size: 11px; font-weight: 600; }
+        .tr-heatmap-cell.s-strong-pos {
+            background: #0d6e4f; color: #fff;
+        }
+        .tr-heatmap-cell.s-pos {
+            background: #c5f0de; color: #0d6e4f;
+        }
+        .tr-heatmap-cell.s-none {
+            background: #f0eef5; color: #9d99b3;
+        }
+        .tr-heatmap-cell.s-neg {
+            background: #fbe1ad; color: #8a5a00;
+        }
+        .tr-heatmap-cell.s-strong-neg {
+            background: #b3303c; color: #fff;
+        }
+        .tr-heatmap-cell.s-mixed {
+            background: linear-gradient(135deg, #c5f0de 50%, #fbe1ad 50%);
+            color: var(--text);
+        }
+        .tr-heatmap-tooltip {
+            position: absolute; bottom: calc(100% + 6px); left: 50%;
+            transform: translateX(-50%);
+            min-width: 180px; max-width: 280px;
+            background: #1f1c2e; color: #fff;
+            padding: 8px 10px; border-radius: 8px;
+            font-size: 11.5px; line-height: 1.5;
+            text-align: left;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.15s;
+            z-index: 10;
+            white-space: normal;
+        }
+        .tr-heatmap-tooltip::after {
+            content: ''; position: absolute; top: 100%; left: 50%;
+            transform: translateX(-50%);
+            border: 4px solid transparent; border-top-color: #1f1c2e;
+        }
+        .tr-heatmap-cell:hover .tr-heatmap-tooltip,
+        .tr-heatmap-cell:focus-within .tr-heatmap-tooltip {
+            opacity: 1;
+        }
+        .tr-heatmap-tooltip .t-empty { color: #b8b3cc; font-style: italic; }
+
+        /* ── #4 Before/After change cards ─────────── */
+        .tr-changes {
+            margin: 6px 0 14px;
+        }
+        .tr-changes-title {
+            font-size: 13px; font-weight: 700; color: var(--muted);
+            margin-bottom: 10px; letter-spacing: 0.02em;
+        }
+        .tr-changes-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+        .tr-change-card {
+            padding: 12px 14px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            display: flex; flex-direction: column; gap: 6px;
+        }
+        .tr-change-card.up { border-top: 3px solid var(--positive); }
+        .tr-change-card.down { border-top: 3px solid var(--negative); }
+        .tr-change-card.flat { border-top: 3px solid var(--neutral); }
+        .tr-change-name { font-size: 12px; color: var(--muted); font-weight: 600; }
+        .tr-change-flow {
+            display: flex; align-items: center; gap: 6px;
+            font-size: 14px; font-weight: 700;
+        }
+        .tr-change-before {
+            color: var(--muted);
+            background: var(--border-soft);
+            padding: 3px 8px; border-radius: 6px;
+            font-size: 13px; font-weight: 600;
+        }
+        .tr-change-arrow { color: var(--muted); font-weight: 700; }
+        .tr-change-after {
+            padding: 3px 8px; border-radius: 6px;
+            font-size: 13px; font-weight: 700;
+        }
+        .tr-change-card.up .tr-change-after { background: var(--positive-soft); color: #0d6e4f; }
+        .tr-change-card.down .tr-change-after { background: var(--negative-soft); color: #b3303c; }
+        .tr-change-card.flat .tr-change-after { background: var(--neutral-soft); color: #8a5a00; }
+        .tr-change-delta {
+            font-size: 12px; font-weight: 700;
+        }
+        .tr-change-card.up .tr-change-delta { color: #0d6e4f; }
+        .tr-change-card.down .tr-change-delta { color: #b3303c; }
+        .tr-change-card.flat .tr-change-delta { color: #8a5a00; }
+
+        /* ── #5 Audience matcher ─────────────────── */
+        .tr-matcher {
+            margin: 6px 0 16px;
+            padding: 16px 18px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+        }
+        .tr-matcher-prompt {
+            font-size: 13px; color: var(--muted); margin-bottom: 10px;
+            font-weight: 600;
+        }
+        .tr-matcher-chips {
+            display: flex; flex-wrap: wrap; gap: 8px;
+            margin-bottom: 14px;
+        }
+        .tr-chip {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 8px 14px; border-radius: 999px;
+            font-size: 13px; font-weight: 600;
+            cursor: pointer;
+            background: var(--surface);
+            border: 2px solid;
+            transition: transform 0.1s, box-shadow 0.15s;
+            user-select: none;
+        }
+        .tr-chip.fit { border-color: #c5f0de; color: #0d6e4f; }
+        .tr-chip.misfit { border-color: #f7c2c8; color: #b3303c; }
+        .tr-chip:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
+        .tr-chip.active.fit { background: #0d6e4f; color: #fff; border-color: #0d6e4f; }
+        .tr-chip.active.misfit { background: #b3303c; color: #fff; border-color: #b3303c; }
+        .tr-matcher-result {
+            min-height: 70px;
+            padding: 14px 16px;
+            border-radius: 12px;
+            background: var(--surface-soft);
+            border: 1px dashed var(--border);
+            display: flex; flex-direction: column; gap: 6px;
+        }
+        .tr-matcher-result.fit { background: var(--positive-soft); border-color: #c5f0de; border-style: solid; }
+        .tr-matcher-result.misfit { background: var(--negative-soft); border-color: #f7c2c8; border-style: solid; }
+        .tr-matcher-verdict {
+            font-size: 18px; font-weight: 800; letter-spacing: -0.01em;
+        }
+        .tr-matcher-result.fit .tr-matcher-verdict { color: #0d6e4f; }
+        .tr-matcher-result.misfit .tr-matcher-verdict { color: #b3303c; }
+        .tr-matcher-reason {
+            font-size: 13px; line-height: 1.55; color: var(--text);
+        }
+        .tr-matcher-empty {
+            color: var(--muted); font-size: 13px; font-style: italic; text-align: center;
+            padding-top: 8px;
+        }
+
+        /* ── #6 Key points timeline ─────────────── */
+        .tr-timeline {
+            margin: 6px 0 16px;
+            padding: 6px 0;
+        }
+        .tr-timeline-item {
+            display: grid;
+            grid-template-columns: 44px 1fr;
+            gap: 14px;
+            position: relative;
+            padding-bottom: 16px;
+        }
+        .tr-timeline-item:not(:last-child)::after {
+            content: '';
+            position: absolute;
+            left: 21px; top: 44px; bottom: 0;
+            width: 2px; background: var(--border);
+        }
+        .tr-timeline-marker {
+            width: 44px; height: 44px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px; font-weight: 800;
+            color: #fff;
+            position: relative; z-index: 1;
+            border: 3px solid #fff;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+        }
+        .tr-timeline-marker.pos { background: linear-gradient(135deg, #20c997, #1ba883); }
+        .tr-timeline-marker.neg { background: linear-gradient(135deg, #e35d6a, #c44a57); }
+        .tr-timeline-marker.neu { background: linear-gradient(135deg, #6f42c1, #5a32a3); }
+        .tr-timeline-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-left: 4px solid;
+            border-radius: 10px;
+            padding: 12px 14px;
+            font-size: 14px; line-height: 1.6;
+        }
+        .tr-timeline-item .tr-timeline-card.pos { border-left-color: #20c997; }
+        .tr-timeline-item .tr-timeline-card.neg { border-left-color: #e35d6a; }
+        .tr-timeline-item .tr-timeline-card.neu { border-left-color: #6f42c1; }
+        .tr-timeline-card mark {
+            background: var(--primary-soft);
+            color: var(--primary-strong);
+            padding: 0 3px; border-radius: 3px;
+            font-weight: 700;
+        }
+
+        /* hide originals */
+        .tr-hidden { display: none !important; }
+
         @media (max-width: 720px) {
             .page { padding: 20px 16px 60px; }
             .header-card { padding: 22px; border-radius: 16px; }
             .stats { grid-template-columns: repeat(2, 1fr); }
             .sentiment-summary { grid-template-columns: 1fr; }
             .report-box { padding: 18px; }
+            .tr-hero { grid-template-columns: 1fr; }
+            .tr-heatmap-grid { grid-template-columns: repeat(4, 1fr); }
+            .tr-changes-row { grid-template-columns: 1fr; }
+            .tr-balance-row { grid-template-columns: 50px 1fr 56px; }
+            .tr-heatmap-tooltip { min-width: 140px; max-width: 220px; }
+        }
+        @media (max-width: 480px) {
+            .tr-heatmap-grid { grid-template-columns: repeat(2, 1fr); }
         }
     </style>
 </head>
@@ -324,7 +703,7 @@
                     <span>🧩 {{ transcript_row.segment_count or 0 }} 세그먼트</span>
                     <span>🕒 {{ transcript_row.updated_at }}</span>
                 </div>
-                <div class="report-box">{{ transcript_report|safe }}</div>
+                <div class="report-box" id="transcriptReportBox" data-report-type="transcript">{{ transcript_report|safe }}</div>
                 <a class="pdf-download-btn" href="/products/{{ product_id }}/videos/{{ video.video_id }}/transcript-report.pdf">
                     ⬇ PDF 다운로드
                 </a>
@@ -372,6 +751,573 @@
             urlParams.set('page', '1');
             window.location.search = urlParams.toString();
         }
+
+        /* ───────────────────────────────────────────────────────────
+           Transcript report visual enhancement
+           - Frontend post-processing of server-rendered markdown HTML
+           - Mirrors the integrated insight (PIR) pattern, but uses
+             distinct visual primitives suited to single-reviewer reports
+           ─────────────────────────────────────────────────────────── */
+
+        const TR_CATEGORIES = [
+            { id: 'camera',      label: '카메라',     icon: '📷', keys: ['카메라','렌즈','조리개','화소','광학','촬영','사진','동영상','비디오','셔터','줌','망원'] },
+            { id: 'battery',     label: '배터리',     icon: '🔋', keys: ['배터리','충전','방전','mah','wh','지속','러닝타임'] },
+            { id: 'display',     label: '디스플레이', icon: '📱', keys: ['디스플레이','화면','밝기','nit','니트','주사율','hz','해상도','패널','픽셀','베젤','터치'] },
+            { id: 'design',      label: '디자인',     icon: '🎨', keys: ['디자인','외관','색상','컬러','마감','프레임','티타늄','알루미늄','그립','무게','경량','두께','감성','마감','재질'] },
+            { id: 'performance', label: '성능',       icon: '⚡', keys: ['성능','프로세서','칩','속도','처리','발열','쓰로틀','쓰로틀링','ai','지능','신경망','벤치','벤치마크','램','메모리'] },
+            { id: 'price',       label: '가격',       icon: '💰', keys: ['가격','만원','원','달러','싸','비싸','합리','인상','인하','가성비','코스트','예산'] },
+            { id: 'sound',       label: '사운드',     icon: '🔊', keys: ['사운드','스피커','음질','소리','마이크','노이즈','이어','헤드폰','이어폰','오디오'] },
+            { id: 'ecosystem',   label: '생태계',     icon: '🔗', keys: ['생태계','연동','os','ios','안드로이드','동기화','연결','앱','지원','업데이트','워치'] }
+        ];
+
+        function _trFindHeading(bodyEl, keyword) {
+            const heads = bodyEl.querySelectorAll('h1, h2, h3, h4');
+            for (const h of heads) {
+                if ((h.textContent || '').includes(keyword)) return h;
+            }
+            return null;
+        }
+
+        function _trSectionSiblings(headingEl, stopAtHr = true) {
+            const out = [];
+            if (!headingEl) return out;
+            const hLevel = parseInt(headingEl.tagName.slice(1), 10);
+            let n = headingEl.nextElementSibling;
+            while (n) {
+                if (/^H[1-4]$/.test(n.tagName)) {
+                    const lvl = parseInt(n.tagName.slice(1), 10);
+                    if (lvl <= hLevel) break;
+                }
+                if (stopAtHr && n.tagName === 'HR') break;
+                out.push(n);
+                n = n.nextElementSibling;
+            }
+            return out;
+        }
+
+        function _trClassifyLi(text) {
+            const t = (text || '').trim();
+            if (t.startsWith('◎')) return 'strongPos';
+            if (t.startsWith('○')) return 'pos';
+            if (t.startsWith('△')) return 'neg';
+            if (t.startsWith('✕') || t.startsWith('✗') || t.startsWith('×')) return 'strongNeg';
+            return null;
+        }
+
+        function _trCountSymbols(text) {
+            const s = text || '';
+            return {
+                strongPos: (s.match(/◎/g) || []).length,
+                pos:       (s.match(/○/g) || []).length,
+                neg:       (s.match(/△/g) || []).length,
+                strongNeg: (s.match(/[✕✗×]/g) || []).length
+            };
+        }
+
+        function _trClassifyByCategory(text) {
+            const t = (text || '').toLowerCase();
+            const hits = [];
+            for (const cat of TR_CATEGORIES) {
+                if (cat.keys.some(k => t.includes(k.toLowerCase()))) hits.push(cat);
+            }
+            return hits;
+        }
+
+        function _trMoodFromSymbols(sym) {
+            const pos = sym.strongPos * 3 + sym.pos * 2;
+            const neg = sym.neg * 2 + sym.strongNeg * 3;
+            const total = pos + neg;
+            if (total === 0) return { pct: 50, label: '중립', pos: 0, neg: 0 };
+            const pct = Math.round((pos / total) * 100);
+            let label;
+            if (pct >= 80) label = '매우 긍정';
+            else if (pct >= 60) label = '긍정';
+            else if (pct >= 40) label = '중립';
+            else if (pct >= 20) label = '부정';
+            else label = '매우 부정';
+            return { pct, label, pos, neg };
+        }
+
+        function _trCollectAllLis(bodyEl) {
+            // Pros/cons items only (those that start with sentiment symbol).
+            // The Python markdown renderer with `nl2br` may emit pros/cons as a
+            // single <p> with <br> separators when no blank line precedes the
+            // bullet list. We handle both:
+            //   1) proper <ul><li>◎ ...</li></ul>
+            //   2) <p><strong>장점</strong><br>- ◎ ...<br>- ○ ...</p>
+            const out = [];
+            const seen = new Set();
+
+            // Path 1: real list items
+            const lis = bodyEl.querySelectorAll('ul li');
+            lis.forEach(li => {
+                const cls = _trClassifyLi(li.textContent);
+                if (cls) {
+                    const text = li.textContent.trim();
+                    out.push({ el: li, sentiment: cls, text: text });
+                    seen.add(text);
+                }
+            });
+
+            // Path 2: paragraph blocks with embedded bullet lines
+            // Use innerHTML and split on <br> to preserve line breaks
+            const ps = bodyEl.querySelectorAll('p');
+            ps.forEach(p => {
+                const html = p.innerHTML || '';
+                if (!/[◎○△✕✗×]/.test(html)) return;
+                // split into virtual lines on <br> (with optional / and whitespace)
+                const lines = html.split(/<br\s*\/?>/i);
+                lines.forEach(line => {
+                    // strip tags to get plain text
+                    const tmp = document.createElement('div');
+                    tmp.innerHTML = line;
+                    let text = (tmp.textContent || '').trim();
+                    // remove leading bullet markers
+                    text = text.replace(/^[\-\*]\s*/, '').trim();
+                    const cls = _trClassifyLi(text);
+                    if (cls && !seen.has(text)) {
+                        out.push({ el: p, sentiment: cls, text: text });
+                        seen.add(text);
+                    }
+                });
+            });
+
+            return out;
+        }
+
+        // For audience matcher: parse list items even if they were rendered
+        // inside a <p> with <br> separators
+        function _trCollectListUnder(headingEl) {
+            if (!headingEl) return [];
+            const sib = _trSectionSiblings(headingEl);
+            const out = [];
+            sib.forEach(el => {
+                if (el.tagName === 'UL' || el.tagName === 'OL') {
+                    Array.from(el.querySelectorAll('li'))
+                        .map(li => li.textContent.trim())
+                        .filter(t => t && !/^언급 없음$/.test(t))
+                        .forEach(t => out.push(t));
+                } else if (el.tagName === 'P' && el.innerHTML) {
+                    const lines = el.innerHTML.split(/<br\s*\/?>/i);
+                    lines.forEach(line => {
+                        const tmp = document.createElement('div');
+                        tmp.innerHTML = line;
+                        let text = (tmp.textContent || '').trim();
+                        text = text.replace(/^[\-\*]\s*/, '').trim();
+                        if (text && !/^언급 없음$/.test(text)) out.push(text);
+                    });
+                }
+            });
+            return out;
+        }
+
+        /* ─── Hero builder: mood meter + verdict + reliability ─── */
+        function _trBuildHero(bodyEl) {
+            const fullText = bodyEl.textContent || '';
+            const symbols = _trCountSymbols(fullText);
+            const mood = _trMoodFromSymbols(symbols);
+
+            // Extract verdict text from "한 줄 구매 판정" section (don't hide yet)
+            let verdictText = '';
+            const verdictHeading = _trFindHeading(bodyEl, '한 줄 구매 판정');
+            let verdictToHide = [];
+            if (verdictHeading) {
+                const sib = _trSectionSiblings(verdictHeading);
+                const bq = sib.find(el => el.tagName === 'BLOCKQUOTE');
+                if (bq) {
+                    verdictText = bq.textContent.trim().replace(/^>\s*/, '');
+                } else {
+                    const p = sib.find(el => el.tagName === 'P');
+                    if (p) verdictText = p.textContent.trim();
+                }
+                verdictToHide = [verdictHeading, ...sib];
+                // also hide trailing hr if any
+                let after = verdictHeading;
+                while (after && (after === verdictHeading || sib.includes(after))) {
+                    after = after.nextElementSibling;
+                }
+                if (after && after.tagName === 'HR') verdictToHide.push(after);
+            }
+
+            // Reliability checks
+            const numUnitMatches = fullText.match(/\d+(?:[.,]\d+)?\s*(?:nit|니트|mAh|mah|hz|Hz|HZ|g|kg|만원|원|%|인치|시간|분|초|cm|mm|µm|um|mp|w|wh)/gi) || [];
+            const hasComparison = !/비교 언급 없음/.test(fullText) && !!bodyEl.querySelector('table');
+            const recHeading = _trFindHeading(bodyEl, '맞습니다');
+            const conHeading = _trFindHeading(bodyEl, '비추');
+            const recItems = _trCollectListUnder(recHeading);
+            const conItems = _trCollectListUnder(conHeading);
+            const hasRec = recItems.length > 0;
+            const hasCon = conItems.length > 0 || symbols.neg + symbols.strongNeg > 0;
+            const checks = [
+                { ok: numUnitMatches.length >= 3, label: '수치 정보 풍부' },
+                { ok: hasComparison, label: '전작 비교 있음' },
+                { ok: hasRec, label: '추천 대상 명확' },
+                { ok: hasCon, label: '단점 구체적 언급' }
+            ];
+            const okCount = checks.filter(c => c.ok).length;
+            const reliabilityPct = Math.round((okCount / 4) * 100);
+            const reliabilityClass = reliabilityPct >= 75 ? 'good' : (reliabilityPct >= 50 ? 'mid' : 'low');
+
+            const hero = document.createElement('div');
+            hero.className = 'tr-hero';
+            const main = document.createElement('div');
+            main.className = 'tr-hero-main';
+
+            const headline = document.createElement('div');
+            headline.className = 'tr-mood-headline';
+            headline.innerHTML =
+                '<div class="tr-mood-label-strong">📊 평가 무드: ' + mood.label + '</div>' +
+                '<div class="tr-mood-pct">긍정 강도 ' + mood.pct + '% · ◎' + symbols.strongPos +
+                ' ○' + symbols.pos + ' △' + symbols.neg + ' ✕' + symbols.strongNeg + '</div>';
+
+            const barWrap = document.createElement('div');
+            barWrap.className = 'tr-mood-bar-wrap';
+            const safePct = Math.max(2, Math.min(98, mood.pct));
+            barWrap.innerHTML =
+                '<div class="tr-mood-bar"><div class="tr-mood-marker" style="left:' + safePct + '%"></div></div>' +
+                '<div class="tr-mood-scale"><span>매우 부정</span><span>부정</span><span>중립</span><span>긍정</span><span>매우 긍정</span></div>';
+
+            main.appendChild(headline);
+            main.appendChild(barWrap);
+
+            if (verdictText) {
+                const verdict = document.createElement('div');
+                verdict.className = 'tr-verdict';
+                verdict.innerHTML = '<span class="tr-verdict-label">🛒 한 줄 구매 판정</span>' + _trEscape(verdictText);
+                main.appendChild(verdict);
+            }
+
+            const rel = document.createElement('div');
+            rel.className = 'tr-reliability-card';
+            const listHtml = checks.map(c =>
+                '<li class="' + (c.ok ? '' : 'miss') + '">' + (c.ok ? '✅' : '❌') + ' ' + c.label + '</li>'
+            ).join('');
+            rel.innerHTML =
+                '<div class="tr-reliability-title">📋 리뷰 정보 충실도</div>' +
+                '<div class="tr-reliability-pct-row">' +
+                    '<span class="tr-reliability-pct">' + reliabilityPct + '%</span>' +
+                    '<span class="tr-reliability-badge ' + reliabilityClass + '">' +
+                        (reliabilityPct >= 75 ? '충실' : reliabilityPct >= 50 ? '보통' : '부족') +
+                    '</span>' +
+                '</div>' +
+                '<ul class="tr-reliability-list">' + listHtml + '</ul>';
+
+            hero.appendChild(main);
+            hero.appendChild(rel);
+            bodyEl.insertBefore(hero, bodyEl.firstChild);
+            // safe to hide originals now
+            verdictToHide.forEach(el => el && el.classList && el.classList.add('tr-hidden'));
+        }
+
+        function _trEscape(s) {
+            const d = document.createElement('div');
+            d.textContent = String(s || '');
+            return d.innerHTML;
+        }
+
+        /* ─── #2 Balance + #3 Heatmap (under 장점 / 단점) ─── */
+        function _trBuildBalanceAndHeatmap(bodyEl) {
+            const heading = _trFindHeading(bodyEl, '장점') ||
+                            _trFindHeading(bodyEl, '단점');
+            if (!heading) return;
+
+            const lis = _trCollectAllLis(bodyEl);
+            if (lis.length === 0) return;
+
+            // Score per side
+            const posLis = lis.filter(x => x.sentiment === 'strongPos' || x.sentiment === 'pos');
+            const negLis = lis.filter(x => x.sentiment === 'neg' || x.sentiment === 'strongNeg');
+            const posScore = lis.reduce((a, x) =>
+                a + (x.sentiment === 'strongPos' ? 3 : x.sentiment === 'pos' ? 2 : 0), 0);
+            const negScore = lis.reduce((a, x) =>
+                a + (x.sentiment === 'strongNeg' ? 3 : x.sentiment === 'neg' ? 2 : 0), 0);
+            const maxScore = Math.max(posScore, negScore, 1);
+
+            // Balance icon set: collect distinct categories per side
+            const posCats = new Map(), negCats = new Map();
+            posLis.forEach(x => _trClassifyByCategory(x.text).forEach(c => posCats.set(c.id, c)));
+            negLis.forEach(x => _trClassifyByCategory(x.text).forEach(c => negCats.set(c.id, c)));
+
+            const balance = document.createElement('div');
+            balance.className = 'tr-balance';
+            const renderRow = (kind, score, items, cats) => {
+                const pct = Math.round((score / maxScore) * 100);
+                const safeWidth = Math.max(8, pct);
+                const iconHtml = Array.from(cats.values()).slice(0, 6).map(c =>
+                    '<span title="' + c.label + '">' + c.icon + '</span>').join('');
+                return '<div class="tr-balance-row">' +
+                    '<div class="tr-balance-label ' + kind + '">' + (kind === 'pos' ? '장점' : '단점') + '</div>' +
+                    '<div class="tr-balance-track">' +
+                        '<div class="tr-balance-fill ' + kind + '" style="width:' + safeWidth + '%">' +
+                            '<span class="tr-balance-icons">' + iconHtml + '</span>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="tr-balance-score ' + kind + '">' + score + '점</div>' +
+                '</div>';
+            };
+            balance.innerHTML =
+                '<div class="tr-balance-title">⚖ 장단점 강도 균형</div>' +
+                renderRow('pos', posScore, posLis, posCats) +
+                renderRow('neg', negScore, negLis, negCats);
+            heading.parentNode.insertBefore(balance, heading.nextSibling);
+
+            // Heatmap
+            const catState = new Map();
+            TR_CATEGORIES.forEach(c => catState.set(c.id, { hasStrongPos:false, hasPos:false, hasNeg:false, hasStrongNeg:false, items:[] }));
+            lis.forEach(x => {
+                const matches = _trClassifyByCategory(x.text);
+                matches.forEach(cat => {
+                    const st = catState.get(cat.id);
+                    if (x.sentiment === 'strongPos') st.hasStrongPos = true;
+                    else if (x.sentiment === 'pos') st.hasPos = true;
+                    else if (x.sentiment === 'neg') st.hasNeg = true;
+                    else if (x.sentiment === 'strongNeg') st.hasStrongNeg = true;
+                    st.items.push({ text: x.text, sentiment: x.sentiment });
+                });
+            });
+            const heatmap = document.createElement('div');
+            heatmap.className = 'tr-heatmap';
+            const cellsHtml = TR_CATEGORIES.map(cat => {
+                const st = catState.get(cat.id);
+                let cls = 's-none';
+                const hasPos = st.hasStrongPos || st.hasPos;
+                const hasNeg = st.hasStrongNeg || st.hasNeg;
+                if (hasPos && hasNeg) cls = 's-mixed';
+                else if (st.hasStrongPos) cls = 's-strong-pos';
+                else if (st.hasPos) cls = 's-pos';
+                else if (st.hasStrongNeg) cls = 's-strong-neg';
+                else if (st.hasNeg) cls = 's-neg';
+                let tipBody;
+                if (st.items.length === 0) {
+                    tipBody = '<span class="t-empty">언급 없음</span>';
+                } else {
+                    tipBody = st.items.slice(0, 4).map(it => _trEscape(it.text)).join('<br>');
+                    if (st.items.length > 4) tipBody += '<br>…';
+                }
+                return '<div class="tr-heatmap-cell ' + cls + '" tabindex="0">' +
+                    '<div class="icon">' + cat.icon + '</div>' +
+                    '<div class="label">' + cat.label + '</div>' +
+                    '<div class="tr-heatmap-tooltip">' + tipBody + '</div>' +
+                '</div>';
+            }).join('');
+            heatmap.innerHTML =
+                '<div class="tr-heatmap-title">🗺 카테고리별 평가 히트맵</div>' +
+                '<div class="tr-heatmap-grid">' + cellsHtml + '</div>';
+            balance.parentNode.insertBefore(heatmap, balance.nextSibling);
+        }
+
+        /* ─── #4 Before/after change cards ─── */
+        function _trBuildChangeCards(bodyEl) {
+            const heading = _trFindHeading(bodyEl, '전작 대비') ||
+                            _trFindHeading(bodyEl, '달라진');
+            if (!heading) return;
+            const sib = _trSectionSiblings(heading);
+            const sectionText = sib.map(el => el.textContent || '').join(' ');
+            if (/비교 언급 없음/.test(sectionText) && !sib.find(el => el.tagName === 'TABLE')) return;
+            const table = sib.find(el => el.tagName === 'TABLE');
+            if (!table) return;
+            const rows = Array.from(table.querySelectorAll('tbody tr'));
+            if (rows.length === 0) return;
+
+            const items = rows.map(r => {
+                const cells = Array.from(r.querySelectorAll('td')).map(c => c.textContent.trim());
+                if (cells.length < 4) return null;
+                const [name, before, after, change] = cells;
+                if (!name) return null;
+                const direction =
+                    /↑/.test(change) ? 'up' :
+                    /↓/.test(change) ? 'down' :
+                    /동일|유지/.test(change) ? 'flat' : 'flat';
+                const numBefore = (before.match(/[\d.,]+/) || [null])[0];
+                const numAfter  = (after.match(/[\d.,]+/) || [null])[0];
+                let delta = '';
+                if (numBefore && numAfter) {
+                    const a = parseFloat(numBefore.replace(/,/g,''));
+                    const b = parseFloat(numAfter.replace(/,/g,''));
+                    if (a > 0 && b > 0 && a !== b) {
+                        const pct = Math.round(((b - a) / a) * 100);
+                        delta = (pct > 0 ? '+' : '') + pct + '%';
+                    }
+                }
+                if (!delta) {
+                    const m = change.match(/[+-]?\d+(?:[.,]\d+)?\s*%?/);
+                    if (m) delta = m[0];
+                }
+                const isNumeric = !!(numBefore && numAfter);
+                return { name, before, after, direction, delta, isNumeric };
+            }).filter(Boolean);
+            if (items.length === 0) return;
+
+            // sort: numeric first, then by absolute delta descending
+            items.sort((a, b) => {
+                if (a.isNumeric !== b.isNumeric) return a.isNumeric ? -1 : 1;
+                const an = parseFloat((a.delta || '').replace(/[^\d.-]/g,'')) || 0;
+                const bn = parseFloat((b.delta || '').replace(/[^\d.-]/g,'')) || 0;
+                return Math.abs(bn) - Math.abs(an);
+            });
+            const top = items.slice(0, 3);
+
+            const wrap = document.createElement('div');
+            wrap.className = 'tr-changes';
+            const cardsHtml = top.map(it => {
+                const arrow = it.direction === 'up' ? '↗' : it.direction === 'down' ? '↘' : '→';
+                const delta = it.delta ? '<div class="tr-change-delta">' + _trEscape(it.delta) + '</div>' : '';
+                return '<div class="tr-change-card ' + it.direction + '">' +
+                    '<div class="tr-change-name">' + _trEscape(it.name) + '</div>' +
+                    '<div class="tr-change-flow">' +
+                        '<span class="tr-change-before">' + _trEscape(it.before) + '</span>' +
+                        '<span class="tr-change-arrow">' + arrow + '</span>' +
+                        '<span class="tr-change-after">' + _trEscape(it.after) + '</span>' +
+                    '</div>' +
+                    delta +
+                '</div>';
+            }).join('');
+            wrap.innerHTML =
+                '<div class="tr-changes-title">🔥 핵심 변화 임팩트</div>' +
+                '<div class="tr-changes-row">' + cardsHtml + '</div>';
+            heading.parentNode.insertBefore(wrap, heading.nextSibling);
+        }
+
+        /* ─── #5 Audience matcher ─── */
+        function _trBuildAudienceMatcher(bodyEl) {
+            const recHeading = _trFindHeading(bodyEl, '맞습니다');
+            const conHeading = _trFindHeading(bodyEl, '비추');
+            if (!recHeading && !conHeading) return;
+
+            const recItems = _trCollectListUnder(recHeading);
+            const conItems = _trCollectListUnder(conHeading);
+            if (recItems.length === 0 && conItems.length === 0) return;
+
+            // Build chips. Use a short label (first 14 chars or up to first delimiter)
+            const shortLabel = (text) => {
+                let t = text.replace(/^[\-·•]\s*/, '');
+                // try clauses split by →, ·, ,, (, –
+                const m = t.split(/[→·,()–\-]/)[0].trim();
+                let label = m || t;
+                if (label.length > 18) label = label.slice(0, 17) + '…';
+                return label;
+            };
+
+            const matcher = document.createElement('div');
+            matcher.className = 'tr-matcher';
+            const recChips = recItems.map((t, i) =>
+                '<button type="button" class="tr-chip fit" data-kind="fit" data-idx="' + i + '">' +
+                '✓ ' + _trEscape(shortLabel(t)) + '</button>').join('');
+            const conChips = conItems.map((t, i) =>
+                '<button type="button" class="tr-chip misfit" data-kind="misfit" data-idx="' + i + '">' +
+                '✗ ' + _trEscape(shortLabel(t)) + '</button>').join('');
+
+            matcher.innerHTML =
+                '<div class="tr-matcher-prompt">👥 당신의 유형을 선택하세요 — 추천 / 비추 즉시 확인</div>' +
+                '<div class="tr-matcher-chips">' + recChips + conChips + '</div>' +
+                '<div class="tr-matcher-result"><div class="tr-matcher-empty">위 칩을 클릭하면 이 제품이 당신에게 맞는지 알려드려요.</div></div>';
+
+            // Insert before the first audience heading; hide the heading + lists
+            const target = recHeading || conHeading;
+            target.parentNode.insertBefore(matcher, target);
+            const hideSection = (h) => {
+                if (!h) return;
+                _trSectionSiblings(h).forEach(el => el.classList.add('tr-hidden'));
+                h.classList.add('tr-hidden');
+            };
+            hideSection(recHeading);
+            hideSection(conHeading);
+
+            // Wire up clicks
+            const result = matcher.querySelector('.tr-matcher-result');
+            const chips = matcher.querySelectorAll('.tr-chip');
+            chips.forEach(chip => {
+                chip.addEventListener('click', () => {
+                    chips.forEach(c => c.classList.remove('active'));
+                    chip.classList.add('active');
+                    const kind = chip.dataset.kind;
+                    const idx = parseInt(chip.dataset.idx, 10);
+                    const reasonText = (kind === 'fit' ? recItems[idx] : conItems[idx]) || '';
+                    result.classList.remove('fit', 'misfit');
+                    result.classList.add(kind);
+                    if (kind === 'fit') {
+                        result.innerHTML =
+                            '<div class="tr-matcher-verdict">✓ 이 제품 추천!</div>' +
+                            '<div class="tr-matcher-reason">' + _trEscape(reasonText) + '</div>';
+                    } else {
+                        result.innerHTML =
+                            '<div class="tr-matcher-verdict">✗ 이 제품 비추</div>' +
+                            '<div class="tr-matcher-reason">' + _trEscape(reasonText) + '</div>';
+                    }
+                });
+            });
+        }
+
+        /* ─── #6 Key points timeline ─── */
+        function _trBuildTimeline(bodyEl) {
+            const heading = _trFindHeading(bodyEl, '핵심 포인트');
+            if (!heading) return;
+            const sib = _trSectionSiblings(heading);
+            const ol = sib.find(el => el.tagName === 'OL');
+            if (!ol) return;
+            const items = Array.from(ol.querySelectorAll('li')).map(li => li.textContent.trim()).filter(Boolean);
+            if (items.length === 0) return;
+
+            const POS_KEYS = ['추천','강점','셀링포인트','셀링','우수','뛰어','확실','독보','매력'];
+            const NEG_KEYS = ['단점','아쉬','한계','미해결','부족','악화','불편','과스펙','업그레이드 메리트 낮'];
+
+            const classify = (t) => {
+                if (NEG_KEYS.some(k => t.includes(k))) return 'neg';
+                if (POS_KEYS.some(k => t.includes(k))) return 'pos';
+                return 'neu';
+            };
+            const highlight = (t) => {
+                // bold the first short clause (up to first '—' or '·' or comma)
+                const idx = t.search(/[—·,]/);
+                if (idx > 4 && idx < 40) {
+                    return '<mark>' + _trEscape(t.slice(0, idx).trim()) + '</mark>' + _trEscape(t.slice(idx));
+                }
+                return _trEscape(t);
+            };
+
+            const tl = document.createElement('div');
+            tl.className = 'tr-timeline';
+            tl.innerHTML = items.map((t, i) => {
+                const cls = classify(t);
+                return '<div class="tr-timeline-item">' +
+                    '<div class="tr-timeline-marker ' + cls + '">' + (i + 1) + '</div>' +
+                    '<div class="tr-timeline-card ' + cls + '">' + highlight(t) + '</div>' +
+                '</div>';
+            }).join('');
+            heading.parentNode.insertBefore(tl, ol);
+            ol.classList.add('tr-hidden');
+        }
+
+        /* ─── Master enhancement entrypoint ─── */
+        function enhanceTranscriptReport(bodyEl) {
+            if (!bodyEl) return;
+            try {
+                _trBuildHero(bodyEl);
+            } catch (e) { console.warn('[transcript-viz] hero failed', e); }
+            try {
+                _trBuildBalanceAndHeatmap(bodyEl);
+            } catch (e) { console.warn('[transcript-viz] balance/heatmap failed', e); }
+            try {
+                _trBuildChangeCards(bodyEl);
+            } catch (e) { console.warn('[transcript-viz] changes failed', e); }
+            try {
+                _trBuildAudienceMatcher(bodyEl);
+            } catch (e) { console.warn('[transcript-viz] matcher failed', e); }
+            try {
+                _trBuildTimeline(bodyEl);
+            } catch (e) { console.warn('[transcript-viz] timeline failed', e); }
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const box = document.getElementById('transcriptReportBox');
+            if (box && box.dataset.reportType === 'transcript') {
+                // Skip if the report content is an error message or is empty
+                const txt = (box.textContent || '').trim();
+                if (txt && !/^\[ERROR\]/.test(txt) && txt !== 'No transcript content available.') {
+                    enhanceTranscriptReport(box);
+                }
+            }
+        });
     </script>
 </body>
 </html>
