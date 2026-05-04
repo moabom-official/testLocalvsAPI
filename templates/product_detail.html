@@ -7,6 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         :root {
             --bg: #f7f5fb;
@@ -332,6 +333,72 @@
             animation: vc-pulse 1.2s ease-in-out infinite;
         }
 
+        /* ── Visual enhancements for integrated insight ─── */
+        /* Section ① — score gauge */
+        .pir-s1-wrap { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; margin: 4px 0; }
+        .pir-gauge-box { flex-shrink: 0; width: 150px; text-align: center; }
+        .pir-gauge-box canvas { display: block; margin: 0 auto; }
+        .pir-gauge-score { font-size: 12px; font-weight: 700; color: var(--text); margin-top: 6px; }
+        .pir-consensus-badge {
+            display: inline-block; margin-top: 6px;
+            padding: 3px 10px; border-radius: 999px;
+            font-size: 11px; font-weight: 600; letter-spacing: 0.01em;
+        }
+        .pir-consensus-high { background: rgba(32,201,151,0.15); color: #19a87c; }
+        .pir-consensus-mid  { background: rgba(245,166,35,0.15);  color: #b07008; }
+        .pir-consensus-low  { background: rgba(227,93,106,0.15);  color: #b44454; }
+        .pir-s1-content { flex: 1; min-width: 200px; }
+        /* product image placeholder (for future pipeline) */
+        .pir-product-images {
+            display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px;
+        }
+        .pir-product-img-placeholder {
+            width: 72px; height: 72px; border-radius: 8px;
+            background: var(--primary-soft); border: 1px dashed var(--border);
+            display: grid; place-items: center;
+            font-size: 20px; color: var(--muted);
+        }
+
+        /* Section ③ — radar chart */
+        .pir-s3-wrap { display: flex; gap: 16px; align-items: flex-start; }
+        .pir-radar-box {
+            flex-shrink: 0; width: 264px;
+            background: var(--surface-soft);
+            border: 1px solid var(--border-soft);
+            border-radius: 12px; padding: 12px 10px 8px;
+            text-align: center;
+        }
+        .pir-radar-box canvas { display: block; margin: 0 auto; }
+        .pir-radar-title {
+            font-size: 11px; color: var(--muted); font-weight: 500;
+            margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.04em;
+        }
+        .pir-s3-table { flex: 1; overflow-x: auto; min-width: 0; }
+
+        /* Section ④ — pro/con icons */
+        .pir-item-icon { font-style: normal; margin-right: 3px; }
+
+        /* Section ⑦ — change highlights */
+        .pir-highlights-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+        .pir-highlight-card {
+            background: var(--surface-soft); border: 1px solid var(--border-soft);
+            border-radius: 10px; padding: 10px 14px; min-width: 130px; flex: 1;
+        }
+        .pir-highlight-item { font-size: 11px; color: var(--muted); margin-bottom: 4px; font-weight: 500; }
+        .pir-highlight-change {
+            display: flex; align-items: center; gap: 5px;
+            font-size: 12px; font-weight: 700; color: var(--text); flex-wrap: wrap;
+        }
+        .pir-highlight-arrow { color: var(--primary); font-size: 14px; font-weight: 800; }
+        .pir-highlight-delta { font-size: 11px; color: var(--primary); font-weight: 600; margin-top: 3px; }
+
+        @media (max-width: 660px) {
+            .pir-s3-wrap { flex-direction: column; }
+            .pir-radar-box { width: 100%; max-width: 280px; margin: 0 auto; }
+            .pir-s1-wrap { flex-direction: column; }
+            .pir-gauge-box { width: 100%; }
+        }
+
         /* ── Integrated insight progress overlay ─────────── */
         .pir-progress-bar {
             margin: 18px 0 8px;
@@ -592,6 +659,13 @@
         const PRODUCT_ID = {{ product.product_id }};
         let lastSelection = null;
         let lastModalMode = null;
+
+        // ── Chart instances tracker (destroy before re-render) ───────────
+        let _pirCharts = [];
+        function _pirDestroyCharts() {
+            _pirCharts.forEach(c => { try { c.destroy(); } catch (_) {} });
+            _pirCharts = [];
+        }
 
         function toggleSelectConfig() {
             document.getElementById('selectConfig').classList.toggle('show');
@@ -1064,7 +1138,9 @@
                                (modelLabel ? ' · ' + modelLabel : '');
 
             // Server returns sanitized HTML via markdown_to_html — safe to inject.
+            _pirDestroyCharts();
             body.innerHTML = result.report_html || ('<pre>' + escapeHtml(result.report_text || '') + '</pre>');
+            enhanceIntegratedReport(body);
 
             if (result.report_id) {
                 pdfLink.style.display = 'inline-block';
@@ -1082,6 +1158,300 @@
             const panel = document.getElementById('integratedInsightPanel');
             panel.classList.remove('show');
             panel.setAttribute('aria-hidden', 'true');
+        }
+
+        // ── Integrated insight visual enhancements (Option A: frontend post-processing) ──
+
+        function enhanceIntegratedReport(bodyEl) {
+            _pirEnhanceSection1Gauge(bodyEl);
+            _pirEnhanceSection3Radar(bodyEl);
+            _pirEnhanceSection4Icons(bodyEl);
+            _pirEnhanceSection7Highlights(bodyEl);
+        }
+
+        // ── Helper: find heading by keyword, return element or null ──────
+        function _pirFindHeading(bodyEl, keyword) {
+            for (const h of bodyEl.querySelectorAll('h1,h2,h3,h4')) {
+                if (h.textContent.includes(keyword)) return h;
+            }
+            return null;
+        }
+
+        // ── Helper: collect sibling elements until next heading ──────────
+        function _pirSectionSiblings(headingEl) {
+            const siblings = [];
+            let el = headingEl.nextElementSibling;
+            while (el) {
+                if (/^H[1-4]$/.test(el.tagName)) break;
+                siblings.push(el);
+                el = el.nextElementSibling;
+            }
+            return siblings;
+        }
+
+        // ── Section ①: score gauge + consensus badge ────────────────────
+        function _pirEnhanceSection1Gauge(bodyEl) {
+            const heading = _pirFindHeading(bodyEl, '한줄 구매 판정');
+            if (!heading) return;
+
+            const siblings = _pirSectionSiblings(heading);
+            const fullText = siblings.map(el => el.textContent).join('\n');
+
+            const scoreMatch = fullText.match(/종합\s*평가[^\d]*(\d+(?:\.\d+)?)\s*\/\s*10/);
+            if (!scoreMatch) return;
+            const score = parseFloat(scoreMatch[1]);
+            if (isNaN(score)) return;
+
+            const consensusMatch = fullText.match(/리뷰어\s*합의도[^높중낮]*(높음|중간|낮음)/);
+            const consensus = consensusMatch ? consensusMatch[1] : null;
+
+            // Build gauge box
+            const gaugeBox = document.createElement('div');
+            gaugeBox.className = 'pir-gauge-box';
+
+            const canvas = document.createElement('canvas');
+            canvas.width = 130; canvas.height = 130;
+            gaugeBox.appendChild(canvas);
+
+            const scoreLabel = document.createElement('div');
+            scoreLabel.className = 'pir-gauge-score';
+            scoreLabel.textContent = score.toFixed(1) + ' / 10';
+            gaugeBox.appendChild(scoreLabel);
+
+            if (consensus) {
+                const badge = document.createElement('div');
+                const cls = consensus === '높음' ? 'high' : consensus === '중간' ? 'mid' : 'low';
+                badge.className = 'pir-consensus-badge pir-consensus-' + cls;
+                badge.textContent = '합의도 ' + consensus;
+                gaugeBox.appendChild(badge);
+            }
+
+            // Product image placeholder (future pipeline hook)
+            const imgPlaceholder = document.createElement('div');
+            imgPlaceholder.className = 'pir-product-images';
+            imgPlaceholder.innerHTML = '<div class="pir-product-img-placeholder" title="제품 이미지 (준비 중)">🖼</div>';
+            gaugeBox.appendChild(imgPlaceholder);
+
+            // Wrap heading's siblings in flex layout
+            const wrapper = document.createElement('div');
+            wrapper.className = 'pir-s1-wrap';
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'pir-s1-content';
+            siblings.forEach(el => contentDiv.appendChild(el));
+            wrapper.appendChild(gaugeBox);
+            wrapper.appendChild(contentDiv);
+            heading.after(wrapper);
+
+            // Render donut chart
+            const color = score >= 8 ? '#20c997' : score >= 6 ? '#f5a623' : '#e35d6a';
+            const chart = new Chart(canvas, {
+                type: 'doughnut',
+                data: {
+                    datasets: [{
+                        data: [score, 10 - score],
+                        backgroundColor: [color, 'rgba(230,225,245,0.45)'],
+                        borderWidth: 0,
+                    }]
+                },
+                options: {
+                    responsive: false,
+                    cutout: '70%',
+                    plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                    animation: { duration: 600 },
+                },
+                plugins: [{
+                    id: 'pir-center-text',
+                    afterDraw(ch) {
+                        const { ctx, chartArea: { left, top, width, height } } = ch;
+                        ctx.save();
+                        ctx.font = 'bold 22px Pretendard, sans-serif';
+                        ctx.fillStyle = color;
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(score.toFixed(1), left + width / 2, top + height / 2);
+                        ctx.restore();
+                    }
+                }]
+            });
+            _pirCharts.push(chart);
+        }
+
+        // ── Section ③: radar chart alongside 6차원 table ───────────────
+        function _pirEnhanceSection3Radar(bodyEl) {
+            const heading = _pirFindHeading(bodyEl, '6차원');
+            if (!heading) return;
+
+            // Find the <table> in this section
+            let tableEl = null;
+            let el = heading.nextElementSibling;
+            while (el) {
+                if (/^H[1-4]$/.test(el.tagName)) break;
+                if (el.tagName === 'TABLE') { tableEl = el; break; }
+                el = el.nextElementSibling;
+            }
+            if (!tableEl) return;
+
+            // Parse rows: dim name (col 0) + score (col 1)
+            const labels = [], values = [];
+            for (const row of tableEl.querySelectorAll('tbody tr')) {
+                const cells = row.querySelectorAll('td');
+                if (cells.length < 2) continue;
+                const dim = cells[0].textContent.trim();
+                const raw = cells[1].textContent.trim();
+                const m = raw.match(/(\d+(?:\.\d+)?)/);
+                if (!m) continue; // 데이터 부족 → skip
+                const v = parseFloat(m[1]);
+                if (isNaN(v) || v < 0 || v > 10) continue;
+                labels.push(dim);
+                values.push(v);
+            }
+            if (labels.length < 3) return; // too few data points
+
+            // Build radar container
+            const radarBox = document.createElement('div');
+            radarBox.className = 'pir-radar-box';
+            const title = document.createElement('div');
+            title.className = 'pir-radar-title';
+            title.textContent = '종합 평가 레이더';
+            radarBox.appendChild(title);
+            const canvas = document.createElement('canvas');
+            canvas.width = 240; canvas.height = 240;
+            radarBox.appendChild(canvas);
+
+            // Wrap table + radar in flex layout
+            const wrapper = document.createElement('div');
+            wrapper.className = 'pir-s3-wrap';
+            const tableWrap = document.createElement('div');
+            tableWrap.className = 'pir-s3-table';
+            tableEl.parentNode.insertBefore(wrapper, tableEl);
+            tableWrap.appendChild(tableEl);
+            wrapper.appendChild(radarBox);
+            wrapper.appendChild(tableWrap);
+
+            const chart = new Chart(canvas, {
+                type: 'radar',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: '점수',
+                        data: values,
+                        backgroundColor: 'rgba(111,66,193,0.12)',
+                        borderColor: 'rgba(111,66,193,0.75)',
+                        pointBackgroundColor: 'rgba(111,66,193,1)',
+                        pointRadius: 3,
+                        borderWidth: 2,
+                    }]
+                },
+                options: {
+                    responsive: false,
+                    animation: { duration: 700 },
+                    scales: {
+                        r: {
+                            min: 0, max: 10,
+                            ticks: {
+                                stepSize: 2, font: { size: 9 },
+                                color: '#6b6880', backdropColor: 'transparent',
+                            },
+                            grid: { color: 'rgba(111,66,193,0.1)' },
+                            angleLines: { color: 'rgba(111,66,193,0.18)' },
+                            pointLabels: {
+                                font: { size: 11, family: 'Pretendard, sans-serif' },
+                                color: '#1f1c2e',
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: { label: ctx => ctx.label + ': ' + ctx.raw + ' / 10' }
+                        }
+                    }
+                }
+            });
+            _pirCharts.push(chart);
+        }
+
+        // ── Section ④: keyword-based category icons ─────────────────────
+        function _pirEnhanceSection4Icons(bodyEl) {
+            const heading = _pirFindHeading(bodyEl, '장점');
+            if (!heading || !heading.textContent.includes('단점')) return;
+
+            const ICON_MAP = [
+                { keys: ['카메라','렌즈','조리개','화소','광학'], icon: '📷' },
+                { keys: ['배터리','충전','발열','mah','wh'],        icon: '🔋' },
+                { keys: ['디스플레이','화면','밝기','색상','주사율','nit'], icon: '🖥️' },
+                { keys: ['가격','원','비용','만원','가성비'],         icon: '💰' },
+                { keys: ['디자인','소재','무게','두께','그립','프레임'], icon: '✨' },
+                { keys: ['성능','칩셋','cpu','ap','벤치','프로세서'], icon: '⚡' },
+                { keys: ['ai','인공지능'],                           icon: '🤖' },
+                { keys: ['소리','음질','스피커'],                     icon: '🔊' },
+            ];
+
+            function iconFor(text) {
+                const lower = text.toLowerCase();
+                for (const { keys, icon } of ICON_MAP) {
+                    if (keys.some(k => lower.includes(k))) return icon;
+                }
+                return '💡';
+            }
+
+            const siblings = _pirSectionSiblings(heading);
+            for (const el of siblings) {
+                for (const li of el.querySelectorAll('li')) {
+                    const text = li.textContent;
+                    const span = document.createElement('span');
+                    span.className = 'pir-item-icon';
+                    span.textContent = iconFor(text);
+                    li.prepend(span);
+                }
+            }
+        }
+
+        // ── Section ⑦: change highlight cards ───────────────────────────
+        function _pirEnhanceSection7Highlights(bodyEl) {
+            const heading = _pirFindHeading(bodyEl, '전작 대비');
+            if (!heading) return;
+
+            let tableEl = null;
+            let el = heading.nextElementSibling;
+            while (el) {
+                if (/^H[1-4]$/.test(el.tagName)) break;
+                if (el.tagName === 'TABLE') { tableEl = el; break; }
+                el = el.nextElementSibling;
+            }
+            if (!tableEl) return;
+
+            // Parse rows with both "전작" and "현재" columns (cols 0,1,2 = 항목/전작/현재)
+            const highlights = [];
+            for (const row of tableEl.querySelectorAll('tbody tr')) {
+                const cells = row.querySelectorAll('td');
+                if (cells.length < 3) continue;
+                const item   = cells[0].textContent.trim();
+                const before = cells[1].textContent.trim();
+                const after  = cells[2].textContent.trim();
+                if (!item || before === after) continue;
+                if (before.includes('데이터 부족') || after.includes('데이터 부족')) continue;
+                if (before.includes('비교 언급 없음') || after.includes('비교 언급 없음')) continue;
+                highlights.push({ item, before, after });
+                if (highlights.length >= 3) break;
+            }
+            if (highlights.length === 0) return;
+
+            const row = document.createElement('div');
+            row.className = 'pir-highlights-row';
+            for (const { item, before, after } of highlights) {
+                const card = document.createElement('div');
+                card.className = 'pir-highlight-card';
+                card.innerHTML =
+                    '<div class="pir-highlight-item">' + escapeHtml(item) + '</div>' +
+                    '<div class="pir-highlight-change">' +
+                        '<span>' + escapeHtml(before) + '</span>' +
+                        '<span class="pir-highlight-arrow">→</span>' +
+                        '<span>' + escapeHtml(after) + '</span>' +
+                    '</div>';
+                row.appendChild(card);
+            }
+            tableEl.parentNode.insertBefore(row, tableEl);
         }
 
         // ── Video card click → inline progress bar + badge on the clicked card
