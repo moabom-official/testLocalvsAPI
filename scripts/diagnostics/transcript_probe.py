@@ -18,16 +18,59 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import atexit
+import base64
 import json
 import os
 import platform
 import socket
 import sys
+import tempfile
 import time
+from http.cookiejar import MozillaCookieJar
 from typing import Any
 
 import requests
 import yt_dlp
+
+_TMP_COOKIE_PATH: str | None = None
+
+
+def get_cookie_path() -> str | None:
+    """Resolve a Netscape cookie file path from env.
+
+    Precedence: YT_COOKIES_PATH (file) > YT_COOKIES_B64 (base64-encoded body, written to /tmp).
+    Returns None when neither is set — caller proceeds anonymously.
+    """
+    global _TMP_COOKIE_PATH
+    p = os.environ.get("YT_COOKIES_PATH")
+    if p and os.path.exists(p):
+        return p
+    b64 = os.environ.get("YT_COOKIES_B64")
+    if not b64:
+        return None
+    if _TMP_COOKIE_PATH and os.path.exists(_TMP_COOKIE_PATH):
+        return _TMP_COOKIE_PATH
+    f = tempfile.NamedTemporaryFile(prefix="yt_cookies_", suffix=".txt", delete=False)
+    f.write(base64.b64decode(b64))
+    f.close()
+    _TMP_COOKIE_PATH = f.name
+    atexit.register(lambda: os.path.exists(_TMP_COOKIE_PATH or "") and os.unlink(_TMP_COOKIE_PATH))  # type: ignore[arg-type]
+    return _TMP_COOKIE_PATH
+
+
+def make_session() -> requests.Session:
+    """requests.Session with the configured cookie jar attached (if any)."""
+    s = requests.Session()
+    p = get_cookie_path()
+    if p:
+        jar = MozillaCookieJar(p)
+        try:
+            jar.load(ignore_discard=True, ignore_expires=True)
+            s.cookies = jar  # type: ignore[assignment]
+        except Exception:
+            pass
+    return s
 
 DEFAULT_VIDEO_IDS = [
     "9bZkp7q19f0",
@@ -49,12 +92,23 @@ def _truncate(s: str | None, n: int = 240) -> str:
 
 
 def probe_environment() -> dict[str, Any]:
+    cookie_path = get_cookie_path()
+    cookie_info: dict[str, Any] = {"path": cookie_path, "loaded_count": 0}
+    if cookie_path:
+        try:
+            jar = MozillaCookieJar(cookie_path)
+            jar.load(ignore_discard=True, ignore_expires=True)
+            cookie_info["loaded_count"] = sum(1 for _ in jar)
+        except Exception as e:
+            cookie_info["error"] = f"{type(e).__name__}: {e}"
+
     out: dict[str, Any] = {
         "hostname": socket.gethostname(),
         "platform": platform.platform(),
         "python": sys.version.split()[0],
         "yt_dlp": getattr(yt_dlp.version, "__version__", "?"),
         "requests": requests.__version__,
+        "cookies": cookie_info,
         "env_proxies": {
             k: os.environ.get(k)
             for k in ("HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy")
@@ -62,7 +116,7 @@ def probe_environment() -> dict[str, Any]:
         },
     }
     try:
-        r = requests.get("https://api.ipify.org?format=json", timeout=10)
+        r = requests.get("https://api.ipify.org?format=json", timeout=10)  # cookie-irrelevant
         out["outbound_ip"] = r.json().get("ip")
     except Exception as e:
         out["outbound_ip_error"] = f"{type(e).__name__}: {e}"
@@ -89,7 +143,7 @@ def probe_watch_page(video_id: str) -> dict[str, Any]:
     out: dict[str, Any] = {"url": url}
     try:
         t0 = time.time()
-        r = requests.get(
+        r = make_session().get(
             url,
             headers={"User-Agent": UA, "Accept-Language": "ko,en;q=0.9"},
             timeout=20,
@@ -118,7 +172,10 @@ def probe_ytdlp(video_id: str) -> dict[str, Any]:
     url = f"https://www.youtube.com/watch?v={video_id}"
     out: dict[str, Any] = {"url": url}
     try:
-        ydl_opts = {"quiet": True, "no_warnings": True, "skip_download": True}
+        ydl_opts: dict[str, Any] = {"quiet": True, "no_warnings": True, "skip_download": True}
+        cookie_path = get_cookie_path()
+        if cookie_path:
+            ydl_opts["cookiefile"] = cookie_path
         t0 = time.time()
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
@@ -171,7 +228,7 @@ def probe_caption_fetch(ytdlp_result: dict[str, Any]) -> dict[str, Any]:
 
     try:
         t0 = time.time()
-        r = requests.get(target_url, timeout=20)
+        r = make_session().get(target_url, timeout=20)
         out["status"] = r.status_code
         out["elapsed_ms"] = int((time.time() - t0) * 1000)
         out["body_len"] = len(r.text or "")
@@ -186,7 +243,10 @@ def probe_caption_fetch_full(video_id: str) -> dict[str, Any]:
     url = f"https://www.youtube.com/watch?v={video_id}"
     out: dict[str, Any] = {}
     try:
-        ydl_opts = {"quiet": True, "no_warnings": True, "skip_download": True}
+        ydl_opts: dict[str, Any] = {"quiet": True, "no_warnings": True, "skip_download": True}
+        cookie_path = get_cookie_path()
+        if cookie_path:
+            ydl_opts["cookiefile"] = cookie_path
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
         subs = info.get("automatic_captions") or info.get("subtitles") or {}
@@ -205,7 +265,7 @@ def probe_caption_fetch_full(video_id: str) -> dict[str, Any]:
         out["ext"] = ext
         out["url_host"] = curl.split("/")[2] if "://" in curl else "?"
         t0 = time.time()
-        r = requests.get(curl, timeout=20)
+        r = make_session().get(curl, timeout=20)
         out["status"] = r.status_code
         out["elapsed_ms"] = int((time.time() - t0) * 1000)
         out["body_len"] = len(r.text or "")
@@ -239,6 +299,13 @@ def render_human(report: dict[str, Any]) -> str:
     )
     if env.get("env_proxies"):
         lines.append(f"PROXIES    : {env['env_proxies']}")
+    cookies = env.get("cookies") or {}
+    if cookies.get("path") or cookies.get("loaded_count"):
+        lines.append(
+            f"COOKIES    : path={cookies.get('path')} loaded={cookies.get('loaded_count')} err={cookies.get('error')}"
+        )
+    else:
+        lines.append("COOKIES    : (none — anonymous)")
     lines.append("=" * 72)
     for vid, v in report["videos"].items():
         lines.append(f"\n[ video_id = {vid} ]")
