@@ -2,6 +2,7 @@
 Integrated analysis report generation service (RunYourAI / openai/gpt-4.1-2025-04-14)
 Compares reviewer (transcript) vs consumer (comments) opinions
 """
+import asyncio
 from typing import Optional
 from scripts.reports.transcript_report import (
     fix_encoding,
@@ -112,18 +113,22 @@ def build_integrated_analysis_report(video_id: str, product_name: str, transcrip
         return error_msg
 
 
-def generate_and_save_all_reports(video_id: str, product_name: str, force_rewrite: bool = False):
+async def generate_and_save_all_reports(video_id: str, product_name: str, force_rewrite: bool = False):
     """
     Generate all reports (transcript, comment, integrated) and save to DB.
     If force_rewrite=False and reports exist, return cached reports.
     Returns (transcript_report, comment_report, integrated_analysis)
+
+    Async: transcript/comment reports run in parallel via asyncio.gather +
+    asyncio.to_thread (each underlying builder remains sync). Integrated
+    report still runs after both, since it depends on the other two.
     """
-    from scripts.database.queries import query_one, execute_update
+    from scripts.database.queries import query_one
     from scripts.reports.transcript_report import build_transcript_report
     from scripts.reports.comment_report import build_comment_sentiment_report
-    
+
     print(f"[REPORT] START: video_id={video_id}, product={product_name}, force_rewrite={force_rewrite}")
-    
+
     # Cache hit only when ALL three reports are present. Otherwise a row with
     # transcript_report only (saved before the comment pipeline ran) would be
     # served forever, hiding the comment/integrated reports even after comments
@@ -145,7 +150,7 @@ def generate_and_save_all_reports(video_id: str, product_name: str, force_rewrit
                 existing_reports.get("comment_report"),
                 existing_reports.get("integrated_report"),
             )
-    
+
     print(f"[REPORT] Generating fresh reports...")
     try:
         # Get transcript
@@ -156,33 +161,58 @@ def generate_and_save_all_reports(video_id: str, product_name: str, force_rewrit
         if not transcript_row:
             print(f"[REPORT] No transcript found")
             return None, None, None
-        
-        # Generate and save transcript report
-        print(f"[REPORT] Generating transcript report...")
-        transcript_report = build_transcript_report(transcript_row["transcript_text"])
+
+        # Run transcript + comment reports in parallel (each is sync → to_thread).
+        # return_exceptions=True so a single failure doesn't kill the other task;
+        # we then treat exceptions as "no report" and skip integrated as before.
+        print(f"[REPORT] Generating transcript + comment reports in parallel...")
+        transcript_task = asyncio.to_thread(
+            build_transcript_report, transcript_row["transcript_text"]
+        )
+        comment_task = asyncio.to_thread(
+            build_comment_sentiment_report, video_id, product_name
+        )
+        transcript_result, comment_result = await asyncio.gather(
+            transcript_task, comment_task, return_exceptions=True
+        )
+
+        if isinstance(transcript_result, Exception):
+            print(f"[REPORT] Transcript report task failed: {type(transcript_result).__name__}: {transcript_result}")
+            transcript_report = None
+        else:
+            transcript_report = transcript_result
+        if isinstance(comment_result, Exception):
+            print(f"[REPORT] Comment report task failed: {type(comment_result).__name__}: {comment_result}")
+            comment_report = None
+        else:
+            comment_report = comment_result
+
         print(f"[REPORT] Transcript report length: {len(transcript_report) if transcript_report else 0}")
-        
-        # Generate and save comment report
-        print(f"[REPORT] Generating comment sentiment report...")
-        comment_report = build_comment_sentiment_report(video_id, product_name)
         print(f"[REPORT] Comment report length: {len(comment_report) if comment_report else 0}")
-        
-        # Generate integrated analysis
+
+        # Generate integrated analysis (depends on both above → stays serial)
         integrated_analysis = None
         if transcript_report and comment_report:
             print(f"[REPORT] Generating integrated analysis...")
-            integrated_analysis = build_integrated_analysis_report(
-                video_id, product_name, transcript_report, comment_report
+            integrated_analysis = await asyncio.to_thread(
+                build_integrated_analysis_report,
+                video_id, product_name, transcript_report, comment_report,
             )
             print(f"[REPORT] Integrated analysis length: {len(integrated_analysis) if integrated_analysis else 0}")
         else:
             print(f"[REPORT] Skipping integrated (transcript={bool(transcript_report)}, comment={bool(comment_report)})")
-        
+
         # Save all reports to DB
         print(f"[REPORT] Saving to database...")
-        upsert_video_report(video_id, transcript_report=transcript_report, comment_report=comment_report, integrated_report=integrated_analysis)
+        await asyncio.to_thread(
+            upsert_video_report,
+            video_id,
+            transcript_report,
+            comment_report,
+            integrated_analysis,
+        )
         print(f"[REPORT] COMPLETE")
-        
+
         return transcript_report, comment_report, integrated_analysis
     except Exception as e:
         print(f"[REPORT] ERROR: {type(e).__name__}: {e}")
