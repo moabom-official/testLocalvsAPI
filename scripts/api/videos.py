@@ -122,7 +122,7 @@ def register_video_routes(app):
 
         # Load cached reports if available
         print(f"[VIDEO_DETAIL] Loading video page: product_id={product_id}, video_id={video_id}")
-        transcript_report, comment_sentiment_report, integrated_analysis = generate_and_save_all_reports(
+        transcript_report, comment_sentiment_report, integrated_analysis = await generate_and_save_all_reports(
             video_id, product["name"], force_rewrite=False
         )
         

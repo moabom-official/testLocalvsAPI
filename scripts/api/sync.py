@@ -587,8 +587,18 @@ def process_comments_with_agent(video_id, product_name):
             classified_count = len(classification_results)
             print(f"[AGENT] Step 6 result: classified_count={len(classification_results)}")
 
-            # Step 5/6: Agent decision + sentiment/aspect
+            # Step 7: Agent decision + sentiment/aspect (3-pass)
+            #   Pass 1 (serial): llm_classifications INSERT, agent.decide(),
+            #                    agent_decisions INSERT, collect ANALYZE targets
+            #   Pass 2 (parallel): sentiment_analyzer.analyze_single via
+            #                      ThreadPoolExecutor — the only real LLM call
+            #   Pass 3 (serial): comment_sentiments + aspect_extractions INSERT
+            #   psycopg2 cursor is not thread-safe, so DB writes stay on main thread.
             print("[AGENT] Step 7: Agent decision + sentiment/aspect persistence...")
+
+            analyze_targets = []  # list of (comment_id, comment_text, decision)
+
+            # ----- Pass 1: classification/decision persistence (serial) -----
             for i, item in enumerate(selected_items):
                 try:
                     comment_id = item["comment_id"]
@@ -649,54 +659,94 @@ def process_comments_with_agent(video_id, product_name):
                     ))
 
                     if decision.final_action == AgentAction.ANALYZE:
-                        sentiment_result = sentiment_analyzer.analyze_single(comment_text)
-                        sentiment_map = {"POSITIVE": "positive", "NEUTRAL": "neutral", "NEGATIVE": "negative"}
-                        sentiment_label = sentiment_map.get(sentiment_result.overall_sentiment.value, "neutral")
-                        analysis_weight = get_analysis_weight(bool(decision.is_low_confidence))
-                        if decision.is_low_confidence:
-                            low_confidence_analyzed_count += 1
-
-                        cur.execute("""
-                            INSERT INTO comment_sentiments (
-                                comment_id, sentiment_label, sentiment_score, analysis_weight, created_at
-                            ) VALUES (%s, %s, %s, %s, %s)
-                            ON CONFLICT (comment_id) DO UPDATE SET
-                                sentiment_label = EXCLUDED.sentiment_label,
-                                sentiment_score = EXCLUDED.sentiment_score,
-                                analysis_weight = EXCLUDED.analysis_weight
-                        """, (
-                            comment_id,
-                            sentiment_label,
-                            float(sentiment_result.overall_score),
-                            float(analysis_weight),
-                            datetime.now()
-                        ))
-
-                        if sentiment_result.aspects:
-                            for aspect in sentiment_result.aspects:
-                                aspect_sentiment_map = {"POSITIVE": "POSITIVE", "NEUTRAL": "NEUTRAL", "NEGATIVE": "NEGATIVE"}
-                                cur.execute("""
-                                    INSERT INTO aspect_extractions (
-                                        comment_id, aspect_name, mention_text,
-                                        aspect_sentiment, aspect_sentiment_score,
-                                        extraction_confidence, extracted_at
-                                    ) VALUES (%s, %s, %s, %s, %s, %s, %s)
-                                """, (
-                                    comment_id,
-                                    aspect.aspect,
-                                    aspect.mention_text,
-                                    aspect_sentiment_map.get(aspect.sentiment.value, "NEUTRAL"),
-                                    float(aspect.score) if aspect.score else None,
-                                    None,
-                                    datetime.now()
-                                ))
-                        stats["analyzed"] += 1
+                        analyze_targets.append((comment_id, comment_text, decision))
                     else:
                         stats["excluded"] += 1
 
                     conn.commit()
                 except Exception as e:
                     print(f"[AGENT] Error processing classified comment {item['comment_id']}: {e}")
+                    stats["errors"] += 1
+                    conn.rollback()
+                    import traceback
+                    traceback.print_exc()
+                    continue
+
+            # ----- Pass 2: parallel sentiment analysis (only LLM call) -----
+            sentiment_results: Dict[str, object] = {}
+            sentiment_errors: Dict[str, Exception] = {}
+            if analyze_targets:
+                print(
+                    f"[AGENT] Step 7 Pass2: parallel sentiment analysis "
+                    f"(targets={len(analyze_targets)}, max_workers=5)"
+                )
+                with ThreadPoolExecutor(max_workers=5) as executor:
+                    future_to_cid = {
+                        executor.submit(sentiment_analyzer.analyze_single, text): cid
+                        for cid, text, _ in analyze_targets
+                    }
+                    for future in as_completed(future_to_cid):
+                        cid = future_to_cid[future]
+                        try:
+                            sentiment_results[cid] = future.result()
+                        except Exception as e:
+                            sentiment_errors[cid] = e
+                            print(f"[AGENT] sentiment failed for {cid}: {type(e).__name__}: {e}")
+
+            # ----- Pass 3: persist sentiment + aspects (serial) -----
+            for comment_id, comment_text, decision in analyze_targets:
+                if comment_id in sentiment_errors:
+                    stats["errors"] += 1
+                    continue
+                sentiment_result = sentiment_results.get(comment_id)
+                if sentiment_result is None:
+                    stats["errors"] += 1
+                    continue
+                try:
+                    sentiment_map = {"POSITIVE": "positive", "NEUTRAL": "neutral", "NEGATIVE": "negative"}
+                    sentiment_label = sentiment_map.get(sentiment_result.overall_sentiment.value, "neutral")
+                    analysis_weight = get_analysis_weight(bool(decision.is_low_confidence))
+                    if decision.is_low_confidence:
+                        low_confidence_analyzed_count += 1
+
+                    cur.execute("""
+                        INSERT INTO comment_sentiments (
+                            comment_id, sentiment_label, sentiment_score, analysis_weight, created_at
+                        ) VALUES (%s, %s, %s, %s, %s)
+                        ON CONFLICT (comment_id) DO UPDATE SET
+                            sentiment_label = EXCLUDED.sentiment_label,
+                            sentiment_score = EXCLUDED.sentiment_score,
+                            analysis_weight = EXCLUDED.analysis_weight
+                    """, (
+                        comment_id,
+                        sentiment_label,
+                        float(sentiment_result.overall_score),
+                        float(analysis_weight),
+                        datetime.now()
+                    ))
+
+                    if sentiment_result.aspects:
+                        for aspect in sentiment_result.aspects:
+                            aspect_sentiment_map = {"POSITIVE": "POSITIVE", "NEUTRAL": "NEUTRAL", "NEGATIVE": "NEGATIVE"}
+                            cur.execute("""
+                                INSERT INTO aspect_extractions (
+                                    comment_id, aspect_name, mention_text,
+                                    aspect_sentiment, aspect_sentiment_score,
+                                    extraction_confidence, extracted_at
+                                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                            """, (
+                                comment_id,
+                                aspect.aspect,
+                                aspect.mention_text,
+                                aspect_sentiment_map.get(aspect.sentiment.value, "NEUTRAL"),
+                                float(aspect.score) if aspect.score else None,
+                                None,
+                                datetime.now()
+                            ))
+                    stats["analyzed"] += 1
+                    conn.commit()
+                except Exception as e:
+                    print(f"[AGENT] Error persisting sentiment for {comment_id}: {e}")
                     stats["errors"] += 1
                     conn.rollback()
                     import traceback
