@@ -1,5 +1,5 @@
 """
-제품 단위 통합 인사이트 보고서 (Azure OpenAI / GPT-4.1-mini)
+제품 단위 통합 인사이트 보고서 (RunYourAI / openai/gpt-4.1-2025-04-14)
 
 입력: 동일 제품에 대한 N개 영상의 자막 기반 보고서(video_reports.transcript_report).
 출력: 영상별 보고서들만을 근거로 합성한 9섹션 통합 인사이트 보고서.
@@ -9,7 +9,7 @@ import json
 from datetime import date
 from typing import List, Dict, Optional, Tuple
 
-from scripts.config import AZURE_OPENAI_API_KEY
+from scripts.config import RUNYOURAI_API_KEY
 from scripts.database.queries import query_one, query_all, execute_insert, execute_update
 from scripts.reports.transcript_report import (
     build_transcript_report,
@@ -217,7 +217,7 @@ def build_product_integrated_insight_report(
 ) -> Tuple[str, str]:
     """
     9섹션 통합 인사이트 보고서를 생성한다.
-    Azure OpenAI 우선 사용, 미설정/실패 시 heuristic fallback.
+    RunYourAI 우선 사용, 미설정/실패 시 heuristic fallback.
 
     반환: (report_text, model_used)
     """
@@ -228,14 +228,14 @@ def build_product_integrated_insight_report(
     today_str = date.today().isoformat()
     prompt = build_product_integrated_insight_prompt(product_name, truncated, today_str=today_str)
 
-    if not AZURE_OPENAI_API_KEY:
-        print("[WARN] AZURE_OPENAI_API_KEY not configured — using heuristic fallback")
+    if not RUNYOURAI_API_KEY:
+        print("[WARN] RUNYOURAI_API_KEY not configured — using heuristic fallback")
         return (_heuristic_fallback_report(product_name, truncated), HEURISTIC_MODEL_LABEL)
 
     try:
         client = get_report_llm_client()
     except ValueError as e:
-        print(f"[WARN] Azure OpenAI client unavailable: {e} — using heuristic fallback")
+        print(f"[WARN] RunYourAI client unavailable: {e} — using heuristic fallback")
         return (_heuristic_fallback_report(product_name, truncated), HEURISTIC_MODEL_LABEL)
 
     try:
