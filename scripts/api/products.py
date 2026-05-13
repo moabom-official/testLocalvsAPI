@@ -1,6 +1,7 @@
 """
 Product-related API routes
 """
+import os
 from time import perf_counter
 
 from fastapi import HTTPException, Request
@@ -33,10 +34,12 @@ def register_product_routes(app):
     @app.get("/products", response_class=HTMLResponse)
     async def list_products(request: Request):
         """List all products."""
-        products = query_all("SELECT * FROM tech_products ORDER BY created_at DESC")
+        show_product_list = os.getenv("SHOW_PRODUCT_LIST", "0") == "1"
+        products = query_all("SELECT * FROM tech_products ORDER BY created_at DESC") if show_product_list else []
         return templates.TemplateResponse("products.html", {
             "request": request,
             "products": products,
+            "show_product_list": show_product_list,
         })
     
     @app.post("/products")
