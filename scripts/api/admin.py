@@ -77,6 +77,21 @@ def _recent_events(limit: int = 100) -> list[dict]:
     return rows
 
 
+def _active_metrics() -> dict:
+    """DAU(오늘/어제) · WAU · MAU — session_uuid 기반 unique 세션."""
+    rows = query_all(
+        """
+        SELECT
+          COUNT(DISTINCT session_uuid) FILTER (WHERE ts >= CURRENT_DATE)                                                  AS dau_today,
+          COUNT(DISTINCT session_uuid) FILTER (WHERE ts >= CURRENT_DATE - INTERVAL '1 day' AND ts < CURRENT_DATE)         AS dau_yesterday,
+          COUNT(DISTINCT session_uuid) FILTER (WHERE ts >= NOW() - INTERVAL '7 days')                                     AS wau,
+          COUNT(DISTINCT session_uuid) FILTER (WHERE ts >= NOW() - INTERVAL '30 days')                                    AS mau
+        FROM usage_events
+        """
+    )
+    return rows[0] if rows else {}
+
+
 def _totals() -> dict:
     rows = query_all(
         """
@@ -107,6 +122,7 @@ def register_admin_routes(app):
                 "daily": _daily_trend(),
                 "recent": _recent_events(),
                 "totals": _totals(),
+                "active": _active_metrics(),
             },
         )
 
