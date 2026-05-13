@@ -18,7 +18,7 @@ UTM_COOKIE = "moabom_utm"
 SESSION_MAX_AGE = 180 * 24 * 3600
 UTM_MAX_AGE = 90 * 24 * 3600
 
-VALID_UTM_SOURCES = {"inha", "incom", "swm17", "linkus", "direct"}
+VALID_UTM_SOURCES = {"aie", "incom", "swm", "linkus", "friend", "direct"}
 
 _SKIP_PREFIXES = ("/static/", "/admin", "/docs", "/openapi", "/redoc", "/favicon")
 _SKIP_SUFFIXES = (".css", ".js", ".png", ".jpg", ".jpeg", ".ico", ".pdf", ".map", ".svg", ".woff", ".woff2")
