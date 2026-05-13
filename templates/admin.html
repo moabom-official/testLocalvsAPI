@@ -42,6 +42,14 @@
   <div class="card"><div class="label">integrated_insight</div><div class="value">{{ totals.insights or 0 }}</div></div>
 </div>
 
+<h2>활성 사용자 <span class="muted" style="font-weight:400; font-size:11px;">(unique session_uuid 기반)</span></h2>
+<div class="totals">
+  <div class="card"><div class="label">오늘 DAU</div><div class="value">{{ active.dau_today or 0 }}</div></div>
+  <div class="card"><div class="label">어제 DAU</div><div class="value">{{ active.dau_yesterday or 0 }}</div></div>
+  <div class="card"><div class="label">WAU (7일)</div><div class="value">{{ active.wau or 0 }}</div></div>
+  <div class="card"><div class="label">MAU (30일)</div><div class="value">{{ active.mau or 0 }}</div></div>
+</div>
+
 <h2>채널별 funnel</h2>
 <table>
   <thead>
