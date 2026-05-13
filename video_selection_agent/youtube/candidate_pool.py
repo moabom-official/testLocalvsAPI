@@ -27,7 +27,8 @@ _VIDEOS_URL = "https://www.googleapis.com/youtube/v3/videos"
 
 def _build_queries(product: ProductContext) -> list[str]:
     name = product.name.strip()
-    queries = [f"{name} 리뷰", f"{name} review", f"{name} 단점"]
+    # 한국 사용자 대상이라 영문 검색은 후보 풀에 기여 적음. quota 절약 위해 제외.
+    queries = [f"{name} 리뷰", f"{name} 단점"]
     if product.brand:
         queries.append(f"{product.brand} {name}")
     return queries
