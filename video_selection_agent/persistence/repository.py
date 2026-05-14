@@ -101,6 +101,7 @@ def save_selection(
                          duration_seconds, selection_mode)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (video_id) DO UPDATE SET
+                        product_id = EXCLUDED.product_id,
                         title = EXCLUDED.title,
                         description = EXCLUDED.description,
                         published_at = EXCLUDED.published_at,
