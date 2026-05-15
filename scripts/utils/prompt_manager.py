@@ -1,10 +1,19 @@
 """
 Centralized prompt definitions for LLM calls.
 
-Edit this file to change prompts sent to Groq Llama.
+활성 프롬프트:
+- build_product_integrated_insight_prompt: 보고서 ④ 제품 단위 9 섹션 통합 보고서
+- build_comment_analysis_prompt:           보고서 ② 댓글 기반 소비자 여론 보고서 (JSON 응답)
+- build_comparison_report_prompt:          보고서 ③ 리뷰어 vs 소비자 비교 보고서 (JSON 응답)
+
+② / ③ 프롬프트는 댓글 원문을 LLM이 생성하지 못하도록 representative_comment_ids 만
+지목하게 한다. 실제 원문은 백엔드가 ID로 comments.text_raw 를 다시 조회해 첨부 →
+환각 0% 보장.
 """
 
 from __future__ import annotations
+
+import json
 
 
 def build_transcript_report_prompt(transcript_text: str) -> str:
@@ -142,32 +151,226 @@ def build_product_integrated_insight_prompt(
 """
 
 
-def build_comment_sentiment_report_prompt(
-    positive_comments: str,
-    neutral_comments: str,
-    negative_comments: str,
-    product_name: str = "제품",
+def build_comment_analysis_prompt(aggregated: dict) -> str:
+    """
+    보고서 ② (댓글 기반 소비자 여론 보고서) 생성용 프롬프트.
+
+    입력 스키마 (호출부 책임):
+      {
+        "product_name": str,
+        "video_title": str,
+        "total_analyzed_comments": int,
+        "weighted_ratio": {"positive_pct": float, "neutral_pct": float, "negative_pct": float},
+        "positive_aspects": [
+          { "aspect_name": str, "comment_count": int,
+            "candidate_comments": [
+              {"comment_id": str, "text_raw": str, "like_count": int}, ...
+            ]
+          }, ...
+        ],
+        "negative_aspects": [동일 구조],
+        "top_aspect_frequencies": [{"aspect_name": str, "count": int}, ...]
+      }
+
+    LLM 역할 (오직 이 두 가지):
+      1) 각 aspect 그룹의 한 줄 요약(summary_line) 생성
+      2) 각 그룹의 candidate_comments 중 대표 1~2개 comment_id 선별
+
+    LLM이 절대 하지 말 것:
+      - 댓글 원문(text_raw)을 생성·요약·재구성 (백엔드가 ID로 다시 조회 첨부)
+      - 입력에 없는 comment_id / aspect_name 생성
+      - top_issues 항목을 새로 만들거나 카운트 변형
+
+    response_format json_object 는 호출부에서 지정. 본 함수는 프롬프트 문자열만 반환.
+    """
+    product_name = aggregated.get("product_name", "제품")
+    video_title = aggregated.get("video_title", "")
+    total = aggregated.get("total_analyzed_comments", 0)
+    weighted = aggregated.get("weighted_ratio", {})
+    pos_aspects = aggregated.get("positive_aspects", [])
+    neg_aspects = aggregated.get("negative_aspects", [])
+    top_freqs = aggregated.get("top_aspect_frequencies", [])
+
+    pos_json = json.dumps(pos_aspects, ensure_ascii=False, indent=2)
+    neg_json = json.dumps(neg_aspects, ensure_ascii=False, indent=2)
+    top_json = json.dumps(top_freqs, ensure_ascii=False)
+    weighted_json = json.dumps(weighted, ensure_ascii=False)
+
+    return f"""당신은 유튜브 댓글 기반 소비자 여론 분석 전문가입니다.
+
+대상 영상: "{video_title}" (제품: {product_name})
+이 영상 댓글에 대해 이미 ABSA(aspect-based sentiment analysis)가 완료된
+집계 결과를 바탕으로 소비자 여론 보고서를 JSON으로 생성하세요.
+
+================ 절대 규칙 (위반 시 응답 무효) ================
+1. 댓글 원문(text_raw)을 절대 생성·요약·재구성하지 않는다.
+   당신은 representative_comment_ids만 지목한다. 원문은 백엔드가 ID로 다시
+   조회해 첨부한다.
+2. representative_comment_ids 의 각 ID는 반드시 해당 aspect 그룹의
+   candidate_comments 에 등장한 comment_id 중에서만 선택한다.
+   새 ID를 만들거나 다른 aspect의 ID를 끌어오지 않는다.
+3. aspect_name 은 입력에 등장한 값만 사용. 신규 aspect 생성 금지.
+4. summary_line: 해당 aspect 그룹 댓글들의 공통 의견을 30자 이내로 한 줄 요약.
+   특정 댓글을 그대로 인용하거나 ◎○△ 기호를 쓰지 않는다.
+5. positive_points / negative_points: comment_count 내림차순 상위 3~5개.
+   입력 aspect 수가 3개 미만이면 있는 만큼만 반환. 5개 초과면 상위 5개만.
+6. one_line_mood: 가중 비율을 보고 분위기를 한 줄로 (예: "전반적 긍정 — 가성비·디자인에 호평").
+7. top_issues: 입력 top_aspect_frequencies 상위 6~8개를 그대로 복사. 가공·재정렬 금지.
+8. 대표 댓글 선별 기준: like_count 높고 텍스트가 너무 짧지 않은(=의미가 있는) 것.
+
+================ 입력 데이터 ================
+총 분석 대상 댓글 수: {total}
+가중 sentiment 비율 (analysis_weight 반영): {weighted_json}
+
+[긍정 aspect 후보 (POSITIVE)]
+{pos_json}
+
+[부정 aspect 후보 (NEGATIVE)]
+{neg_json}
+
+[전체 aspect 빈도 상위 (top_issues 입력)]
+{top_json}
+
+================ 응답 형식 (JSON ONLY, 마크다운 코드펜스 금지) ================
+{{
+  "sentiment_summary": {{
+    "positive_pct": <float, 입력 weighted_ratio.positive_pct 그대로>,
+    "neutral_pct":  <float>,
+    "negative_pct": <float>,
+    "one_line_mood": "<str, 한 줄>"
+  }},
+  "positive_points": [
+    {{
+      "aspect_name": "<str, 입력 그대로>",
+      "summary_line": "<str, 30자 이내>",
+      "comment_count": <int, 입력값 그대로>,
+      "representative_comment_ids": ["<str>", ...]   // 1~2개
+    }}
+  ],
+  "negative_points": [ /* 동일 구조 */ ],
+  "top_issues": [ {{ "keyword": "<str>", "count": <int> }} ]   // 6~8개
+}}
+
+JSON 객체 하나만 출력. 설명문·인사말·코드펜스 모두 금지.
+"""
+
+
+def build_comparison_report_prompt(
+    transcript_report_md: str,
+    comment_report_json: dict,
+    aspect_summary: dict,
 ) -> str:
-    """Build the prompt for analyzing product reactions from video comments."""
-    return (
-        f"유튜브 영상의 댓글을 sentiment별로 분석해서 {product_name}에 대한 사람들의 반응 보고서를 만들어줘.\\n\\n"
-        "출력 형식:\\n"
-        "- 첫 줄: [댓글 반응 기반 제품 평가보고서]\\n"
-        "- 한국어로 작성\\n"
-        "- 약 300자 이내로 간결하게 (중복 제거, 핵심만)\\n"
-        "- 각 sentiment별로 사람들이 어떤 말을 하는지 간단히 정리\\n"
-        "- 마지막에 장점 3가지, 단점 3가지 종합\\n\\n"
-        "긍정적 댓글 (positive):\\n"
-        f"{positive_comments}\\n\\n"
-        "중립적 댓글 (neutral):\\n"
-        f"{neutral_comments}\\n\\n"
-        "부정적 댓글 (negative):\\n"
-        f"{negative_comments}\\n\\n"
-        "요구사항 (300자 이내):\\n"
-        "1) 긍정 댓글의 주요 주제는?\\n"
-        "2) 부정 댓글의 주요 이유는?\\n"
-        "3) 이 제품의 핵심 장점 3가지\\n"
-        "4) 이 제품의 핵심 단점 3가지\\n"
-        "5) 한 줄 결론\\n"
-        "\\n중요: 300자 이내로 작성하는 것이 핵심이야. 불필요한 설명은 제외하고 핵심만 담아줘."
+    """
+    보고서 ③ (리뷰어 vs 소비자 비교 보고서) 생성용 프롬프트.
+
+    입력:
+      - transcript_report_md: 보고서 ①의 자막 기반 마크다운 보고서 전문
+      - comment_report_json:  보고서 ②의 JSON 응답 dict
+        (sentiment_summary / positive_points / negative_points / top_issues)
+      - aspect_summary: 백엔드가 사전 집계한 aspect 단위 비교 기초 데이터:
+        {
+          "product_name": str,
+          "common_aspects": [
+            {
+              "aspect_name": str,
+              "consumer_dominant_sentiment": "POSITIVE"|"NEGATIVE"|"NEUTRAL",
+              "consumer_positive_count": int,
+              "consumer_negative_count": int,
+              "consumer_neutral_count": int,
+              "candidate_comments": [
+                {"comment_id": str, "text_raw": str, "like_count": int}, ...
+              ]
+            }, ...
+          ],
+          "reviewer_only_aspect_hints": [str, ...],
+          "consumer_only_aspects": [str, ...]
+        }
+
+    LLM 역할:
+      - common_aspects 의 reviewer 자막 톤 vs consumer 다수 sentiment 비교 →
+        agreement / disagreement 판정
+      - 각 항목별 reviewer_quote 을 transcript_report_md 에서 1~2문장 발췌
+      - 각 항목별 consumer_comment_ids 1~2개를 candidate_comments 에서 선별
+      - reviewer_only / consumer_only 정리
+      - trust_score (0~100) + 2~3줄 종합 판단
+
+    LLM이 절대 하지 말 것:
+      - 입력에 없는 reviewer 발언 / 소비자 댓글 원문 생성
+      - candidate_comments 에 없는 comment_id 사용
+      - reviewer_quote 을 transcript_report_md 에서 발췌하지 않고 상상으로 생성
+      - reviewer_only_aspect_hints / consumer_only_aspects 외 토픽 추가
+    """
+    product_name = aspect_summary.get("product_name", "제품")
+    common_json = json.dumps(
+        aspect_summary.get("common_aspects", []), ensure_ascii=False, indent=2
     )
+    rev_only_json = json.dumps(
+        aspect_summary.get("reviewer_only_aspect_hints", []), ensure_ascii=False
+    )
+    cons_only_json = json.dumps(
+        aspect_summary.get("consumer_only_aspects", []), ensure_ascii=False
+    )
+    comment_json_str = json.dumps(comment_report_json, ensure_ascii=False, indent=2)
+
+    return f"""당신은 리뷰어(자막) vs 소비자(댓글) 의견을 비교 분석하는 전문가입니다.
+
+대상 제품: {product_name}
+
+다음 세 가지 입력만 근거로 비교 보고서 JSON을 생성하세요.
+입력 외 사실·수치·인용을 추가로 만들어 내면 응답이 무효 처리됩니다.
+
+================ 입력 1: 리뷰어 자막 분석 보고서 (마크다운) ================
+{transcript_report_md}
+
+================ 입력 2: 소비자 댓글 분석 보고서 (JSON, 보고서 ② 결과) ================
+{comment_json_str}
+
+================ 입력 3: 사전 집계된 aspect 단위 비교 기초 데이터 ================
+[양쪽 모두 다룬 aspect (common_aspects)]
+{common_json}
+
+[리뷰어 자막에 자주 등장하나 댓글 ABSA에 없는 토픽 힌트 (reviewer_only_aspect_hints)]
+{rev_only_json}
+
+[댓글 ABSA에는 있으나 리뷰어 자막에 거의 없는 aspect (consumer_only_aspects)]
+{cons_only_json}
+
+================ 절대 규칙 (위반 시 응답 무효) ================
+1. consumer_comment_ids 의 각 ID는 반드시 해당 aspect의 candidate_comments 에
+   등장한 comment_id 중에서만 선택. 다른 aspect의 ID를 끌어오거나 새 ID 생성 금지.
+2. 소비자 댓글 원문을 생성·요약·재구성 금지. comment_id 만 지목.
+3. reviewer_quote 은 반드시 입력 1의 transcript_report_md 에서 1~2문장을
+   거의 그대로 발췌. 상상으로 생성 금지. 해당 aspect가 transcript_report_md 에서
+   언급되지 않으면 그 aspect는 agreement/disagreement 양쪽에서 모두 제외.
+4. agreement_points 판정: reviewer가 긍정적으로 언급한 항목을 consumer 도 다수 긍정
+   (consumer_positive_count > consumer_negative_count), 또는 양쪽 모두 부정.
+5. disagreement_points 판정: reviewer는 긍정인데 consumer 다수 부정,
+   또는 reviewer 부정인데 consumer 다수 긍정.
+6. reviewer_only / consumer_only 는 입력 reviewer_only_aspect_hints /
+   consumer_only_aspects 안의 문자열에서만 선택. 새 토픽 생성 금지.
+   각 칼럼당 최대 6개까지.
+7. trust_score (0~100): agreement 가 많을수록 높게.
+   계산 가이드: round(100 * agreement_count / max(1, agreement_count + disagreement_count)).
+   판단상 보정은 ±10 이내로만.
+8. verdict.summary: 2~3줄. 리뷰 신뢰도와 구매 시 주의점(불일치 항목 기반)을 포함.
+
+================ 응답 형식 (JSON ONLY, 마크다운 코드펜스 금지) ================
+{{
+  "agreement_points": [
+    {{
+      "topic": "<str, common_aspects.aspect_name>",
+      "reviewer_quote": "<str, transcript_report_md 발췌 1~2문장>",
+      "consumer_comment_ids": ["<str>", ...]   // 1~2개
+    }}
+  ],
+  "disagreement_points": [ /* 동일 구조 */ ],
+  "reviewer_only": [ "<str>", ... ],   // 입력 reviewer_only_aspect_hints 에서 선택
+  "consumer_only": [ "<str>", ... ],   // 입력 consumer_only_aspects 에서 선택
+  "verdict": {{
+    "trust_score": <int, 0-100>,
+    "summary": "<str, 2~3줄>"
+  }}
+}}
+
+JSON 객체 하나만 출력. 설명문·인사말·코드펜스 모두 금지.
+"""
