@@ -603,6 +603,559 @@
         @media (max-width: 480px) {
             .tr-heatmap-grid { grid-template-columns: repeat(2, 1fr); }
         }
+
+        /* ─────────────────────────────────────────────────────────────────
+           보고서 ② (댓글 기반 소비자 여론) — .cm-* prefix
+           보고서 ③ (리뷰어 vs 소비자 비교)   — .cmp-* prefix
+           디자인 토큰은 --primary / --positive / --neutral / --negative 재사용
+           ───────────────────────────────────────────────────────────────── */
+        .cm-section-title, .cmp-section-title {
+            font-size: 14.5px; font-weight: 700; color: var(--text);
+            margin: 22px 0 10px;
+            letter-spacing: -0.01em;
+        }
+        .cm-section-title:first-child, .cmp-section-title:first-child { margin-top: 4px; }
+        .cm-section-intro, .cmp-section-intro {
+            font-size: 13px; color: var(--muted);
+            line-height: 1.55; margin-bottom: 12px;
+        }
+
+        /* ── ② S1 소비자 민심 한눈에 ──────────────────────── */
+        .cm-mood-card {
+            background: linear-gradient(135deg, #f8f4ff 0%, #fff5f8 100%);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 20px 22px;
+            box-shadow: var(--shadow);
+        }
+        .cm-mood-headline {
+            display: flex; align-items: baseline; gap: 12px;
+            flex-wrap: wrap; margin-bottom: 6px;
+        }
+        .cm-mood-pct-large {
+            font-size: 30px; font-weight: 800; letter-spacing: -0.02em;
+            background: linear-gradient(135deg, var(--positive) 0%, var(--primary) 100%);
+            -webkit-background-clip: text; background-clip: text; color: transparent;
+        }
+        .cm-mood-label {
+            font-size: 16px; font-weight: 700; color: var(--text);
+            letter-spacing: -0.01em;
+        }
+        .cm-mood-sentence {
+            font-size: 13px; color: var(--muted); margin-bottom: 14px;
+        }
+        .cm-mood-bars { display: flex; flex-direction: column; gap: 8px; }
+        .cm-mood-bar-row {
+            display: grid;
+            grid-template-columns: 56px 1fr 64px;
+            align-items: center; gap: 10px;
+            font-size: 13px;
+        }
+        .cm-mood-bar-label { font-weight: 700; }
+        .cm-mood-bar-label.pos { color: #0d6e4f; }
+        .cm-mood-bar-label.neu { color: #8a5a00; }
+        .cm-mood-bar-label.neg { color: #b3303c; }
+        .cm-mood-bar-track {
+            height: 14px;
+            background: var(--border-soft);
+            border-radius: 999px;
+            overflow: hidden;
+        }
+        .cm-mood-bar-fill {
+            height: 100%; border-radius: 999px;
+            transition: width 0.5s ease;
+            min-width: 4px;
+        }
+        .cm-mood-bar-fill.pos { background: linear-gradient(90deg, #20c997, #2db98c); }
+        .cm-mood-bar-fill.neu { background: linear-gradient(90deg, #f5a623, #ec9011); }
+        .cm-mood-bar-fill.neg { background: linear-gradient(90deg, #e35d6a, #d04a57); }
+        .cm-mood-bar-pct {
+            text-align: right; font-weight: 600;
+            font-variant-numeric: tabular-nums; color: var(--text);
+        }
+
+        /* ── ② S2/S3 긍정/부정 핵심 포인트 카드 ──────────── */
+        .cm-points { display: flex; flex-direction: column; gap: 12px; }
+        .cm-point-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px 16px;
+            transition: box-shadow 0.15s, border-color 0.15s;
+        }
+        .cm-point-card.pos { border-left: 4px solid var(--positive); }
+        .cm-point-card.neg { border-left: 4px solid var(--negative); }
+        .cm-point-card:hover { box-shadow: var(--shadow); }
+        .cm-point-header {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 10px; margin-bottom: 6px; flex-wrap: wrap;
+        }
+        .cm-point-left {
+            display: flex; align-items: center; gap: 8px; min-width: 0;
+        }
+        .cm-point-badge {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 4px 10px; border-radius: 999px;
+            font-size: 11.5px; font-weight: 700; white-space: nowrap;
+        }
+        .cm-point-badge.pos { background: var(--positive-soft); color: #0d6e4f; }
+        .cm-point-badge.neg { background: var(--negative-soft); color: #b3303c; }
+        .cm-point-aspect {
+            font-size: 15px; font-weight: 700; letter-spacing: -0.01em;
+        }
+        .cm-point-count {
+            font-size: 12px; color: var(--muted); font-weight: 500;
+            white-space: nowrap;
+        }
+        .cm-point-summary {
+            font-size: 14px; line-height: 1.55; color: var(--text);
+            margin-bottom: 10px;
+        }
+        .cm-point-quotes { display: flex; flex-direction: column; gap: 8px; }
+
+        /* ── 공통 댓글 quote (line-clamp:2 + 더보기) ─────── */
+        .cm-quote {
+            background: var(--surface-soft);
+            border-left: 3px solid var(--border);
+            border-radius: 6px;
+            padding: 10px 12px;
+            font-size: 13px; line-height: 1.55;
+        }
+        .cm-quote.pos { border-left-color: var(--positive); }
+        .cm-quote.neg { border-left-color: var(--negative); }
+        .cm-quote-text {
+            color: var(--text);
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: normal;
+            word-break: break-word;
+        }
+        .cm-quote-text.expanded {
+            -webkit-line-clamp: unset;
+            display: block;
+            overflow: visible;
+        }
+        .cm-quote-meta {
+            margin-top: 6px;
+            font-size: 11.5px; color: var(--muted);
+            display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+        }
+        .cm-quote-like { display: inline-flex; align-items: center; gap: 3px; }
+        .cm-quote-source {
+            display: inline-block; padding: 1px 6px;
+            background: var(--border-soft); border-radius: 4px;
+            font-size: 10.5px; font-weight: 600; color: var(--muted);
+        }
+        .cm-quote-toggle {
+            background: none; border: none; cursor: pointer;
+            color: var(--primary); font-size: 11.5px; font-weight: 600;
+            padding: 0; font-family: inherit;
+        }
+        .cm-quote-toggle:hover { color: var(--primary-strong); text-decoration: underline; }
+
+        /* ── ② S4 주요 언급 이슈 (히트맵 카드) ──────────── */
+        .cm-issues {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+            gap: 10px;
+        }
+        .cm-issue-cell {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px 10px;
+            text-align: center;
+            display: flex; flex-direction: column; gap: 4px; align-items: center;
+            transition: transform 0.12s, box-shadow 0.15s;
+        }
+        .cm-issue-cell:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+        }
+        .cm-issue-icon { font-size: 22px; line-height: 1; }
+        .cm-issue-name {
+            font-size: 12.5px; font-weight: 700; letter-spacing: -0.01em;
+        }
+        .cm-issue-count {
+            font-size: 11.5px; color: var(--muted); font-weight: 600;
+            font-variant-numeric: tabular-nums;
+        }
+        .cm-issue-cell.rank-1 {
+            background: var(--primary-soft);
+            border-color: #ddd2f5;
+        }
+        .cm-issue-cell.rank-2 { background: rgba(111, 66, 193, 0.07); }
+        .cm-issue-cell.rank-3 { background: rgba(111, 66, 193, 0.04); }
+
+        /* ── ③ S1/S2 일치/불일치 카드 (좌우 evi-box) ─────── */
+        .cmp-cards { display: flex; flex-direction: column; gap: 12px; }
+        .cmp-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px 16px;
+            transition: box-shadow 0.15s;
+        }
+        .cmp-card.agree    { border-left: 4px solid var(--positive); }
+        .cmp-card.disagree { border-left: 4px solid var(--negative); }
+        .cmp-card:hover { box-shadow: var(--shadow); }
+        .cmp-card-header {
+            display: flex; align-items: center; gap: 8px;
+            margin-bottom: 12px; flex-wrap: wrap;
+        }
+        .cmp-card-badge {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 4px 10px; border-radius: 999px;
+            font-size: 11.5px; font-weight: 700; white-space: nowrap;
+        }
+        .cmp-card-badge.agree    { background: var(--positive-soft); color: #0d6e4f; }
+        .cmp-card-badge.disagree { background: var(--negative-soft); color: #b3303c; }
+        .cmp-card-topic {
+            font-size: 15px; font-weight: 700; letter-spacing: -0.01em;
+        }
+        .cmp-evidence-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .cmp-evi-box {
+            background: var(--surface-soft);
+            border: 1px solid var(--border-soft);
+            border-radius: 10px;
+            padding: 12px 14px;
+            display: flex; flex-direction: column; gap: 6px;
+            min-width: 0;
+        }
+        .cmp-evi-label {
+            font-size: 11.5px; color: var(--muted); font-weight: 600;
+            letter-spacing: 0.02em;
+            display: inline-flex; align-items: center; gap: 4px;
+        }
+        .cmp-evi-body {
+            font-size: 13.5px; line-height: 1.55; color: var(--text);
+        }
+        .cmp-evi-body.reviewer-quote {
+            font-style: italic; color: #4f4c63;
+            border-left: 2px solid var(--primary-soft);
+            padding-left: 8px;
+        }
+        .cmp-evi-comments { display: flex; flex-direction: column; gap: 6px; }
+
+        /* ── ③ S3 리뷰어만 vs 소비자만 (좌우 칼럼) ─────────── */
+        .cmp-only-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .cmp-only-col {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px 16px;
+        }
+        .cmp-only-header {
+            display: flex; align-items: center; gap: 6px;
+            margin-bottom: 10px; font-size: 13px; font-weight: 700;
+            letter-spacing: 0.01em;
+        }
+        .cmp-only-header.reviewer { color: var(--primary-strong); }
+        .cmp-only-header.consumer { color: #b3303c; }
+        .cmp-only-list {
+            list-style: none; margin: 0; padding: 0;
+            display: flex; flex-direction: column; gap: 6px;
+        }
+        .cmp-only-list li {
+            font-size: 13px; line-height: 1.55;
+            padding-left: 12px; position: relative;
+            color: var(--text);
+        }
+        .cmp-only-list li::before {
+            content: '·'; position: absolute; left: 0; top: 0;
+            color: var(--muted); font-weight: 800;
+        }
+        .cmp-only-list li.empty {
+            color: var(--muted); font-style: italic;
+        }
+
+        /* ── ③ S4 종합 판단 (신뢰도 게이지) ──────────────── */
+        .cmp-verdict {
+            background: linear-gradient(135deg, #f8f4ff 0%, #fff5f8 100%);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 20px 22px;
+            box-shadow: var(--shadow);
+            display: flex; gap: 22px; align-items: center; flex-wrap: wrap;
+        }
+        .cmp-verdict-gauge {
+            flex-shrink: 0;
+            width: 130px; text-align: center;
+        }
+        .cmp-verdict-gauge-pct {
+            font-size: 34px; font-weight: 800; line-height: 1.1;
+            letter-spacing: -0.02em;
+            background: linear-gradient(135deg, var(--positive), #19a87c);
+            -webkit-background-clip: text; background-clip: text; color: transparent;
+        }
+        .cmp-verdict-gauge-pct.mid {
+            background: linear-gradient(135deg, var(--neutral), #d18411);
+            -webkit-background-clip: text; background-clip: text; color: transparent;
+        }
+        .cmp-verdict-gauge-pct.low {
+            background: linear-gradient(135deg, var(--negative), #c44a57);
+            -webkit-background-clip: text; background-clip: text; color: transparent;
+        }
+        .cmp-verdict-gauge-bar {
+            width: 100%; height: 8px; border-radius: 999px;
+            background: var(--border-soft); margin-top: 6px;
+            overflow: hidden;
+        }
+        .cmp-verdict-gauge-fill {
+            height: 100%; border-radius: 999px;
+            transition: width 0.6s ease;
+            min-width: 4px;
+        }
+        .cmp-verdict-gauge-fill.high { background: linear-gradient(90deg, var(--positive), #19a87c); }
+        .cmp-verdict-gauge-fill.mid  { background: linear-gradient(90deg, var(--neutral),  #d18411); }
+        .cmp-verdict-gauge-fill.low  { background: linear-gradient(90deg, var(--negative), #c44a57); }
+        .cmp-verdict-gauge-label {
+            font-size: 11px; color: var(--muted); margin-top: 6px;
+            font-weight: 600; letter-spacing: 0.02em;
+        }
+        .cmp-verdict-body { flex: 1; min-width: 200px; }
+        .cmp-verdict-headline {
+            font-size: 16px; font-weight: 700; margin-bottom: 6px;
+            letter-spacing: -0.01em;
+        }
+        .cmp-verdict-summary {
+            font-size: 14px; line-height: 1.65; color: var(--text);
+            white-space: pre-line;
+        }
+        .cmp-verdict-meta {
+            margin-top: 10px; padding-top: 8px;
+            border-top: 1px dashed var(--border-soft);
+            font-size: 11.5px; color: var(--muted);
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* ────────────────────────────────────────────────────────────────────
+           보고서 ③ v2.2 — 6 섹션 확장 (match_tier / evidence_strength / gap_type
+           배지 + S4 spec_changes + S5 consumer_questions + fallback_notes)
+           ──────────────────────────────────────────────────────────────────── */
+
+        /* 메타 배지 (cmp-card-header 우측에 그룹 노출) */
+        .cmp-card-meta {
+            display: inline-flex; gap: 6px; flex-wrap: wrap; align-items: center;
+            margin-left: auto;
+        }
+        .cmp-meta-badge {
+            display: inline-flex; align-items: center; gap: 3px;
+            padding: 2px 8px; border-radius: 999px;
+            font-size: 11px; font-weight: 700; letter-spacing: 0.01em;
+            line-height: 1.45; white-space: nowrap;
+            border: 1px solid transparent;
+        }
+        /* match_tier */
+        .cmp-meta-badge.tier-strict {
+            background: var(--primary-soft); color: var(--primary-strong);
+            border-color: #ddd2f5;
+        }
+        .cmp-meta-badge.tier-semantic {
+            background: var(--surface); color: var(--primary);
+            border-color: var(--primary); border-style: dashed;
+        }
+        .cmp-meta-badge.tier-text {
+            background: var(--border-soft); color: var(--muted);
+        }
+        /* evidence_strength */
+        .cmp-meta-badge.strength-strong {
+            background: var(--positive-soft); color: #0d6e4f;
+            border-color: #c5f0de;
+        }
+        .cmp-meta-badge.strength-medium {
+            background: var(--neutral-soft); color: #8a5a00;
+            border-color: #fbe1ad;
+        }
+        .cmp-meta-badge.strength-weak {
+            background: var(--border-soft); color: var(--muted);
+        }
+        /* gap_type (S2 only) */
+        .cmp-meta-badge.gap-opposite {
+            background: var(--negative-soft); color: #b3303c;
+            border-color: #f7c2c8;
+        }
+        .cmp-meta-badge.gap-temperature_gap {
+            background: #fef0d8; color: #b07008;
+            border-color: #fbe1ad;
+        }
+
+        /* S2 빈 상태 — 긍정형 카드 (대체로 일치) */
+        .cmp-empty-positive {
+            background: var(--positive-soft);
+            border: 1px solid #c5f0de;
+            border-left: 4px solid var(--positive);
+            border-radius: 12px;
+            padding: 14px 18px;
+            display: flex; flex-direction: column; gap: 6px;
+        }
+        .cmp-empty-positive-headline {
+            font-size: 14.5px; font-weight: 700; color: #0d6e4f;
+            display: inline-flex; align-items: center; gap: 6px;
+        }
+        .cmp-empty-positive-body {
+            font-size: 13px; line-height: 1.55; color: var(--text);
+        }
+
+        /* ── ③ S4 핵심 스펙 변화 (.tr-change-card 와 별도, row 기반) ───── */
+        .cmp-specs {
+            display: flex; flex-direction: column; gap: 8px;
+        }
+        .cmp-spec-row {
+            display: grid;
+            grid-template-columns: 1fr auto auto;
+            align-items: center;
+            gap: 14px;
+            padding: 12px 16px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            transition: box-shadow 0.15s, border-color 0.15s;
+        }
+        .cmp-spec-row:hover { box-shadow: var(--shadow); }
+        .cmp-spec-name {
+            font-size: 14px; font-weight: 700; color: var(--text);
+            letter-spacing: -0.01em;
+        }
+        .cmp-spec-flow {
+            display: inline-flex; align-items: center; gap: 6px;
+            font-size: 13px;
+            font-variant-numeric: tabular-nums;
+        }
+        .cmp-spec-before {
+            padding: 3px 9px; border-radius: 6px;
+            background: var(--border-soft); color: var(--muted);
+            font-weight: 600;
+        }
+        .cmp-spec-arrow { color: var(--primary); font-weight: 800; }
+        .cmp-spec-after {
+            padding: 3px 9px; border-radius: 6px;
+            background: var(--primary-soft); color: var(--primary-strong);
+            font-weight: 700;
+        }
+        .cmp-spec-delta {
+            font-size: 13px; font-weight: 800;
+            color: var(--positive);
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+            padding: 3px 9px; border-radius: 6px;
+            background: var(--positive-soft);
+        }
+        .cmp-spec-delta.neg { color: #b3303c; background: var(--negative-soft); }
+        .cmp-spec-delta.flat { color: #8a5a00; background: var(--neutral-soft); }
+
+        /* ── ③ S5 소비자 질문 ────────────────────────────── */
+        .cmp-questions {
+            display: flex; flex-direction: column; gap: 10px;
+        }
+        .cmp-question-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--primary);
+            border-radius: 12px;
+            padding: 14px 16px;
+            transition: box-shadow 0.15s;
+        }
+        .cmp-question-card:hover { box-shadow: var(--shadow); }
+        .cmp-question-header {
+            display: flex; align-items: flex-start; gap: 12px;
+        }
+        .cmp-question-icon {
+            flex-shrink: 0;
+            width: 32px; height: 32px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-strong));
+            color: #fff;
+            display: grid; place-items: center;
+            font-size: 16px; font-weight: 800;
+            letter-spacing: -0.02em;
+        }
+        .cmp-question-body { flex: 1; min-width: 0; }
+        .cmp-question-similar {
+            flex-shrink: 0;
+            font-size: 11.5px; color: var(--muted); font-weight: 600;
+            font-variant-numeric: tabular-nums;
+            padding: 3px 9px; border-radius: 999px;
+            background: var(--border-soft);
+            white-space: nowrap; align-self: flex-start;
+        }
+        .cmp-question-answer {
+            margin-top: 10px;
+            padding: 8px 12px;
+            background: var(--surface-soft);
+            border-left: 2px solid var(--border);
+            border-radius: 6px;
+            font-size: 13px; line-height: 1.55;
+        }
+        .cmp-question-answer.has-answer {
+            border-left-color: var(--primary);
+            color: var(--text);
+        }
+        .cmp-question-answer.no-answer {
+            color: var(--muted); font-style: italic;
+        }
+        .cmp-question-answer-label {
+            font-size: 10.5px; font-weight: 700; color: var(--muted);
+            letter-spacing: 0.04em; margin-right: 6px;
+            text-transform: uppercase;
+        }
+
+        /* ── ③ 데이터 범위 + 숨겨진 섹션 footer ─────────────── */
+        .cmp-data-scope {
+            margin-top: 14px;
+            padding: 12px 14px;
+            background: var(--surface-soft);
+            border: 1px dashed var(--border);
+            border-radius: 10px;
+            font-size: 12px; color: var(--muted);
+            line-height: 1.55;
+            display: flex; flex-direction: column; gap: 6px;
+        }
+        .cmp-data-scope-row {
+            display: flex; align-items: flex-start; gap: 8px;
+        }
+        .cmp-data-scope-label {
+            flex-shrink: 0;
+            font-weight: 700; color: var(--primary-strong);
+            white-space: nowrap;
+        }
+        .cmp-data-scope-row.hidden-sections .cmp-data-scope-label {
+            color: var(--muted);
+        }
+        .cmp-data-scope-row strong {
+            color: var(--text); font-weight: 700;
+        }
+
+        /* ── 빈 상태 + 로딩 ────────────────────────────────── */
+        .cm-loading, .cmp-loading {
+            color: var(--muted); font-size: 13px;
+            padding: 14px 4px;
+        }
+
+        @media (max-width: 720px) {
+            .cmp-evidence-grid { grid-template-columns: 1fr; }
+            .cmp-only-grid     { grid-template-columns: 1fr; }
+            .cmp-verdict       { flex-direction: column; align-items: stretch; text-align: left; }
+            .cmp-verdict-gauge { width: 100%; }
+            .cm-mood-bar-row   { grid-template-columns: 48px 1fr 56px; }
+            .cm-issues         { grid-template-columns: repeat(3, 1fr); }
+            .cmp-spec-row      { grid-template-columns: 1fr; gap: 8px; }
+            .cmp-card-meta     { margin-left: 0; margin-top: 4px; }
+        }
+        @media (max-width: 480px) {
+            .cm-issues { grid-template-columns: repeat(2, 1fr); }
+        }
     </style>
 </head>
 <body>
@@ -712,29 +1265,41 @@
             {% endif %}
         </section>
 
-        <!-- Comment Report -->
+        <!-- Comment Report (보고서 ② — 댓글 기반 소비자 여론, v2 JSON) -->
         <section class="section">
-            <h2>📊 댓글 반응 분석</h2>
-            {% if comment_sentiment_report %}
-                <div class="report-box">{{ comment_sentiment_report|safe }}</div>
+            <h2>💬 보고서 ② — 댓글 기반 소비자 여론</h2>
+            <div class="report-meta">
+                <span>👥 영상 1개 단위 · 사람들이 뭐라고 하는가</span>
+            </div>
+            {% if comment_report_json %}
+                <script type="application/json" id="commentReportData">{{ comment_report_json|tojson }}</script>
+                <div id="commentReportBox" class="cm-root">
+                    <div class="cm-loading">렌더링 중…</div>
+                </div>
                 <a class="pdf-download-btn" href="/products/{{ product_id }}/videos/{{ video.video_id }}/comment-report.pdf">
                     ⬇ PDF 다운로드
                 </a>
             {% else %}
-                <div class="empty-report">댓글 반응 분석을 사용할 수 없습니다. 제품 관련 댓글이 부족하거나 분석 서비스가 일시적으로 사용 불가한 경우입니다.</div>
+                <div class="empty-report">댓글 반응 분석을 사용할 수 없습니다. 제품 관련 ANALYZE 댓글이 부족하거나 LLM 응답이 실패한 경우입니다.</div>
             {% endif %}
         </section>
 
-        <!-- Integrated Report -->
+        <!-- Integrated Report (보고서 ③ — 리뷰어 vs 소비자 비교, v2 JSON) -->
         <section class="section">
-            <h2>🔗 통합 분석 — 리뷰어 vs 소비자</h2>
-            {% if integrated_analysis %}
-                <div class="report-box">{{ integrated_analysis|safe }}</div>
+            <h2>🔗 보고서 ③ — 리뷰어 vs 소비자 비교</h2>
+            <div class="report-meta">
+                <span>⚖ 영상 1개 단위 · 리뷰어 말, 믿을 수 있나</span>
+            </div>
+            {% if integrated_report_json %}
+                <script type="application/json" id="integratedReportData">{{ integrated_report_json|tojson }}</script>
+                <div id="integratedReportBox" class="cmp-root">
+                    <div class="cmp-loading">렌더링 중…</div>
+                </div>
                 <a class="pdf-download-btn" href="/products/{{ product_id }}/videos/{{ video.video_id }}/integrated-analysis.pdf">
                     ⬇ PDF 다운로드
                 </a>
             {% else %}
-                <div class="empty-report">통합 분석을 사용할 수 없습니다. 자막·댓글 보고서가 모두 생성되어야 합니다.</div>
+                <div class="empty-report">통합 비교 보고서를 사용할 수 없습니다. 리뷰어와 소비자가 공통으로 언급한 항목이 없거나, 보고서 ①·② 둘 중 하나가 생성 실패한 경우입니다.</div>
             {% endif %}
         </section>
     </div>
@@ -1308,13 +1873,564 @@
             } catch (e) { console.warn('[transcript-viz] timeline failed', e); }
         }
 
+        /* ═══════════════════════════════════════════════════════════════
+           보고서 ② / ③ 시각화 렌더러
+           - 입력: <script type="application/json" id="..."> 에 직렬화된 JSON
+           - 렌더링: pure CSS/JS 컴포넌트 (Chart.js 미사용)
+           - 환각 차단: 백엔드가 _filter_ids_by_whitelist + attach_comment_texts
+             를 거친 데이터이므로 representative_comments / consumer_comments
+             는 항상 실제 DB 원문이다 (LLM 생성 텍스트 0%)
+           ═══════════════════════════════════════════════════════════════ */
+
+        // ── 공통 유틸 ─────────────────────────────────────────────
+        function _cmEsc(s) {
+            if (s === null || s === undefined) return '';
+            return String(s).replace(/[&<>"']/g, c => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            })[c]);
+        }
+        function _cmReadJson(id) {
+            const el = document.getElementById(id);
+            if (!el) return null;
+            try { return JSON.parse(el.textContent || 'null'); }
+            catch (e) {
+                console.warn('[report-viz] JSON parse failed for #' + id, e);
+                return null;
+            }
+        }
+        function _cmClamp(n, lo, hi) {
+            return Math.max(lo, Math.min(hi, n));
+        }
+
+        // aspect_name → 이모지 (히트맵·일부 카드용)
+        const _CM_ICON_MAP = {
+            '디스플레이': '🖥', '디자인': '🎨', '카메라': '📷', '배터리': '🔋',
+            '발열': '🔥', '가격': '💰', '성능': '⚡', '소음': '🔊',
+            '휴대성': '🧳', '내구성': '🛡', '기능': '⚙', 'AI': '🤖',
+            '충전': '🔌', 'AS': '🛠'
+        };
+        function _cmIconFor(keyword) {
+            if (!keyword) return '💡';
+            if (_CM_ICON_MAP[keyword]) return _CM_ICON_MAP[keyword];
+            const lower = String(keyword).toLowerCase();
+            const candidates = Object.keys(_CM_ICON_MAP);
+            for (const k of candidates) {
+                if (lower.includes(k.toLowerCase())) return _CM_ICON_MAP[k];
+            }
+            return '💡';
+        }
+
+        // 댓글 quote 렌더 (보고서 ②/③ 공통)
+        let _cmQuoteSeq = 0;
+        function _cmRenderQuote(c, kind /* 'pos' | 'neg' */) {
+            const text = c && c.text_raw ? c.text_raw : '';
+            const author = c && c.author_name ? c.author_name : '';
+            const likes = c && typeof c.like_count === 'number' ? c.like_count : 0;
+            const qid = 'cmq_' + (++_cmQuoteSeq);
+            return '<div class="cm-quote ' + kind + '">' +
+                    '<div class="cm-quote-text" id="' + qid + '">' + _cmEsc(text) + '</div>' +
+                    '<div class="cm-quote-meta">' +
+                        '<span class="cm-quote-like">👍 ' + likes + '</span>' +
+                        (author ? '<span>' + _cmEsc(author) + '</span>' : '') +
+                        '<span class="cm-quote-source">원문 그대로</span>' +
+                        '<button type="button" class="cm-quote-toggle" ' +
+                                'data-target="' + qid + '" style="display:none;">더보기</button>' +
+                    '</div>' +
+                '</div>';
+        }
+
+        // 렌더 후 2줄 초과 quote 에만 "더보기" 토글 활성화
+        function _cmBindQuoteToggles(rootEl) {
+            rootEl.querySelectorAll('.cm-quote-text').forEach(textEl => {
+                const isClamped = textEl.scrollHeight > textEl.clientHeight + 2;
+                const btn = rootEl.querySelector('.cm-quote-toggle[data-target="' + textEl.id + '"]');
+                if (!btn) return;
+                if (isClamped) {
+                    btn.style.display = 'inline-block';
+                    btn.addEventListener('click', () => {
+                        const expanded = textEl.classList.toggle('expanded');
+                        btn.textContent = expanded ? '접기' : '더보기';
+                    });
+                }
+            });
+        }
+
+        // ── 보고서 ② 렌더러 ──────────────────────────────────────
+        function enhanceCommentReport(rootEl, data) {
+            if (!rootEl) return;
+            if (!data) {
+                rootEl.innerHTML = '<div class="empty-report">렌더링할 데이터가 없습니다.</div>';
+                return;
+            }
+            const parts = [];
+            parts.push(_cmRenderS1(data.sentiment_summary, data._meta));
+            parts.push(_cmRenderS2(data.positive_points));
+            parts.push(_cmRenderS3(data.negative_points));
+            parts.push(_cmRenderS4(data.top_issues));
+            rootEl.innerHTML = parts.join('');
+            _cmBindQuoteToggles(rootEl);
+        }
+
+        function _cmRenderS1(s, meta) {
+            if (!s) return '';
+            const pos = _cmClamp(parseFloat(s.positive_pct) || 0, 0, 100);
+            const neu = _cmClamp(parseFloat(s.neutral_pct)  || 0, 0, 100);
+            const neg = _cmClamp(parseFloat(s.negative_pct) || 0, 0, 100);
+            const mood = s.one_line_mood || '';
+            const total = (meta && meta.total_analyzed_comments) || 0;
+            return '<h3 class="cm-section-title">1. 소비자 민심 한눈에</h3>' +
+                '<div class="cm-section-intro">긍정/부정/중립 비율 + 전체 분위기 한 줄. ' +
+                'comment_sentiments 가중 집계 (analysis_weight 반영) — LLM 미관여.</div>' +
+                '<div class="cm-mood-card">' +
+                    '<div class="cm-mood-headline">' +
+                        '<span class="cm-mood-pct-large">' + pos.toFixed(0) + '%</span>' +
+                        '<span class="cm-mood-label">' + _cmEsc(mood) + '</span>' +
+                    '</div>' +
+                    '<div class="cm-mood-sentence">분석 댓글 ' + total + '건 — 가중 비율 (확신도 반영)</div>' +
+                    '<div class="cm-mood-bars">' +
+                        _cmMoodBarRow('pos', '😊 긍정', pos) +
+                        _cmMoodBarRow('neu', '😐 중립', neu) +
+                        _cmMoodBarRow('neg', '😠 부정', neg) +
+                    '</div>' +
+                '</div>';
+        }
+        function _cmMoodBarRow(kind, label, pct) {
+            const width = Math.max(2, pct);
+            return '<div class="cm-mood-bar-row">' +
+                    '<div class="cm-mood-bar-label ' + kind + '">' + label + '</div>' +
+                    '<div class="cm-mood-bar-track">' +
+                        '<div class="cm-mood-bar-fill ' + kind + '" style="width:' + width + '%"></div>' +
+                    '</div>' +
+                    '<div class="cm-mood-bar-pct">' + pct.toFixed(1) + '%</div>' +
+                '</div>';
+        }
+
+        function _cmRenderS2(points) {
+            return '<h3 class="cm-section-title">2. 긍정 핵심 인사이트</h3>' +
+                '<div class="cm-section-intro">긍정 댓글의 반복 포인트 3~5개를 댓글 건수 막대로 나열. ' +
+                '각 포인트 = 한 줄 요약 + 그 아래 대표 댓글 1~2개 (원문 그대로).</div>' +
+                _cmRenderPoints(points || [], 'pos');
+        }
+        function _cmRenderS3(points) {
+            return '<h3 class="cm-section-title">3. 부정 핵심 인사이트</h3>' +
+                '<div class="cm-section-intro">동일 구조 · 부정 댓글 기준. 실제 부정 댓글 원문 인용으로 균형감 확보.</div>' +
+                _cmRenderPoints(points || [], 'neg');
+        }
+        function _cmRenderPoints(points, kind) {
+            if (!points.length) {
+                const msg = (kind === 'pos') ? '긍정' : '부정';
+                return '<div class="empty-report" style="font-size:13px;padding:14px;">'
+                    + msg + ' 핵심 포인트가 도출되지 않았습니다.</div>';
+            }
+            return '<div class="cm-points">' +
+                points.map(p => _cmRenderPointCard(p, kind)).join('') +
+            '</div>';
+        }
+        function _cmRenderPointCard(p, kind) {
+            const badge = (kind === 'pos') ? '👍 긍정' : '👎 부정';
+            const aspect = p.aspect_name || '';
+            const summary = p.summary_line || '';
+            const cnt = (typeof p.comment_count === 'number') ? p.comment_count : 0;
+            const quotes = (p.representative_comments || [])
+                .map(c => _cmRenderQuote(c, kind))
+                .join('');
+            return '<div class="cm-point-card ' + kind + '">' +
+                    '<div class="cm-point-header">' +
+                        '<div class="cm-point-left">' +
+                            '<span class="cm-point-badge ' + kind + '">' + badge + '</span>' +
+                            '<span class="cm-point-aspect">' + _cmEsc(aspect) + '</span>' +
+                        '</div>' +
+                        '<span class="cm-point-count">관련 댓글 ' + cnt + '건</span>' +
+                    '</div>' +
+                    '<div class="cm-point-summary">' + _cmEsc(summary) + '</div>' +
+                    (quotes ? '<div class="cm-point-quotes">' + quotes + '</div>' : '') +
+                '</div>';
+        }
+
+        function _cmRenderS4(issues) {
+            if (!issues || !issues.length) {
+                return '<h3 class="cm-section-title">4. 주요 언급 이슈</h3>' +
+                    '<div class="empty-report" style="font-size:13px;padding:14px;">언급 이슈 데이터가 없습니다.</div>';
+            }
+            const cells = issues.map((it, i) => {
+                const rankCls = (i === 0) ? 'rank-1'
+                              : (i <= 2)  ? 'rank-2'
+                              : (i <= 4)  ? 'rank-3' : '';
+                const keyword = it.keyword || '';
+                const count = (typeof it.count === 'number') ? it.count : 0;
+                return '<div class="cm-issue-cell ' + rankCls + '">' +
+                        '<div class="cm-issue-icon">' + _cmIconFor(keyword) + '</div>' +
+                        '<div class="cm-issue-name">' + _cmEsc(keyword) + '</div>' +
+                        '<div class="cm-issue-count">' + count + '회</div>' +
+                    '</div>';
+            }).join('');
+            return '<h3 class="cm-section-title">4. 주요 언급 이슈</h3>' +
+                '<div class="cm-section-intro">댓글에서 가장 많이 언급된 제품 키워드/이슈를 빈도순 정리.</div>' +
+                '<div class="cm-issues">' + cells + '</div>';
+        }
+
+        // ── 보고서 ③ v2.2 — 6 섹션 렌더러 (Option A: 빈 섹션 숨김 + footer 노트) ──
+        // S1 일치 / S2 불일치(항상 표시 - 빈 시 긍정 backup) /
+        // S3 reviewer_only·consumer_only / S4 핵심 스펙 변화 (빈 시 숨김) /
+        // S5 소비자 질문 (빈 시 숨김) / S6 종합 판단
+        // + footer: data_scope + 숨겨진 섹션 목록
+        function enhanceComparisonReport(rootEl, data) {
+            if (!rootEl) return;
+            if (!data) {
+                rootEl.innerHTML = '<div class="empty-report">렌더링할 데이터가 없습니다.</div>';
+                return;
+            }
+            const fn = data.fallback_notes || {};
+            const specs = data.spec_changes || [];
+            const questions = data.consumer_questions || [];
+
+            // Option A: 비어있는 S4/S5 를 추적하여 footer 로 압축 노출
+            const hiddenSections = [];
+            if (specs.length === 0) {
+                hiddenSections.push({
+                    tag: 'S4', label: '핵심 스펙 변화',
+                    reason: '자막에 전작 비교 표가 없음',
+                });
+            }
+            if (questions.length === 0) {
+                hiddenSections.push({
+                    tag: 'S5', label: '소비자 질문',
+                    reason: 'QUESTION 라벨 댓글 없음',
+                });
+            }
+
+            const parts = [];
+            parts.push(_cmpRenderS1(data.agreement_points));
+            parts.push(_cmpRenderS2(data.disagreement_points, fn));
+            parts.push(_cmpRenderS3(data.reviewer_only, data.consumer_only));
+            parts.push(_cmpRenderS4(specs));        // '' if empty
+            parts.push(_cmpRenderS5(questions));    // '' if empty
+            parts.push(_cmpRenderS6(data.verdict, data._meta, specs, questions));
+            parts.push(_cmpRenderDataScope(fn.data_scope, hiddenSections));
+            rootEl.innerHTML = parts.join('');
+            _cmBindQuoteToggles(rootEl);
+        }
+
+        // S2 가 빈 경우 LLM 이 fallback_notes 를 안 채워도 항상 노출되는 FE default 메시지
+        const _CMP_DEFAULT_DISAGREE_EMPTY =
+            '리뷰어와 소비자 의견이 대체로 일치합니다. 큰 갈등 지점이 발견되지 않았습니다.';
+
+        // ── 메타 배지 라벨 / 클래스 ──────────────────────────────
+        const _CMP_TIER_LABEL = {
+            strict:   '🎯 정확 매칭',
+            semantic: '🔗 의미 매칭',
+            text:     '📝 텍스트 비교',
+        };
+        const _CMP_STRENGTH_LABEL = {
+            strong: '근거 강함',
+            medium: '근거 보통',
+            weak:   '근거 약함',
+        };
+        const _CMP_GAP_LABEL = {
+            opposite:        '정반대',
+            temperature_gap: '온도차',
+        };
+
+        function _cmpMetaBadgesHtml(p, isDisagree) {
+            const out = [];
+            if (p.match_tier && _CMP_TIER_LABEL[p.match_tier]) {
+                out.push('<span class="cmp-meta-badge tier-' + p.match_tier + '">'
+                    + _CMP_TIER_LABEL[p.match_tier] + '</span>');
+            }
+            if (p.evidence_strength && _CMP_STRENGTH_LABEL[p.evidence_strength]) {
+                out.push('<span class="cmp-meta-badge strength-' + p.evidence_strength + '">'
+                    + _CMP_STRENGTH_LABEL[p.evidence_strength] + '</span>');
+            }
+            if (isDisagree && p.gap_type && _CMP_GAP_LABEL[p.gap_type]) {
+                out.push('<span class="cmp-meta-badge gap-' + p.gap_type + '">'
+                    + _CMP_GAP_LABEL[p.gap_type] + '</span>');
+            }
+            if (!out.length) return '';
+            return '<div class="cmp-card-meta">' + out.join('') + '</div>';
+        }
+
+        // ── S1 / S2 일치 / 불일치 카드 (메타 배지 포함) ──────────
+        function _cmpRenderS1(points) {
+            return '<h3 class="cmp-section-title">1. 의견 일치 포인트</h3>' +
+                '<div class="cmp-section-intro">리뷰어도 소비자도 동의하는 항목 = 가장 신뢰도 높은 정보. ' +
+                '3 단계 fallback 매칭 (strict → semantic → text) 으로 빈약 출력을 방지. ' +
+                '각 카드는 리뷰어 자막 발췌 + 소비자 댓글 원문 좌우 배치 + 매칭 단계·근거 강도 배지.</div>' +
+                _cmpRenderCards(points || [], 'agree');
+        }
+
+        function _cmpRenderS2(points, fallbackNotes) {
+            const intro = '<div class="cmp-section-intro">리뷰어↔소비자 평가가 다른 항목. ' +
+                '"명확한 반대" + "온도차" 까지 포함. 비었을 경우 backup — 공백 대신 ' +
+                '"대체로 일치" 긍정 결론으로 채움.</div>';
+            const items = points || [];
+            if (items.length === 0) {
+                // Option A: LLM 이 메시지를 안 채워도 항상 긍정 backup 카드를 노출.
+                // FE default 로 fallback 해 "도출되지 않았습니다" bland 메시지는 절대 표시하지 않음.
+                const llmMsg = (fallbackNotes && fallbackNotes.disagreement_empty_message) || '';
+                const msg = (typeof llmMsg === 'string' && llmMsg.trim())
+                    ? llmMsg.trim()
+                    : _CMP_DEFAULT_DISAGREE_EMPTY;
+                return '<h3 class="cmp-section-title">2. 의견 불일치 포인트</h3>' + intro +
+                    '<div class="cmp-empty-positive">' +
+                        '<div class="cmp-empty-positive-headline">' +
+                            '✓ 리뷰어와 소비자 의견이 대체로 일치합니다' +
+                        '</div>' +
+                        '<div class="cmp-empty-positive-body">' + _cmEsc(msg) + '</div>' +
+                    '</div>';
+            }
+            return '<h3 class="cmp-section-title">2. 의견 불일치 포인트</h3>' + intro +
+                _cmpRenderCards(items, 'disagree');
+        }
+
+        function _cmpRenderCards(points, kind) {
+            if (!points.length) {
+                const msg = (kind === 'agree') ? '일치 항목이 도출되지 않았습니다.' : '불일치 항목이 도출되지 않았습니다.';
+                return '<div class="empty-report" style="font-size:13px;padding:14px;">' + msg + '</div>';
+            }
+            return '<div class="cmp-cards">' +
+                points.map(p => _cmpRenderCard(p, kind)).join('') +
+            '</div>';
+        }
+        function _cmpRenderCard(p, kind) {
+            const isDisagree = (kind === 'disagree');
+            const badge = isDisagree ? '✕ 불일치' : '✓ 일치';
+            const topic = p.topic || '';
+            const quote = p.reviewer_quote || '';
+            const quoteKind = isDisagree ? 'neg' : 'pos';
+            const metaBadges = _cmpMetaBadgesHtml(p, isDisagree);
+            const consumerComments = (p.consumer_comments || [])
+                .map(c => _cmRenderQuote(c, quoteKind))
+                .join('');
+            const reviewerSide = '<div class="cmp-evi-box">' +
+                    '<div class="cmp-evi-label">📝 리뷰어 자막</div>' +
+                    '<div class="cmp-evi-body reviewer-quote">' + _cmEsc(quote) + '</div>' +
+                '</div>';
+            const consumerSide = '<div class="cmp-evi-box">' +
+                    '<div class="cmp-evi-label">💬 소비자 댓글</div>' +
+                    (consumerComments
+                        ? '<div class="cmp-evi-comments">' + consumerComments + '</div>'
+                        : '<div class="cmp-evi-body" style="color:var(--muted);font-style:italic;">대표 댓글이 없습니다.</div>'
+                    ) +
+                '</div>';
+            return '<div class="cmp-card ' + kind + '">' +
+                    '<div class="cmp-card-header">' +
+                        '<span class="cmp-card-badge ' + kind + '">' + badge + '</span>' +
+                        '<span class="cmp-card-topic">' + _cmEsc(topic) + '</span>' +
+                        metaBadges +
+                    '</div>' +
+                    '<div class="cmp-evidence-grid">' + reviewerSide + consumerSide + '</div>' +
+                '</div>';
+        }
+
+        // ── S3 reviewer_only / consumer_only (변경 없음) ────────
+        function _cmpRenderS3(reviewerOnly, consumerOnly) {
+            const rev = reviewerOnly || [];
+            const con = consumerOnly || [];
+            const revItems = rev.length
+                ? rev.map(t => '<li>' + _cmEsc(t) + '</li>').join('')
+                : '<li class="empty">없음</li>';
+            const conItems = con.length
+                ? con.map(t => '<li>' + _cmEsc(t) + '</li>').join('')
+                : '<li class="empty">없음</li>';
+            return '<h3 class="cmp-section-title">3. 리뷰어만 언급 vs 소비자만 언급</h3>' +
+                '<div class="cmp-section-intro">한쪽만 다룬 주제 — 리뷰어는 전문 포인트(벤치마크 등), ' +
+                '소비자는 실사용 이슈(AS·내구성 등). 각 칼럼에 항목 여러 개. 각각 고유 가치.</div>' +
+                '<div class="cmp-only-grid">' +
+                    '<div class="cmp-only-col">' +
+                        '<div class="cmp-only-header reviewer">📝 리뷰어만 언급</div>' +
+                        '<ul class="cmp-only-list">' + revItems + '</ul>' +
+                    '</div>' +
+                    '<div class="cmp-only-col">' +
+                        '<div class="cmp-only-header consumer">💬 소비자만 언급</div>' +
+                        '<ul class="cmp-only-list">' + conItems + '</ul>' +
+                    '</div>' +
+                '</div>';
+        }
+
+        // ── S4 핵심 스펙 변화 (v2.2 신규) ────────────────────────
+        function _cmpDeltaSign(delta) {
+            const s = String(delta || '');
+            if (/^-|↓|감소|하락/.test(s)) return 'neg';
+            if (/유지|동일/.test(s)) return 'flat';
+            return '';   // default = pos (green)
+        }
+        function _cmpRenderS4(specs) {
+            const items = specs || [];
+            // Option A: 비어있으면 섹션 자체를 그리지 않음 (footer 의 hiddenSections 가 사유 노출)
+            if (items.length === 0) return '';
+            const intro = '<div class="cmp-section-intro">자막에서 추출된 정량 스펙 변화를 한 줄 카드로 표시. ' +
+                '본문에 묻혀 있던 수치 (12MP→48MP 등) 를 끌어올림. 보고서 ①의 전작 비교 표를 파싱해 생성.</div>';
+            const rows = items.map(s => {
+                const name = s.spec_name || '';
+                const before = s.before || '';
+                const after = s.after || '';
+                const delta = s.delta || '';
+                const deltaCls = _cmpDeltaSign(delta);
+                return '<div class="cmp-spec-row">' +
+                        '<div class="cmp-spec-name">' + _cmEsc(name) + '</div>' +
+                        '<div class="cmp-spec-flow">' +
+                            '<span class="cmp-spec-before">' + _cmEsc(before) + '</span>' +
+                            '<span class="cmp-spec-arrow">→</span>' +
+                            '<span class="cmp-spec-after">' + _cmEsc(after) + '</span>' +
+                        '</div>' +
+                        (delta
+                            ? '<div class="cmp-spec-delta ' + deltaCls + '">' + _cmEsc(delta) + '</div>'
+                            : '<div></div>')
+                    + '</div>';
+            }).join('');
+            return '<h3 class="cmp-section-title">4. 핵심 스펙 변화 요약</h3>' + intro +
+                '<div class="cmp-specs">' + rows + '</div>';
+        }
+
+        // ── S5 소비자 질문 (v2.2 신규) ───────────────────────────
+        function _cmpRenderS5(questions) {
+            const items = questions || [];
+            // Option A: 비어있으면 섹션 자체를 그리지 않음 (footer 가 사유 노출)
+            if (items.length === 0) return '';
+            const intro = '<div class="cmp-section-intro">지금까지 묻혀있던 ' +
+                '<code>llm_classifications.QUESTION</code> 라벨 댓글 활용. ' +
+                '소비자가 실제로 던진 질문을 유사 질문끼리 묶어 노출 → 구매 전 사용자 공감.</div>';
+            const cards = items.map((q, i) => {
+                const qc = q.question_comment || {};
+                const qText = qc.text_raw || '';
+                const author = qc.author_name || '';
+                const likes = qc.like_count || 0;
+                const similar = q.similar_count || 1;
+                const short = q.short_answer;
+                const qid = 'cmpQ_' + i;
+                const hasAnswer = (typeof short === 'string' && short.trim().length > 0);
+                const answerHtml = hasAnswer
+                    ? '<div class="cmp-question-answer has-answer">' +
+                        '<span class="cmp-question-answer-label">자막·댓글 근거</span>' +
+                        _cmEsc(short.trim()) +
+                      '</div>'
+                    : '<div class="cmp-question-answer no-answer">' +
+                        '<span class="cmp-question-answer-label">답변</span>' +
+                        '리뷰에서 다뤄지지 않음' +
+                      '</div>';
+                if (!qText) return '';
+                return '<div class="cmp-question-card">' +
+                        '<div class="cmp-question-header">' +
+                            '<div class="cmp-question-icon">Q</div>' +
+                            '<div class="cmp-question-body">' +
+                                '<div class="cm-quote-text" id="' + qid + '">' +
+                                    _cmEsc(qText) +
+                                '</div>' +
+                                '<div class="cm-quote-meta">' +
+                                    '<span class="cm-quote-like">👍 ' + likes + '</span>' +
+                                    (author ? '<span>' + _cmEsc(author) + '</span>' : '') +
+                                    '<span class="cm-quote-source">원문 그대로</span>' +
+                                    '<button type="button" class="cm-quote-toggle" ' +
+                                            'data-target="' + qid + '" style="display:none;">더보기</button>' +
+                                '</div>' +
+                            '</div>' +
+                            '<div class="cmp-question-similar">유사 질문 ' + similar + '건</div>' +
+                        '</div>' +
+                        answerHtml +
+                    '</div>';
+            }).join('');
+            return '<h3 class="cmp-section-title">5. 소비자가 가장 궁금해하는 질문</h3>' + intro +
+                '<div class="cmp-questions">' + cards + '</div>';
+        }
+
+        // ── S6 종합 판단 (이전 S4 이동 + 메타 확장) ──────────────
+        function _cmpRenderS6(verdict, meta, specs, questions) {
+            if (!verdict) {
+                return '<h3 class="cmp-section-title">6. 종합 판단</h3>' +
+                    '<div class="empty-report" style="font-size:13px;padding:14px;">종합 판단 데이터가 없습니다.</div>';
+            }
+            const score = _cmClamp(parseInt(verdict.trust_score, 10) || 0, 0, 100);
+            const cls = (score >= 70) ? 'high' : (score >= 40) ? 'mid' : 'low';
+            const pctCls = (cls === 'high') ? '' : cls;
+            const summary = verdict.summary || '';
+            const headline = (cls === 'high') ? '리뷰어 의견을 대체로 신뢰할 만합니다'
+                          : (cls === 'mid')  ? '일부 항목은 실사용 후기 추가 확인이 필요합니다'
+                          : '불일치 항목이 많아 신중히 판단하세요';
+            const agree    = (meta && typeof meta.agreement_count          === 'number') ? meta.agreement_count          : 0;
+            const disagree = (meta && typeof meta.disagreement_count       === 'number') ? meta.disagreement_count       : 0;
+            const specN    = (meta && typeof meta.spec_change_count        === 'number') ? meta.spec_change_count        : (specs || []).length;
+            const qN       = (meta && typeof meta.consumer_question_count  === 'number') ? meta.consumer_question_count  : (questions || []).length;
+            return '<h3 class="cmp-section-title">6. 종합 판단</h3>' +
+                '<div class="cmp-section-intro">리뷰 신뢰도 + 구매 시 주의점 2~3 줄. ' +
+                '보고서의 결론이므로 맨 뒤로 배치 (마무리 역할).</div>' +
+                '<div class="cmp-verdict">' +
+                    '<div class="cmp-verdict-gauge">' +
+                        '<div class="cmp-verdict-gauge-pct ' + pctCls + '">' + score + '%</div>' +
+                        '<div class="cmp-verdict-gauge-bar">' +
+                            '<div class="cmp-verdict-gauge-fill ' + cls + '" style="width:' + score + '%"></div>' +
+                        '</div>' +
+                        '<div class="cmp-verdict-gauge-label">리뷰 신뢰도</div>' +
+                    '</div>' +
+                    '<div class="cmp-verdict-body">' +
+                        '<div class="cmp-verdict-headline">' + _cmEsc(headline) + '</div>' +
+                        '<div class="cmp-verdict-summary">' + _cmEsc(summary) + '</div>' +
+                        '<div class="cmp-verdict-meta">계산 근거: 일치 ' + agree + '건 / 불일치 ' + disagree +
+                            '건 / 스펙 변화 ' + specN + '건 / 소비자 질문 ' + qN + '건</div>' +
+                    '</div>' +
+                '</div>';
+        }
+
+        // ── fallback_notes.data_scope + 숨겨진 섹션 footer (Option A) ─────
+        // hiddenSections: [{tag, label, reason}, ...] — 빈 배열이면 해당 row 생략
+        function _cmpRenderDataScope(scopeText, hiddenSections) {
+            const s = (scopeText || '').trim();
+            const hidden = hiddenSections || [];
+            if (!s && hidden.length === 0) return '';
+            const rows = [];
+            if (s) {
+                rows.push(
+                    '<div class="cmp-data-scope-row">' +
+                        '<span class="cmp-data-scope-label">📊 데이터 범위</span>' +
+                        '<span>' + _cmEsc(s) + '</span>' +
+                    '</div>'
+                );
+            }
+            if (hidden.length > 0) {
+                const items = hidden.map(h =>
+                    _cmEsc(h.tag) + ' <strong>' + _cmEsc(h.label) + '</strong> — ' +
+                    _cmEsc(h.reason)
+                ).join(' &nbsp;·&nbsp; ');
+                rows.push(
+                    '<div class="cmp-data-scope-row hidden-sections">' +
+                        '<span class="cmp-data-scope-label">⊘ 표시되지 않은 섹션</span>' +
+                        '<span>' + items + '</span>' +
+                    '</div>'
+                );
+            }
+            return '<div class="cmp-data-scope">' + rows.join('') + '</div>';
+        }
+
         document.addEventListener('DOMContentLoaded', function () {
-            const box = document.getElementById('transcriptReportBox');
-            if (box && box.dataset.reportType === 'transcript') {
-                // Skip if the report content is an error message or is empty
-                const txt = (box.textContent || '').trim();
+            // 보고서 ① (자막)
+            const tbox = document.getElementById('transcriptReportBox');
+            if (tbox && tbox.dataset.reportType === 'transcript') {
+                const txt = (tbox.textContent || '').trim();
                 if (txt && !/^\[ERROR\]/.test(txt) && txt !== 'No transcript content available.') {
-                    enhanceTranscriptReport(box);
+                    enhanceTranscriptReport(tbox);
+                }
+            }
+            // 보고서 ② (댓글)
+            const cmBox = document.getElementById('commentReportBox');
+            if (cmBox) {
+                const cmData = _cmReadJson('commentReportData');
+                if (cmData) {
+                    try { enhanceCommentReport(cmBox, cmData); }
+                    catch (e) {
+                        console.warn('[report-viz] enhanceCommentReport failed', e);
+                        cmBox.innerHTML = '<div class="empty-report">렌더링 실패 (콘솔 확인).</div>';
+                    }
+                }
+            }
+            // 보고서 ③ (비교)
+            const ciBox = document.getElementById('integratedReportBox');
+            if (ciBox) {
+                const ciData = _cmReadJson('integratedReportData');
+                if (ciData) {
+                    try { enhanceComparisonReport(ciBox, ciData); }
+                    catch (e) {
+                        console.warn('[report-viz] enhanceComparisonReport failed', e);
+                        ciBox.innerHTML = '<div class="empty-report">렌더링 실패 (콘솔 확인).</div>';
+                    }
                 }
             }
         });
