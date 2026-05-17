@@ -571,6 +571,68 @@
         .tr-change-card.down .tr-change-delta { color: #b3303c; }
         .tr-change-card.flat .tr-change-delta { color: #8a5a00; }
 
+        /* ── #4.5 Differentiation & value verdict (2-pane card) ── */
+        .tr-vv-wrap {
+            margin: 6px 0 16px;
+        }
+        .tr-vv-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .tr-vv-pane {
+            display: flex; flex-direction: column;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px 14px;
+            min-width: 0;
+        }
+        .tr-vv-pane-pros { border-color: #c5f0de; background: var(--positive-soft); }
+        .tr-vv-pane-caut { border-color: #f4d8a8; background: var(--neutral-soft, #fff4e0); }
+        .tr-vv-pane-head {
+            display: flex; align-items: center; gap: 6px;
+            font-size: 13px; font-weight: 700;
+            margin-bottom: 8px;
+            letter-spacing: 0.01em;
+        }
+        .tr-vv-pane-icon {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 22px; height: 22px; border-radius: 999px;
+            font-size: 12px; font-weight: 800;
+            flex-shrink: 0;
+        }
+        .tr-vv-pane-pros .tr-vv-pane-title { color: #0d6e4f; }
+        .tr-vv-pane-pros .tr-vv-pane-icon  { background: #19a87c; color: #fff; }
+        .tr-vv-pane-caut .tr-vv-pane-title { color: #8a5a00; }
+        .tr-vv-pane-caut .tr-vv-pane-icon  { background: #c98a2a; color: #fff; }
+        .tr-vv-pane-list {
+            list-style: none; padding: 0; margin: 0;
+            display: flex; flex-direction: column; gap: 6px;
+        }
+        .tr-vv-item {
+            font-size: 12px; line-height: 1.5;
+            color: var(--text); font-weight: 500;
+            padding-left: 14px; position: relative;
+            word-break: keep-all;
+        }
+        .tr-vv-item::before {
+            content: '·';
+            position: absolute; left: 4px; top: -2px;
+            font-weight: 800;
+        }
+        .tr-vv-pane-pros .tr-vv-item::before { color: #19a87c; }
+        .tr-vv-pane-caut .tr-vv-item::before { color: #c98a2a; }
+        .tr-vv-item-muted {
+            color: var(--muted); font-style: italic; font-weight: 400;
+        }
+        .tr-vv-item-empty {
+            color: var(--muted); font-style: italic; font-weight: 400;
+        }
+        @media (max-width: 660px) {
+            .tr-vv-grid { grid-template-columns: 1fr; }
+        }
+
         /* ── #5 Audience matcher ─────────────────── */
         .tr-matcher {
             margin: 6px 0 16px;
@@ -1963,6 +2025,131 @@
             heading.parentNode.insertBefore(wrap, heading.nextSibling);
         }
 
+        /* ─── #4.5 Differentiation & value verdict (2-pane card) ─── */
+        // Replaces the free-bullet list under '### 차별성 & 구매 합리성' with a
+        // 2-pane verdict card: left = '차별점' (positive accent), right = '감안할
+        // 점' (cautionary accent). Each bullet is parsed by its '차별점:' or
+        // '감안할 점:' label prefix. Existing _tr* utilities are only called, not
+        // modified. The standalone '🛒 한 줄 구매 판정' section is left alone — no
+        // duplicated verdict line in this card.
+        function _trBuildValueVerdict(bodyEl) {
+            const heading = _trFindHeading(bodyEl, '차별성');
+            if (!heading) return;
+
+            const siblings = _trSectionSiblings(heading);
+            if (siblings.length === 0) return;
+
+            // Path 1 (real <ul><li>) + Path 2 (<p> with <br>-separated lines).
+            // We only consume bullets that start with the fixed labels.
+            const PROS_RE = /^(?:[-*]\s*)?차별점\s*[:：]\s*(.+)$/;
+            const CAUT_RE = /^(?:[-*]\s*)?(?:감안할\s*점|감안할점)\s*[:：]\s*(.+)$/;
+
+            const pros = [];
+            const cautions = [];
+            const consumedLis = [];
+            const touchedPs = new Set();
+
+            function eatLine(line, sourceEl) {
+                const text = (line || '').trim();
+                if (!text) return false;
+                let m = text.match(PROS_RE);
+                if (m) { pros.push(m[1].trim()); return true; }
+                m = text.match(CAUT_RE);
+                if (m) { cautions.push(m[1].trim()); return true; }
+                return false;
+            }
+
+            siblings.forEach(el => {
+                // Real list items
+                el.querySelectorAll('li').forEach(li => {
+                    if (eatLine(li.textContent, li)) consumedLis.push(li);
+                });
+                // <p> with embedded bullet lines (nl2br fallback)
+                if (el.tagName === 'P') {
+                    const html = el.innerHTML || '';
+                    if (!/차별점|감안/.test(html)) return;
+                    const lines = html.split(/<br\s*\/?>/i);
+                    let pHadAny = false;
+                    lines.forEach(line => {
+                        const tmp = document.createElement('div');
+                        tmp.innerHTML = line;
+                        if (eatLine(tmp.textContent || '', el)) pHadAny = true;
+                    });
+                    if (pHadAny) touchedPs.add(el);
+                }
+            });
+
+            if (pros.length === 0 && cautions.length === 0) return;
+
+            // Detect data-insufficient bullets so we render them with a subdued tone.
+            const insufficientRe = /(데이터\s*부족|언급\s*없음|정보\s*부족|평가\s*없음|다루지\s*않음|미언급)/;
+
+            function buildPane(kind, items, title, icon, emptyText) {
+                const pane = document.createElement('div');
+                pane.className = 'tr-vv-pane tr-vv-pane-' + kind;
+                const head = document.createElement('div');
+                head.className = 'tr-vv-pane-head';
+                head.innerHTML =
+                    '<span class="tr-vv-pane-icon" aria-hidden="true">' + icon + '</span>' +
+                    '<span class="tr-vv-pane-title">' + _trEscape(title) + '</span>';
+                pane.appendChild(head);
+                const list = document.createElement('ul');
+                list.className = 'tr-vv-pane-list';
+                if (items.length === 0) {
+                    const li = document.createElement('li');
+                    li.className = 'tr-vv-item tr-vv-item-empty';
+                    li.textContent = emptyText;
+                    list.appendChild(li);
+                } else {
+                    items.forEach(text => {
+                        const li = document.createElement('li');
+                        const muted = insufficientRe.test(text);
+                        li.className = 'tr-vv-item' + (muted ? ' tr-vv-item-muted' : '');
+                        li.textContent = text;
+                        list.appendChild(li);
+                    });
+                }
+                pane.appendChild(list);
+                return pane;
+            }
+
+            const wrap = document.createElement('div');
+            wrap.className = 'tr-vv-wrap';
+            const grid = document.createElement('div');
+            grid.className = 'tr-vv-grid';
+            grid.appendChild(buildPane('pros', pros,
+                '차별점 — 이래서 살 만하다', '✓', '차별점 정보 부족'));
+            grid.appendChild(buildPane('caut', cautions,
+                '감안할 점 — 한계', '⚠', '감안할 점 정보 없음'));
+            wrap.appendChild(grid);
+
+            heading.parentNode.insertBefore(wrap, heading.nextSibling);
+
+            // Hide original source elements only after the verdict card is in.
+            const touchedUls = new Set();
+            consumedLis.forEach(li => {
+                li.classList.add('tr-hidden');
+                if (li.parentElement) touchedUls.add(li.parentElement);
+            });
+            touchedUls.forEach(ul => {
+                const remaining = Array.from(ul.querySelectorAll(':scope > li'))
+                    .filter(li => !li.classList.contains('tr-hidden'));
+                if (remaining.length === 0) ul.classList.add('tr-hidden');
+            });
+            touchedPs.forEach(p => {
+                const html = p.innerHTML || '';
+                const lines = html.split(/<br\s*\/?>/i);
+                const allLabeled = lines.every(line => {
+                    const tmp = document.createElement('div');
+                    tmp.innerHTML = line;
+                    const text = (tmp.textContent || '').trim();
+                    if (!text) return true;
+                    return PROS_RE.test(text) || CAUT_RE.test(text);
+                });
+                if (allLabeled) p.classList.add('tr-hidden');
+            });
+        }
+
         /* ─── #5 Audience matcher ─── */
         function _trBuildAudienceMatcher(bodyEl) {
             const recHeading = _trFindHeading(bodyEl, '맞습니다');
@@ -2088,6 +2275,9 @@
             try {
                 _trBuildChangeCards(bodyEl);
             } catch (e) { console.warn('[transcript-viz] changes failed', e); }
+            try {
+                _trBuildValueVerdict(bodyEl);
+            } catch (e) { console.warn('[transcript-viz] value verdict failed', e); }
             try {
                 _trBuildAudienceMatcher(bodyEl);
             } catch (e) { console.warn('[transcript-viz] matcher failed', e); }
