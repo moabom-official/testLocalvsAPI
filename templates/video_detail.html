@@ -218,28 +218,46 @@
         }
 
         /* ── Transcript report visualizations (.tr-*) ─────────────── */
+        /* .tr-hero is now a thin outer stack — the mood box and reliability box
+           are independent cards stacked vertically. */
         .tr-hero {
-            display: grid;
-            grid-template-columns: 1fr 280px;
-            gap: 18px;
+            display: flex; flex-direction: column;
+            gap: 14px;
             margin: 4px 0 22px;
-            padding: 20px 22px;
+        }
+
+        /* (1) 평가 무드 박스 */
+        .tr-mood-box {
             background: linear-gradient(135deg, #f8f4ff 0%, #fff5f8 100%);
             border: 1px solid var(--border);
-            border-radius: 16px;
+            border-radius: 14px;
             box-shadow: var(--shadow);
+            padding: 18px 20px;
+            display: flex; flex-direction: column; gap: 12px;
         }
-        .tr-hero-main { display: flex; flex-direction: column; gap: 12px; min-width: 0; justify-content: center; }
+        .tr-mood-box-head {
+            display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+        }
+        .tr-mood-title {
+            font-size: 15px; font-weight: 700; color: var(--text);
+            letter-spacing: -0.01em;
+        }
+        .tr-mood-sub {
+            font-size: 12px; color: var(--muted); font-weight: 500;
+        }
         .tr-mood-headline {
             display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
         }
         .tr-mood-label-strong {
-            font-size: 22px; font-weight: 800; letter-spacing: -0.02em;
+            font-size: 24px; font-weight: 800; letter-spacing: -0.02em;
         }
+        .tr-mood-tone-pos     { color: #19a87c; }
+        .tr-mood-tone-neutral { color: #8a5a00; }
+        .tr-mood-tone-neg     { color: #b3303c; }
         .tr-mood-pct {
-            font-size: 14px; font-weight: 600; color: var(--muted);
+            font-size: 13px; font-weight: 600; color: var(--muted);
         }
-        .tr-mood-bar-wrap { position: relative; padding: 10px 0 4px; }
+        .tr-mood-bar-wrap { position: relative; padding: 6px 0 2px; }
         .tr-mood-bar {
             position: relative;
             height: 14px; border-radius: 999px;
@@ -262,6 +280,8 @@
             font-size: 11px; color: var(--muted); margin-top: 6px;
             font-weight: 500;
         }
+
+        /* 한 줄 구매 판정 — 두 박스 사이에 단독 카드로 둠 */
         .tr-verdict {
             background: var(--surface);
             border: 1px solid var(--border);
@@ -274,16 +294,32 @@
         .tr-verdict-label {
             color: var(--primary-strong); font-weight: 700; margin-right: 6px;
         }
-        .tr-reliability-card {
+
+        /* (2) 리뷰 정보 충실도 박스 */
+        .tr-rel-box {
             background: var(--surface);
             border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 14px 16px;
-            display: flex; flex-direction: column; gap: 6px;
+            border-radius: 14px;
+            box-shadow: var(--shadow);
+            padding: 18px 20px;
+            display: flex; flex-direction: column; gap: 14px;
         }
-        .tr-reliability-title { font-size: 12px; color: var(--muted); font-weight: 600; }
-        .tr-reliability-pct-row {
+        .tr-rel-head {
+            display: flex; align-items: flex-start; justify-content: space-between;
+            gap: 12px; flex-wrap: wrap;
+        }
+        .tr-rel-head-left { flex: 1; min-width: 0; }
+        .tr-rel-title {
+            font-size: 15px; font-weight: 700; color: var(--text);
+            letter-spacing: -0.01em; margin-bottom: 4px;
+        }
+        .tr-rel-sub {
+            font-size: 12px; color: var(--muted); font-weight: 500;
+            line-height: 1.45; word-break: keep-all;
+        }
+        .tr-rel-pct-row {
             display: flex; align-items: baseline; gap: 6px;
+            flex-shrink: 0;
         }
         .tr-reliability-pct {
             font-size: 26px; font-weight: 800; letter-spacing: -0.02em;
@@ -297,16 +333,44 @@
         .tr-reliability-badge.good { background: var(--positive-soft); color: #0d6e4f; }
         .tr-reliability-badge.mid { background: var(--neutral-soft); color: #8a5a00; }
         .tr-reliability-badge.low { background: #eee; color: #555; }
-        .tr-reliability-list {
-            list-style: none; margin: 4px 0 0; padding: 0;
-            display: flex; flex-direction: column; gap: 4px;
-            font-size: 12.5px;
+
+        /* 4개 체크 항목 2 × 2 그리드 */
+        .tr-rel-checks {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
         }
-        .tr-reliability-list li {
-            display: flex; align-items: center; gap: 6px;
-            color: var(--text);
+        .tr-rel-check {
+            display: flex; align-items: center; gap: 10px;
+            padding: 12px 14px;
+            border: 1px solid;
+            border-radius: 10px;
+            min-width: 0;
         }
-        .tr-reliability-list li.miss { color: var(--muted); text-decoration: line-through; opacity: 0.7; }
+        .tr-rel-check-ok {
+            background: var(--positive-soft); border-color: #c5f0de;
+        }
+        .tr-rel-check-no {
+            background: var(--negative-soft); border-color: #f7c2c8;
+        }
+        .tr-rel-check-icon {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 24px; height: 24px; border-radius: 999px;
+            font-size: 13px; font-weight: 800;
+            flex-shrink: 0;
+        }
+        .tr-rel-check-ok .tr-rel-check-icon { background: #19a87c; color: #fff; }
+        .tr-rel-check-no .tr-rel-check-icon { background: #b3303c; color: #fff; }
+        .tr-rel-check-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+        .tr-rel-check-label {
+            font-size: 13px; font-weight: 700; color: var(--text);
+            word-break: keep-all;
+        }
+        .tr-rel-check-status {
+            font-size: 11px; font-weight: 600;
+        }
+        .tr-rel-check-ok .tr-rel-check-status { color: #0d6e4f; }
+        .tr-rel-check-no .tr-rel-check-status { color: #b3303c; }
 
         /* ── #2 Balance diagram ────────────────────── */
         .tr-balance {
@@ -433,6 +497,95 @@
         }
         .tr-heatmap-tooltip .t-empty { color: #b8b3cc; font-style: italic; }
 
+        /* ── #2.5 Pros/Cons strength-ranked card grid ── */
+        .tr-pc-wrap {
+            margin: 8px 0 16px;
+        }
+        .tr-pc-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .tr-pc-col {
+            display: flex; flex-direction: column; gap: 8px;
+            min-width: 0;
+        }
+        .tr-pc-col-header {
+            display: flex; align-items: center; justify-content: space-between;
+            font-size: 12px; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.04em;
+            padding: 0 2px 4px;
+        }
+        .tr-pc-col-header-pos { color: #0d6e4f; }
+        .tr-pc-col-header-neg { color: #b3303c; }
+        .tr-pc-col-count {
+            font-size: 11px; font-weight: 700; color: var(--muted);
+            background: var(--surface-soft, #faf7ff);
+            padding: 2px 8px; border-radius: 999px;
+        }
+        .tr-pc-card {
+            display: flex; align-items: flex-start; gap: 10px;
+            background: var(--surface);
+            border: 1px solid var(--border-soft);
+            border-radius: 10px;
+            padding: 10px 12px;
+            min-width: 0;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        .tr-pc-card:hover {
+            box-shadow: var(--shadow);
+        }
+        .tr-pc-card-strong-pos { border-left: 3px solid #19a87c; }
+        .tr-pc-card-pos        { border-left: 3px solid #c5f0de; }
+        .tr-pc-card-strong-neg { border-left: 3px solid #b3303c; }
+        .tr-pc-card-neg        { border-left: 3px solid #f7c2c8; }
+        .tr-pc-badge {
+            display: inline-flex; align-items: center;
+            font-size: 10px; font-weight: 700;
+            padding: 3px 8px; border-radius: 999px;
+            white-space: nowrap; flex-shrink: 0;
+            letter-spacing: 0.02em;
+        }
+        .tr-pc-badge-strong-pos {
+            background: #19a87c; color: #fff;
+        }
+        .tr-pc-badge-pos {
+            background: var(--positive-soft); color: #0d6e4f;
+            border: 1px solid #c5f0de;
+        }
+        .tr-pc-badge-strong-neg {
+            background: #b3303c; color: #fff;
+        }
+        .tr-pc-badge-neg {
+            background: var(--negative-soft); color: #b3303c;
+            border: 1px solid #f7c2c8;
+        }
+        .tr-pc-icon {
+            font-size: 16px; line-height: 1.2; flex-shrink: 0;
+        }
+        .tr-pc-text {
+            flex: 1; min-width: 0;
+            display: flex; flex-direction: column; gap: 3px;
+        }
+        .tr-pc-main {
+            font-size: 13px; line-height: 1.4;
+            color: var(--text); font-weight: 600;
+            word-break: keep-all;
+        }
+        .tr-pc-sub {
+            font-size: 11px; line-height: 1.45;
+            color: var(--muted); font-weight: 400;
+            word-break: keep-all;
+        }
+        .tr-pc-empty {
+            font-size: 12px; color: var(--muted);
+            font-style: italic; padding: 8px 4px;
+            text-align: center;
+        }
+        @media (max-width: 660px) {
+            .tr-pc-grid { grid-template-columns: 1fr; }
+        }
+
         /* ── #4 Before/After change cards ─────────── */
         .tr-changes {
             margin: 6px 0 14px;
@@ -481,6 +634,189 @@
         .tr-change-card.up .tr-change-delta { color: #0d6e4f; }
         .tr-change-card.down .tr-change-delta { color: #b3303c; }
         .tr-change-card.flat .tr-change-delta { color: #8a5a00; }
+
+        /* ── #4.5 Differentiation & value verdict (2-pane card) ── */
+        .tr-vv-wrap {
+            margin: 6px 0 16px;
+        }
+        .tr-vv-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .tr-vv-pane {
+            display: flex; flex-direction: column;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px 14px;
+            min-width: 0;
+        }
+        .tr-vv-pane-pros { border-color: #c5f0de; background: var(--positive-soft); }
+        .tr-vv-pane-caut { border-color: #f4d8a8; background: var(--neutral-soft, #fff4e0); }
+        .tr-vv-pane-head {
+            display: flex; align-items: center; gap: 6px;
+            font-size: 13px; font-weight: 700;
+            margin-bottom: 8px;
+            letter-spacing: 0.01em;
+        }
+        .tr-vv-pane-icon {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 22px; height: 22px; border-radius: 999px;
+            font-size: 12px; font-weight: 800;
+            flex-shrink: 0;
+        }
+        .tr-vv-pane-pros .tr-vv-pane-title { color: #0d6e4f; }
+        .tr-vv-pane-pros .tr-vv-pane-icon  { background: #19a87c; color: #fff; }
+        .tr-vv-pane-caut .tr-vv-pane-title { color: #8a5a00; }
+        .tr-vv-pane-caut .tr-vv-pane-icon  { background: #c98a2a; color: #fff; }
+        .tr-vv-pane-list {
+            list-style: none; padding: 0; margin: 0;
+            display: flex; flex-direction: column; gap: 6px;
+        }
+        .tr-vv-item {
+            font-size: 12px; line-height: 1.5;
+            color: var(--text); font-weight: 500;
+            padding-left: 14px; position: relative;
+            word-break: keep-all;
+        }
+        .tr-vv-item::before {
+            content: '·';
+            position: absolute; left: 4px; top: -2px;
+            font-weight: 800;
+        }
+        .tr-vv-pane-pros .tr-vv-item::before { color: #19a87c; }
+        .tr-vv-pane-caut .tr-vv-item::before { color: #c98a2a; }
+        .tr-vv-item-muted {
+            color: var(--muted); font-style: italic; font-weight: 400;
+        }
+        .tr-vv-item-empty {
+            color: var(--muted); font-style: italic; font-weight: 400;
+        }
+        @media (max-width: 660px) {
+            .tr-vv-grid { grid-template-columns: 1fr; }
+        }
+
+        /* ── Comments screen: donut + key-comment cards + collapsible list ── */
+        .cmd-section-sub {
+            font-size: 13px; font-weight: 500; color: var(--muted);
+            margin-left: 6px;
+        }
+        .cmd-loading {
+            font-size: 13px; color: var(--muted); padding: 12px 4px;
+        }
+        .cmd-dist-grid {
+            display: grid;
+            grid-template-columns: minmax(180px, 220px) 1fr;
+            gap: 22px;
+            align-items: start;
+            margin-top: 12px;
+            padding: 14px 16px;
+            background: var(--surface);
+            border: 1px solid var(--border-soft);
+            border-radius: 12px;
+        }
+        .cmd-donut-wrap {
+            display: flex; flex-direction: column; align-items: center; gap: 10px;
+        }
+        .cmd-donut-wrap svg {
+            display: block; max-width: 180px; height: auto;
+        }
+        .cmd-donut-legend {
+            display: flex; flex-wrap: wrap; gap: 4px;
+            align-items: center; justify-content: center;
+            width: 100%;
+        }
+        .cmd-legend-item {
+            display: inline-flex; align-items: center; gap: 5px;
+            background: transparent; border: none; padding: 4px 8px;
+            border-radius: 6px; cursor: pointer;
+            font-family: inherit; font-size: 12px; font-weight: 600;
+            color: var(--text);
+            transition: background 0.15s;
+        }
+        .cmd-legend-item:hover {
+            background: var(--primary-soft);
+        }
+        .cmd-legend-dot {
+            width: 10px; height: 10px; border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .cmd-legend-count {
+            color: var(--muted); font-weight: 500;
+            font-variant-numeric: tabular-nums;
+        }
+        .cmd-key-comments {
+            display: flex; flex-direction: column; gap: 10px;
+            min-width: 0;
+        }
+        .cmd-key-title {
+            font-size: 12px; color: var(--muted); font-weight: 600;
+            letter-spacing: 0.02em;
+            margin-bottom: 2px;
+        }
+        .cmd-key-card {
+            background: var(--surface);
+            border: 1px solid var(--border-soft);
+            border-left: 3px solid var(--border);
+            border-radius: 10px;
+            padding: 12px 14px;
+            display: flex; flex-direction: column; gap: 5px;
+            min-width: 0;
+            transition: box-shadow 0.15s;
+        }
+        .cmd-key-card:hover { box-shadow: var(--shadow); }
+        .cmd-key-positive { border-left-color: #19a87c; }
+        .cmd-key-negative { border-left-color: #b3303c; }
+        .cmd-key-neutral  { border-left-color: #b8b3c4; }
+        .cmd-key-text {
+            font-size: 13px; line-height: 1.55; color: var(--text);
+            font-weight: 500; word-break: keep-all;
+        }
+        .cmd-key-meta {
+            font-size: 11px; font-weight: 600;
+        }
+        .cmd-key-positive .cmd-key-meta { color: #0d6e4f; }
+        .cmd-key-negative .cmd-key-meta { color: #b3303c; }
+        .cmd-key-neutral  .cmd-key-meta { color: var(--muted); }
+        .cmd-empty {
+            font-size: 13px; color: var(--muted); font-style: italic;
+            padding: 14px; text-align: center;
+            border: 1px dashed var(--border-soft); border-radius: 10px;
+        }
+
+        /* Full analyzed-comments list — collapsed by default, expands inline */
+        .cmd-full-toggle { margin-top: 4px; }
+        .cmd-full-toggle > summary {
+            list-style: none; cursor: pointer; user-select: none;
+            padding: 12px 16px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: space-between;
+            font-size: 13px; font-weight: 600; color: var(--text);
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .cmd-full-toggle > summary::-webkit-details-marker { display: none; }
+        .cmd-full-toggle > summary:hover {
+            background: var(--primary-soft); border-color: var(--primary-soft);
+        }
+        .cmd-full-toggle-text strong { color: var(--primary-strong); font-weight: 700; }
+        .cmd-full-toggle-filter {
+            margin-left: 6px; font-size: 11px;
+            color: var(--primary-strong); background: var(--primary-soft);
+            padding: 2px 8px; border-radius: 999px; font-weight: 600;
+        }
+        .cmd-full-toggle-icon {
+            color: var(--muted); transition: transform 0.2s;
+            font-size: 14px; line-height: 1;
+        }
+        .cmd-full-toggle[open] > summary .cmd-full-toggle-icon { transform: rotate(180deg); }
+        .cmd-full-body { padding-top: 14px; }
+
+        @media (max-width: 660px) {
+            .cmd-dist-grid { grid-template-columns: 1fr; gap: 16px; }
+        }
 
         /* ── #5 Audience matcher ─────────────────── */
         .tr-matcher {
@@ -594,7 +930,8 @@
             .stats { grid-template-columns: repeat(2, 1fr); }
             .sentiment-summary { grid-template-columns: 1fr; }
             .report-box { padding: 18px; }
-            .tr-hero { grid-template-columns: 1fr; }
+            .tr-rel-checks { grid-template-columns: 1fr; }
+            .tr-rel-head { flex-direction: column; align-items: stretch; }
             .tr-heatmap-grid { grid-template-columns: repeat(4, 1fr); }
             .tr-changes-row { grid-template-columns: 1fr; }
             .tr-balance-row { grid-template-columns: 50px 1fr 56px; }
@@ -843,6 +1180,45 @@
             padding-left: 8px;
         }
         .cmp-evi-comments { display: flex; flex-direction: column; gap: 6px; }
+
+        /* ── ③ S1/S2 reviewer-quote structured card (.cmp-rq-*) ─── */
+        .cmp-rq-body {
+            display: flex; flex-direction: column; gap: 8px;
+        }
+        .cmp-rq-badge {
+            display: inline-flex; align-items: center;
+            align-self: flex-start;
+            font-size: 11px; font-weight: 700;
+            padding: 3px 9px; border-radius: 999px;
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+        }
+        .cmp-rq-badge-strong-pos { background: #19a87c; color: #fff; }
+        .cmp-rq-badge-pos        { background: var(--positive-soft); color: #0d6e4f; border: 1px solid #c5f0de; }
+        .cmp-rq-badge-strong-neg { background: #b3303c; color: #fff; }
+        .cmp-rq-badge-neg        { background: var(--negative-soft); color: #b3303c; border: 1px solid #f7c2c8; }
+        .cmp-rq-headline {
+            font-size: 14px; font-weight: 700; line-height: 1.4;
+            color: var(--text);
+            word-break: keep-all;
+        }
+        .cmp-rq-chips {
+            display: flex; flex-wrap: wrap; gap: 5px;
+        }
+        .cmp-rq-chip {
+            font-size: 11.5px; font-weight: 500;
+            color: var(--text);
+            background: var(--surface);
+            border: 1px solid var(--border-soft);
+            padding: 3px 9px; border-radius: 999px;
+            white-space: nowrap;
+            line-height: 1.3;
+        }
+        .cmp-rq-sub {
+            font-size: 11.5px; line-height: 1.45;
+            color: var(--muted);
+            font-style: italic;
+        }
 
         /* ── ③ S3 리뷰어만 vs 소비자만 (좌우 칼럼) ─────────── */
         .cmp-only-grid {
@@ -1189,60 +1565,81 @@
             <div class="stat-box"><div class="label">제품 관련 댓글</div><div class="value">{{ product_related_count }}</div></div>
         </div>
 
-        <!-- Sentiment summary -->
+        <!-- Sentiment summary — donut + key-comment cards -->
         <section class="section">
-            <h2>댓글 감성 분포</h2>
-            <div class="sentiment-summary">
-                <div class="sentiment-box positive {% if current_sentiment == 'positive' %}active{% endif %}" onclick="filterBySentiment('positive')" id="box-positive">
-                    <div class="label">😊 긍정</div>
-                    <div class="value">{{ sentiment_positive }}</div>
+            <h2>댓글 감성 분포 <span class="cmd-section-sub">— 분석 댓글 {{ analyzed_comment_count }}건</span></h2>
+            {% if (sentiment_positive + sentiment_neutral + sentiment_negative) > 0 %}
+                <script type="application/json" id="cmdData">{
+                    "pos": {{ sentiment_positive }},
+                    "neu": {{ sentiment_neutral }},
+                    "neg": {{ sentiment_negative }},
+                    "total_analyzed": {{ analyzed_comment_count }},
+                    "current_sentiment": {{ (current_sentiment or '')|tojson }},
+                    "sample": [
+                        {% for c in comments %}{
+                            "text": {{ (c.text_raw or '')|tojson }},
+                            "label": {{ (c.sentiment_label or '')|tojson }},
+                            "score": {{ (c.sentiment_score|float) if c.sentiment_score is not none else 0 }}
+                        }{% if not loop.last %},{% endif %}{% endfor %}
+                    ]
+                }</script>
+                <div id="cmdDist" class="cmd-dist-grid">
+                    <div class="cmd-loading">렌더링 중…</div>
                 </div>
-                <div class="sentiment-box neutral {% if current_sentiment == 'neutral' %}active{% endif %}" onclick="filterBySentiment('neutral')" id="box-neutral">
-                    <div class="label">😐 중립</div>
-                    <div class="value">{{ sentiment_neutral }}</div>
-                </div>
-                <div class="sentiment-box negative {% if current_sentiment == 'negative' %}active{% endif %}" onclick="filterBySentiment('negative')" id="box-negative">
-                    <div class="label">😠 부정</div>
-                    <div class="value">{{ sentiment_negative }}</div>
-                </div>
-            </div>
+            {% else %}
+                <div class="empty-report">감성 분석된 댓글이 없습니다.</div>
+            {% endif %}
         </section>
 
-        <!-- Comments -->
+        <!-- Comments — full list collapsed inside <details> -->
         <section class="section">
-            <h2>최종 분석 댓글 <span class="count">{{ analyzed_comment_count }}건</span></h2>
             {% if comments %}
-                {% for comment in comments %}
-                    <div class="comment-item {% if comment.sentiment_label %}{{ comment.sentiment_label }}{% else %}neutral{% endif %}">
-                        <div class="comment-text">{{ comment.text_raw }}</div>
-                        <div class="comment-meta">
-                            {% if comment.sentiment_label %}
-                                감성: <strong class="{{ comment.sentiment_label }}">{{ comment.sentiment_label|upper }}</strong> ({{ comment.sentiment_score }})
-                            {% else %}
-                                감성: <strong>UNANALYZED</strong>
+                <details class="cmd-full-toggle" {% if current_sentiment %}open{% endif %}>
+                    <summary>
+                        <span class="cmd-full-toggle-text">
+                            전체 분석 댓글 <strong>{{ analyzed_comment_count }}건</strong>
+                            {% if current_sentiment %}
+                                <span class="cmd-full-toggle-filter">· 필터: {{ current_sentiment|upper }}</span>
                             {% endif %}
-                        </div>
-                    </div>
-                {% endfor %}
+                            펼치기
+                        </span>
+                        <span class="cmd-full-toggle-icon" aria-hidden="true">▾</span>
+                    </summary>
+                    <div class="cmd-full-body">
+                        {% for comment in comments %}
+                            <div class="comment-item {% if comment.sentiment_label %}{{ comment.sentiment_label }}{% else %}neutral{% endif %}">
+                                <div class="comment-text">{{ comment.text_raw }}</div>
+                                <div class="comment-meta">
+                                    {% if comment.sentiment_label %}
+                                        감성: <strong class="{{ comment.sentiment_label }}">{{ comment.sentiment_label|upper }}</strong> ({{ comment.sentiment_score }})
+                                    {% else %}
+                                        감성: <strong>UNANALYZED</strong>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        {% endfor %}
 
-                {% if total_pages > 1 %}
-                    <div class="pagination">
-                        {% if current_page > 1 %}
-                            <a href="?page={{ current_page - 1 }}{% if current_sentiment %}&sentiment={{ current_sentiment }}{% endif %}">‹ 이전</a>
-                        {% else %}
-                            <span class="disabled">‹ 이전</span>
+                        {% if total_pages > 1 %}
+                            <div class="pagination">
+                                {% if current_page > 1 %}
+                                    <a href="?page={{ current_page - 1 }}{% if current_sentiment %}&sentiment={{ current_sentiment }}{% endif %}">‹ 이전</a>
+                                {% else %}
+                                    <span class="disabled">‹ 이전</span>
+                                {% endif %}
+
+                                <span class="current">{{ current_page }} / {{ total_pages }}</span>
+
+                                {% if current_page < total_pages %}
+                                    <a href="?page={{ current_page + 1 }}{% if current_sentiment %}&sentiment={{ current_sentiment }}{% endif %}">다음 ›</a>
+                                {% else %}
+                                    <span class="disabled">다음 ›</span>
+                                {% endif %}
+                            </div>
                         {% endif %}
-
-                        <span class="current">{{ current_page }} / {{ total_pages }}</span>
-
-                        {% if current_page < total_pages %}
-                            <a href="?page={{ current_page + 1 }}{% if current_sentiment %}&sentiment={{ current_sentiment }}{% endif %}">다음 ›</a>
-                        {% else %}
-                            <span class="disabled">다음 ›</span>
-                        {% endif %}
                     </div>
-                {% endif %}
+                </details>
             {% else %}
+                <h2>최종 분석 댓글</h2>
                 <div class="empty-report">분석된 댓글이 없습니다.</div>
             {% endif %}
         </section>
@@ -1316,6 +1713,127 @@
             urlParams.set('page', '1');
             window.location.search = urlParams.toString();
         }
+
+        /* ── Comments-screen: SVG donut + key-comment cards ───────────
+           The original 3-box sentiment summary is replaced by a donut +
+           a short "핵심 댓글" card list. Data comes from #cmdData (server
+           rendered Jinja JSON), no extra deps, no Chart.js. The filter
+           function (filterBySentiment) is reused via legend buttons so
+           the existing ?sentiment= filter path remains intact. */
+        function _cmdEscape(s) {
+            const d = document.createElement('div');
+            d.textContent = String(s == null ? '' : s);
+            return d.innerHTML;
+        }
+        function _cmdReadData() {
+            const el = document.getElementById('cmdData');
+            if (!el) return null;
+            try { return JSON.parse(el.textContent); } catch (e) { return null; }
+        }
+        function _cmdBuildDonut(pos, neu, neg, total) {
+            const cx = 90, cy = 90, r = 60, sw = 26;
+            const C = 2 * Math.PI * r;
+            const segs = [
+                { kind: 'positive', count: pos, color: '#20c997', label: '긍정' },
+                { kind: 'neutral',  count: neu, color: '#b8b3c4', label: '중립' },
+                { kind: 'negative', count: neg, color: '#e35d6a', label: '부정' }
+            ];
+            let offset = 0;
+            const arcs = segs.map(s => {
+                if (s.count <= 0) return '';
+                const len = (s.count / total) * C;
+                const arc = '<circle cx="' + cx + '" cy="' + cy + '" r="' + r +
+                    '" fill="none" stroke="' + s.color + '" stroke-width="' + sw +
+                    '" stroke-dasharray="' + len.toFixed(3) + ' ' + C.toFixed(3) +
+                    '" stroke-dashoffset="' + (-offset).toFixed(3) +
+                    '" transform="rotate(-90 ' + cx + ' ' + cy + ')"></circle>';
+                offset += len;
+                return arc;
+            }).join('');
+            const svg = '<svg width="180" height="180" viewBox="0 0 180 180" role="img" aria-label="감성 분포 도넛">' +
+                arcs +
+                '<text x="90" y="92" text-anchor="middle" font-size="28" font-weight="800" fill="#1f1c2e">' + total + '</text>' +
+                '<text x="90" y="114" text-anchor="middle" font-size="12" fill="#6b6880">건</text>' +
+                '</svg>';
+            const legend = '<div class="cmd-donut-legend">' + segs.map(s =>
+                '<button type="button" class="cmd-legend-item" onclick="filterBySentiment(\'' + s.kind + '\')" title="' + s.label + ' 댓글만 필터">' +
+                    '<span class="cmd-legend-dot" style="background:' + s.color + '"></span>' +
+                    '<span class="cmd-legend-label">' + s.label + '</span>' +
+                    '<span class="cmd-legend-count">' + s.count + '</span>' +
+                '</button>'
+            ).join('') + '</div>';
+            return svg + legend;
+        }
+        function _cmdPickKeyComments(sample) {
+            // Backend SELECT does not include like_count, so we approximate
+            // "impact" with the absolute sentiment_score. Goal: a short list
+            // that mixes positive + negative voices.
+            const scored = (sample || [])
+                .filter(c => c && c.text && c.label)
+                .map(c => ({
+                    text: String(c.text),
+                    label: String(c.label).toLowerCase(),
+                    score: Number(c.score) || 0,
+                    abs: Math.abs(Number(c.score) || 0)
+                }))
+                .sort((a, b) => b.abs - a.abs);
+            const picked = [];
+            const seen = new Set();
+            function add(c) {
+                if (!c || seen.has(c.text)) return;
+                seen.add(c.text);
+                picked.push(c);
+            }
+            add(scored.find(c => c.label === 'positive'));
+            add(scored.find(c => c.label === 'negative'));
+            for (const c of scored) {
+                if (picked.length >= 3) break;
+                add(c);
+            }
+            return picked.slice(0, 3);
+        }
+        function _cmdBuildKeyCards(sample) {
+            const picked = _cmdPickKeyComments(sample);
+            const labelKr = { positive: '긍정', negative: '부정', neutral: '중립' };
+            const TRUNC = 60;
+            function trunc(s) { return s.length > TRUNC ? s.slice(0, TRUNC) + '…' : s; }
+            const head = '<div class="cmd-key-title">핵심 댓글</div>';
+            if (picked.length === 0) {
+                return head + '<div class="cmd-empty">현재 페이지에 표시할 핵심 댓글이 없습니다.</div>';
+            }
+            const cards = picked.map(c => {
+                const score = c.score.toFixed(2);
+                const tag = labelKr[c.label] || '중립';
+                return '<div class="cmd-key-card cmd-key-' + c.label + '">' +
+                        '<div class="cmd-key-text">' + _cmdEscape(trunc(c.text)) + '</div>' +
+                        '<div class="cmd-key-meta">' + tag + ' ' + score + ' · 강도순</div>' +
+                    '</div>';
+            }).join('');
+            return head + cards;
+        }
+        function cmdRender() {
+            const root = document.getElementById('cmdDist');
+            if (!root) return;
+            try {
+                const data = _cmdReadData();
+                if (!data) return;
+                const pos = Number(data.pos) || 0;
+                const neu = Number(data.neu) || 0;
+                const neg = Number(data.neg) || 0;
+                const total = pos + neu + neg;
+                if (total <= 0) {
+                    root.outerHTML = '<div class="empty-report">감성 분석된 댓글이 없습니다.</div>';
+                    return;
+                }
+                root.innerHTML =
+                    '<div class="cmd-donut-wrap">' + _cmdBuildDonut(pos, neu, neg, total) + '</div>' +
+                    '<div class="cmd-key-comments">' + _cmdBuildKeyCards(data.sample || []) + '</div>';
+            } catch (e) {
+                console.warn('[cmd] sentiment donut render failed', e);
+                // leave the .cmd-loading placeholder in place — non-fatal
+            }
+        }
+        document.addEventListener('DOMContentLoaded', cmdRender);
 
         /* ───────────────────────────────────────────────────────────
            Transcript report visual enhancement
@@ -1523,17 +2041,35 @@
             const reliabilityPct = Math.round((okCount / 4) * 100);
             const reliabilityClass = reliabilityPct >= 75 ? 'good' : (reliabilityPct >= 50 ? 'mid' : 'low');
 
+            // ── Outer stack: 두 박스를 세로로 쌓는 단순 wrapper. 기존 grid 2-col
+            //    레이아웃은 폐기 — 평가 무드(리뷰어 평가 톤)와 충실도(보고서 정보
+            //    충실도)는 성격이 무관하므로 별도 카드로 분리해 시각적 혼동 제거.
             const hero = document.createElement('div');
             hero.className = 'tr-hero';
-            const main = document.createElement('div');
-            main.className = 'tr-hero-main';
+
+            // ── (1) 평가 무드 박스 ──────────────────────────────────────
+            const moodBox = document.createElement('div');
+            moodBox.className = 'tr-mood-box';
+
+            // 톤 클래스 매핑 — mood.pct 기반. label 색상에만 사용.
+            const moodTone = mood.pct >= 60 ? 'pos'
+                          : mood.pct >= 40 ? 'neutral'
+                          : 'neg';
+
+            const moodHead = document.createElement('div');
+            moodHead.className = 'tr-mood-box-head';
+            moodHead.innerHTML =
+                '<span class="tr-mood-title">📊 평가 무드</span>' +
+                '<span class="tr-mood-sub">리뷰어의 전반적 평가 톤</span>';
 
             const headline = document.createElement('div');
             headline.className = 'tr-mood-headline';
             headline.innerHTML =
-                '<div class="tr-mood-label-strong">📊 평가 무드: ' + mood.label + '</div>' +
-                '<div class="tr-mood-pct">긍정 강도 ' + mood.pct + '% · ◎' + symbols.strongPos +
-                ' ○' + symbols.pos + ' △' + symbols.neg + ' ✕' + symbols.strongNeg + '</div>';
+                '<span class="tr-mood-label-strong tr-mood-tone-' + moodTone + '">' +
+                    _trEscape(mood.label) +
+                '</span>' +
+                '<span class="tr-mood-pct">긍정 강도 ' + mood.pct + '% · ◎' + symbols.strongPos +
+                ' ○' + symbols.pos + ' △' + symbols.neg + ' ✕' + symbols.strongNeg + '</span>';
 
             const barWrap = document.createElement('div');
             barWrap.className = 'tr-mood-bar-wrap';
@@ -1542,33 +2078,56 @@
                 '<div class="tr-mood-bar"><div class="tr-mood-marker" style="left:' + safePct + '%"></div></div>' +
                 '<div class="tr-mood-scale"><span>매우 부정</span><span>부정</span><span>중립</span><span>긍정</span><span>매우 긍정</span></div>';
 
-            main.appendChild(headline);
-            main.appendChild(barWrap);
+            moodBox.appendChild(moodHead);
+            moodBox.appendChild(headline);
+            moodBox.appendChild(barWrap);
+            hero.appendChild(moodBox);
 
+            // ── (옵션) 한 줄 구매 판정 ──────────────────────────────────
+            // verdictText 가 있으면 두 박스 사이에 별도 .tr-verdict 노드로 둠.
+            // 원본 "### 🛒 한 줄 구매 판정" 섹션은 verdictToHide 로 숨김 처리 유지.
             if (verdictText) {
                 const verdict = document.createElement('div');
                 verdict.className = 'tr-verdict';
                 verdict.innerHTML = '<span class="tr-verdict-label">🛒 한 줄 구매 판정</span>' + _trEscape(verdictText);
-                main.appendChild(verdict);
+                hero.appendChild(verdict);
             }
 
-            const rel = document.createElement('div');
-            rel.className = 'tr-reliability-card';
-            const listHtml = checks.map(c =>
-                '<li class="' + (c.ok ? '' : 'miss') + '">' + (c.ok ? '✅' : '❌') + ' ' + c.label + '</li>'
-            ).join('');
-            rel.innerHTML =
-                '<div class="tr-reliability-title">📋 리뷰 정보 충실도</div>' +
-                '<div class="tr-reliability-pct-row">' +
-                    '<span class="tr-reliability-pct">' + reliabilityPct + '%</span>' +
-                    '<span class="tr-reliability-badge ' + reliabilityClass + '">' +
-                        (reliabilityPct >= 75 ? '충실' : reliabilityPct >= 50 ? '보통' : '부족') +
-                    '</span>' +
-                '</div>' +
-                '<ul class="tr-reliability-list">' + listHtml + '</ul>';
+            // ── (2) 리뷰 정보 충실도 박스 ──────────────────────────────
+            const relBox = document.createElement('div');
+            relBox.className = 'tr-rel-box';
 
-            hero.appendChild(main);
-            hero.appendChild(rel);
+            const badgeLabel = reliabilityPct >= 75 ? '충실'
+                            : reliabilityPct >= 50 ? '보통'
+                            : '부족';
+            const cardsHtml = checks.map(c => {
+                const variant = c.ok ? 'ok' : 'no';
+                const icon = c.ok ? '✓' : '✕';
+                const status = c.ok ? '충족' : '미충족';
+                return '<div class="tr-rel-check tr-rel-check-' + variant + '">' +
+                        '<span class="tr-rel-check-icon">' + icon + '</span>' +
+                        '<div class="tr-rel-check-body">' +
+                            '<div class="tr-rel-check-label">' + _trEscape(c.label) + '</div>' +
+                            '<div class="tr-rel-check-status">' + status + '</div>' +
+                        '</div>' +
+                    '</div>';
+            }).join('');
+
+            relBox.innerHTML =
+                '<div class="tr-rel-head">' +
+                    '<div class="tr-rel-head-left">' +
+                        '<div class="tr-rel-title">📋 리뷰 정보 충실도</div>' +
+                        '<div class="tr-rel-sub">이 보고서가 구매 판단에 필요한 정보를 얼마나 담고 있는지 — 4개 항목 충족도</div>' +
+                    '</div>' +
+                    '<div class="tr-rel-pct-row">' +
+                        '<span class="tr-reliability-pct">' + reliabilityPct + '%</span>' +
+                        '<span class="tr-reliability-badge ' + reliabilityClass + '">' + badgeLabel + '</span>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="tr-rel-checks">' + cardsHtml + '</div>';
+
+            hero.appendChild(relBox);
+
             bodyEl.insertBefore(hero, bodyEl.firstChild);
             // safe to hide originals now
             verdictToHide.forEach(el => el && el.classList && el.classList.add('tr-hidden'));
@@ -1672,6 +2231,181 @@
         }
 
         /* ─── #4 Before/after change cards ─── */
+        /* ─── #2.5 Pros/Cons strength-ranked card grid ─── */
+        // Replaces the original ◎○△✕ text list under 장점 / 단점 headings with a
+        // 2-column card grid sorted by strength (◎/✕ first). The balance bar and
+        // category heatmap inserted by _trBuildBalanceAndHeatmap remain above
+        // untouched. All data comes from the existing _tr* utilities — no util
+        // is modified.
+        function _trBuildProsConsCards(bodyEl) {
+            const heading = _trFindHeading(bodyEl, '장점') ||
+                            _trFindHeading(bodyEl, '단점');
+            if (!heading) return;
+
+            const lis = _trCollectAllLis(bodyEl);
+            if (lis.length === 0) return;
+
+            // Sort within each side by symbol strength
+            const order = { strongPos: 0, pos: 1, strongNeg: 0, neg: 1 };
+            const posItems = lis
+                .filter(x => x.sentiment === 'strongPos' || x.sentiment === 'pos')
+                .sort((a, b) => order[a.sentiment] - order[b.sentiment]);
+            const negItems = lis
+                .filter(x => x.sentiment === 'strongNeg' || x.sentiment === 'neg')
+                .sort((a, b) => order[a.sentiment] - order[b.sentiment]);
+
+            if (posItems.length === 0 && negItems.length === 0) return;
+
+            // Peel off "(부가 설명)" trailing parenthetical as secondary text.
+            // Leading ◎○△✕ / dash markers are stripped first.
+            function splitText(text) {
+                let t = (text || '').replace(/^[◎○△✕✗×]\s*/, '').replace(/^[\-\*]\s*/, '').trim();
+                const m = t.match(/^(.+?)\s*[\(（]([^)）]{2,})[\)）]\s*$/);
+                if (m) return { main: m[1].trim(), sub: m[2].trim() };
+                return { main: t, sub: '' };
+            }
+
+            function badgeFor(sentiment) {
+                if (sentiment === 'strongPos') return { label: '핵심',     variant: 'strong-pos' };
+                if (sentiment === 'pos')        return { label: '장점',     variant: 'pos' };
+                if (sentiment === 'strongNeg') return { label: '주요 단점', variant: 'strong-neg' };
+                if (sentiment === 'neg')        return { label: '아쉬움',   variant: 'neg' };
+                return { label: '', variant: '' };
+            }
+
+            function buildCard(item) {
+                const { main, sub } = splitText(item.text);
+                const b = badgeFor(item.sentiment);
+                const cats = _trClassifyByCategory(item.text);
+                const icon = (cats[0] && cats[0].icon) || '';
+                const card = document.createElement('div');
+                card.className = 'tr-pc-card tr-pc-card-' + b.variant;
+                card.innerHTML =
+                    '<span class="tr-pc-badge tr-pc-badge-' + b.variant + '">' +
+                        _trEscape(b.label) +
+                    '</span>' +
+                    (icon ? '<span class="tr-pc-icon" aria-hidden="true">' + icon + '</span>' : '') +
+                    '<div class="tr-pc-text">' +
+                        '<div class="tr-pc-main">' + _trEscape(main) + '</div>' +
+                        (sub ? '<div class="tr-pc-sub">' + _trEscape(sub) + '</div>' : '') +
+                    '</div>';
+                return card;
+            }
+
+            function buildColumn(kind, items, title) {
+                const col = document.createElement('div');
+                col.className = 'tr-pc-col tr-pc-col-' + kind;
+                const header = document.createElement('div');
+                header.className = 'tr-pc-col-header tr-pc-col-header-' + kind;
+                header.innerHTML =
+                    '<span class="tr-pc-col-title">' + _trEscape(title) + '</span>' +
+                    '<span class="tr-pc-col-count">' + items.length + '</span>';
+                col.appendChild(header);
+                if (items.length === 0) {
+                    const empty = document.createElement('div');
+                    empty.className = 'tr-pc-empty';
+                    empty.textContent = '항목 없음';
+                    col.appendChild(empty);
+                } else {
+                    items.forEach(it => col.appendChild(buildCard(it)));
+                }
+                return col;
+            }
+
+            const wrap = document.createElement('div');
+            wrap.className = 'tr-pc-wrap';
+            const grid = document.createElement('div');
+            grid.className = 'tr-pc-grid';
+            grid.appendChild(buildColumn('pos', posItems, '장점'));
+            grid.appendChild(buildColumn('neg', negItems, '단점'));
+            wrap.appendChild(grid);
+
+            // Insert after the heatmap (which sits after the balance bar). If those
+            // are missing for any reason, fall back to inserting right after the heading.
+            const heatmap = bodyEl.querySelector('.tr-heatmap');
+            const balance = bodyEl.querySelector('.tr-balance');
+            const anchor = heatmap || balance || heading;
+            anchor.parentNode.insertBefore(wrap, anchor.nextSibling);
+
+            // Hide the original ◎○△✕ items only after the cards are in the DOM.
+            // Path 1 (real <li>): hide each li; hide parent <ul> if every li hidden.
+            // Path 2 (<p> with embedded ◎○△✕ lines): hide the whole <p> only when
+            // every non-empty line in it is a symbol-prefixed item (otherwise the
+            // <p> may carry other prose we should keep).
+            const touchedUls = new Set();
+            const touchedPs = new Map(); // p -> total lines
+            lis.forEach(({ el }) => {
+                if (!el) return;
+                if (el.tagName === 'LI') {
+                    el.classList.add('tr-hidden');
+                    if (el.parentElement) touchedUls.add(el.parentElement);
+                } else if (el.tagName === 'P') {
+                    touchedPs.set(el, (touchedPs.get(el) || 0) + 1);
+                }
+            });
+            touchedUls.forEach(ul => {
+                const remaining = Array.from(ul.querySelectorAll(':scope > li'))
+                    .filter(li => !li.classList.contains('tr-hidden'));
+                if (remaining.length === 0) ul.classList.add('tr-hidden');
+            });
+            // A line counts as "safe to hide together with the bullets" if it is
+            // a symbol bullet (◎○△✕), a plain '장점' / '단점' label, OR a label
+            // immediately followed by a symbol bullet ("장점- ◎ ..." / "단점 △ ...").
+            // Markdown's nl2br often flattens "**장점**\n- ◎ ..." into
+            //   <p><strong>장점</strong>- ◎ ...<br>- ◎ ...<br>...</p>
+            // and without the label-prefix rule the first line "장점- ◎ ..."
+            // (textContent of the <strong> + adjacent text node) is neither a
+            // label-only nor a symbol bullet, so the entire <p> stays alive.
+            const LABEL_RE = /^(장점|단점|장점\s*\/\s*단점|장점\/단점|pros|cons|good|bad)\s*$/i;
+            const LABEL_PREFIX_RE = /^(장점|단점|장점\s*\/\s*단점|장점\/단점)\s*[-–—*·:]?\s*/i;
+            function isLabelOnly(text) { return LABEL_RE.test(text); }
+
+            touchedPs.forEach((_, p) => {
+                const html = p.innerHTML || '';
+                const lines = html.split(/<br\s*\/?>/i);
+                const allHideable = lines.every(line => {
+                    const tmp = document.createElement('div');
+                    tmp.innerHTML = line;
+                    const text = (tmp.textContent || '').replace(/^[\-\*]\s*/, '').trim();
+                    if (!text) return true; // blank line OK
+                    if (isLabelOnly(text)) return true; // 장점 / 단점 라벨 라인은 같이 사라져도 OK
+                    // 라벨 prefix + symbol bullet 한 라인 케이스 (예: "장점- ◎ ...").
+                    // 라벨 부분을 떼어내 보고 나머지가 symbol bullet 이면 hideable.
+                    const stripped = text
+                        .replace(LABEL_PREFIX_RE, '')
+                        .replace(/^[\-\*]\s*/, '')
+                        .trim();
+                    if (stripped !== text && _trClassifyLi(stripped) !== null) return true;
+                    return _trClassifyLi(text) !== null;
+                });
+                if (allHideable) p.classList.add('tr-hidden');
+            });
+
+            // Standalone label-only <p> or <strong>장점</strong> blocks that
+            // weren't picked up by _trCollectAllLis (because they have no symbol)
+            // also need to disappear, otherwise a dangling "장점" / "단점"
+            // heading sits above the new card grid. Scope the cleanup to the
+            // section siblings of the pros/cons heading so we never touch
+            // unrelated paragraphs.
+            const labelHeadings = [];
+            const hPos = _trFindHeading(bodyEl, '장점');
+            const hNeg = _trFindHeading(bodyEl, '단점');
+            if (hPos) labelHeadings.push(hPos);
+            if (hNeg && hNeg !== hPos) labelHeadings.push(hNeg);
+            labelHeadings.forEach(h => {
+                _trSectionSiblings(h).forEach(el => {
+                    if (!el || el.classList.contains('tr-hidden')) return;
+                    // Skip nodes that still carry a bullet (already handled above
+                    // and they own real content).
+                    const html = el.innerHTML || '';
+                    if (/[◎○△✕✗×]/.test(html)) return;
+                    const text = (el.textContent || '').trim();
+                    if (!text) return;
+                    if (isLabelOnly(text)) el.classList.add('tr-hidden');
+                });
+            });
+        }
+
         function _trBuildChangeCards(bodyEl) {
             const heading = _trFindHeading(bodyEl, '전작 대비') ||
                             _trFindHeading(bodyEl, '달라진');
@@ -1741,6 +2475,131 @@
                 '<div class="tr-changes-title">🔥 핵심 변화 임팩트</div>' +
                 '<div class="tr-changes-row">' + cardsHtml + '</div>';
             heading.parentNode.insertBefore(wrap, heading.nextSibling);
+        }
+
+        /* ─── #4.5 Differentiation & value verdict (2-pane card) ─── */
+        // Replaces the free-bullet list under '### 차별성 & 구매 합리성' with a
+        // 2-pane verdict card: left = '차별점' (positive accent), right = '감안할
+        // 점' (cautionary accent). Each bullet is parsed by its '차별점:' or
+        // '감안할 점:' label prefix. Existing _tr* utilities are only called, not
+        // modified. The standalone '🛒 한 줄 구매 판정' section is left alone — no
+        // duplicated verdict line in this card.
+        function _trBuildValueVerdict(bodyEl) {
+            const heading = _trFindHeading(bodyEl, '차별성');
+            if (!heading) return;
+
+            const siblings = _trSectionSiblings(heading);
+            if (siblings.length === 0) return;
+
+            // Path 1 (real <ul><li>) + Path 2 (<p> with <br>-separated lines).
+            // We only consume bullets that start with the fixed labels.
+            const PROS_RE = /^(?:[-*]\s*)?차별점\s*[:：]\s*(.+)$/;
+            const CAUT_RE = /^(?:[-*]\s*)?(?:감안할\s*점|감안할점)\s*[:：]\s*(.+)$/;
+
+            const pros = [];
+            const cautions = [];
+            const consumedLis = [];
+            const touchedPs = new Set();
+
+            function eatLine(line, sourceEl) {
+                const text = (line || '').trim();
+                if (!text) return false;
+                let m = text.match(PROS_RE);
+                if (m) { pros.push(m[1].trim()); return true; }
+                m = text.match(CAUT_RE);
+                if (m) { cautions.push(m[1].trim()); return true; }
+                return false;
+            }
+
+            siblings.forEach(el => {
+                // Real list items
+                el.querySelectorAll('li').forEach(li => {
+                    if (eatLine(li.textContent, li)) consumedLis.push(li);
+                });
+                // <p> with embedded bullet lines (nl2br fallback)
+                if (el.tagName === 'P') {
+                    const html = el.innerHTML || '';
+                    if (!/차별점|감안/.test(html)) return;
+                    const lines = html.split(/<br\s*\/?>/i);
+                    let pHadAny = false;
+                    lines.forEach(line => {
+                        const tmp = document.createElement('div');
+                        tmp.innerHTML = line;
+                        if (eatLine(tmp.textContent || '', el)) pHadAny = true;
+                    });
+                    if (pHadAny) touchedPs.add(el);
+                }
+            });
+
+            if (pros.length === 0 && cautions.length === 0) return;
+
+            // Detect data-insufficient bullets so we render them with a subdued tone.
+            const insufficientRe = /(데이터\s*부족|언급\s*없음|정보\s*부족|평가\s*없음|다루지\s*않음|미언급)/;
+
+            function buildPane(kind, items, title, icon, emptyText) {
+                const pane = document.createElement('div');
+                pane.className = 'tr-vv-pane tr-vv-pane-' + kind;
+                const head = document.createElement('div');
+                head.className = 'tr-vv-pane-head';
+                head.innerHTML =
+                    '<span class="tr-vv-pane-icon" aria-hidden="true">' + icon + '</span>' +
+                    '<span class="tr-vv-pane-title">' + _trEscape(title) + '</span>';
+                pane.appendChild(head);
+                const list = document.createElement('ul');
+                list.className = 'tr-vv-pane-list';
+                if (items.length === 0) {
+                    const li = document.createElement('li');
+                    li.className = 'tr-vv-item tr-vv-item-empty';
+                    li.textContent = emptyText;
+                    list.appendChild(li);
+                } else {
+                    items.forEach(text => {
+                        const li = document.createElement('li');
+                        const muted = insufficientRe.test(text);
+                        li.className = 'tr-vv-item' + (muted ? ' tr-vv-item-muted' : '');
+                        li.textContent = text;
+                        list.appendChild(li);
+                    });
+                }
+                pane.appendChild(list);
+                return pane;
+            }
+
+            const wrap = document.createElement('div');
+            wrap.className = 'tr-vv-wrap';
+            const grid = document.createElement('div');
+            grid.className = 'tr-vv-grid';
+            grid.appendChild(buildPane('pros', pros,
+                '차별점 — 이래서 살 만하다', '✓', '차별점 정보 부족'));
+            grid.appendChild(buildPane('caut', cautions,
+                '감안할 점 — 한계', '⚠', '감안할 점 정보 없음'));
+            wrap.appendChild(grid);
+
+            heading.parentNode.insertBefore(wrap, heading.nextSibling);
+
+            // Hide original source elements only after the verdict card is in.
+            const touchedUls = new Set();
+            consumedLis.forEach(li => {
+                li.classList.add('tr-hidden');
+                if (li.parentElement) touchedUls.add(li.parentElement);
+            });
+            touchedUls.forEach(ul => {
+                const remaining = Array.from(ul.querySelectorAll(':scope > li'))
+                    .filter(li => !li.classList.contains('tr-hidden'));
+                if (remaining.length === 0) ul.classList.add('tr-hidden');
+            });
+            touchedPs.forEach(p => {
+                const html = p.innerHTML || '';
+                const lines = html.split(/<br\s*\/?>/i);
+                const allLabeled = lines.every(line => {
+                    const tmp = document.createElement('div');
+                    tmp.innerHTML = line;
+                    const text = (tmp.textContent || '').trim();
+                    if (!text) return true;
+                    return PROS_RE.test(text) || CAUT_RE.test(text);
+                });
+                if (allLabeled) p.classList.add('tr-hidden');
+            });
         }
 
         /* ─── #5 Audience matcher ─── */
@@ -1863,8 +2722,14 @@
                 _trBuildBalanceAndHeatmap(bodyEl);
             } catch (e) { console.warn('[transcript-viz] balance/heatmap failed', e); }
             try {
+                _trBuildProsConsCards(bodyEl);
+            } catch (e) { console.warn('[transcript-viz] pros/cons cards failed', e); }
+            try {
                 _trBuildChangeCards(bodyEl);
             } catch (e) { console.warn('[transcript-viz] changes failed', e); }
+            try {
+                _trBuildValueVerdict(bodyEl);
+            } catch (e) { console.warn('[transcript-viz] value verdict failed', e); }
             try {
                 _trBuildAudienceMatcher(bodyEl);
             } catch (e) { console.warn('[transcript-viz] matcher failed', e); }
@@ -2191,6 +3056,94 @@
                 points.map(p => _cmpRenderCard(p, kind)).join('') +
             '</div>';
         }
+        // ── reviewer_quote 를 평가 카드 구조로 파싱 ──
+        // 입력: raw reviewer_quote 문자열
+        // 출력: { badge: {label, variant}|null, headline: str, chips: [str], subText: str }
+        //   - leading ◎○△✕ 기호는 강도 배지로 변환 (◎='강한 호평', ○='호평',
+        //     △='아쉬움 지적', ✕='단점 지적'). 기호 없으면 badge=null.
+        //   - 끝의 (...) 또는 （...） 안 내용은 '/', ',', '·' 로 분리해 칩.
+        //     단 토큰에 "미언급/언급 없음/데이터 부족/정보 부족" 이 포함되거나 한
+        //     토큰이 너무 길면 칩 대신 subText 로 빠짐 (목업의 "자막 내 구체 수치
+        //     언급 없음" 같은 케이스).
+        //   - 괄호 앞 본문 = headline. 괄호가 없으면 전체가 headline.
+        function _cmpFormatReviewerQuote(quote) {
+            const raw = (quote == null ? '' : String(quote)).trim();
+            if (!raw) return { badge: null, headline: '', chips: [], subText: '' };
+
+            let text = raw;
+            let badge = null;
+            const first = text.charAt(0);
+            if (first === '◎')      { badge = { label: '강한 호평',  variant: 'strong-pos' }; text = text.slice(1).trim(); }
+            else if (first === '○') { badge = { label: '호평',        variant: 'pos' };        text = text.slice(1).trim(); }
+            else if (first === '△') { badge = { label: '아쉬움 지적', variant: 'neg' };        text = text.slice(1).trim(); }
+            else if (first === '✕' || first === '✗' || first === '×') {
+                badge = { label: '단점 지적', variant: 'strong-neg' };
+                text = text.slice(1).trim();
+            }
+
+            // Trailing (..) or （..）. Capture the LAST balanced pair so a phrase
+            // like "전작(S23) 대비 ↑49% (수치 출처)" peels off only the last one.
+            const m = text.match(/^(.*?)\s*[\(（]([^)）]+)[\)）]\s*$/);
+            let headline = text;
+            let chips = [];
+            let subText = '';
+            if (m) {
+                headline = (m[1] || '').trim();
+                const inner = (m[2] || '').trim();
+                const tokens = inner.split(/[\/,·]/).map(t => t.trim()).filter(Boolean);
+                const muteRe = /(미언급|언급\s*없음|데이터\s*부족|정보\s*부족|평가\s*없음|다루지\s*않음)/;
+                const anyMuted = tokens.some(t => muteRe.test(t));
+                const anyLong  = tokens.some(t => t.length > 14);
+                if (tokens.length === 0 || anyMuted || anyLong) {
+                    subText = inner;
+                } else {
+                    chips = tokens;
+                }
+            }
+            // Headline must not be empty — if peeling left it blank, restore the raw text
+            // (minus the leading symbol) so the user still sees something meaningful.
+            if (!headline) headline = text || raw;
+
+            return { badge, headline, chips, subText };
+        }
+
+        // Wraps reviewer-quote formatting in try/catch. On failure (or if the
+        // helper throws), falls back to the original italic-blockquote rendering
+        // so the raw quote text is never lost.
+        function _cmpReviewerSideHtml(quote) {
+            try {
+                const parsed = _cmpFormatReviewerQuote(quote);
+                const badgeHtml = parsed.badge
+                    ? '<span class="cmp-rq-badge cmp-rq-badge-' + parsed.badge.variant + '">' +
+                        _cmEsc(parsed.badge.label) +
+                      '</span>'
+                    : '';
+                const headlineHtml = parsed.headline
+                    ? '<div class="cmp-rq-headline">' + _cmEsc(parsed.headline) + '</div>'
+                    : '';
+                const chipsHtml = parsed.chips.length
+                    ? '<div class="cmp-rq-chips">' +
+                        parsed.chips.map(c => '<span class="cmp-rq-chip">' + _cmEsc(c) + '</span>').join('') +
+                      '</div>'
+                    : '';
+                const subHtml = parsed.subText
+                    ? '<div class="cmp-rq-sub">' + _cmEsc(parsed.subText) + '</div>'
+                    : '';
+                return '<div class="cmp-evi-box cmp-rq">' +
+                        '<div class="cmp-evi-label">📝 리뷰어 자막</div>' +
+                        '<div class="cmp-rq-body">' +
+                            badgeHtml + headlineHtml + chipsHtml + subHtml +
+                        '</div>' +
+                    '</div>';
+            } catch (e) {
+                console.warn('[cmp-rq] reviewer quote format failed:', e);
+                return '<div class="cmp-evi-box">' +
+                        '<div class="cmp-evi-label">📝 리뷰어 자막</div>' +
+                        '<div class="cmp-evi-body reviewer-quote">' + _cmEsc(quote || '') + '</div>' +
+                    '</div>';
+            }
+        }
+
         function _cmpRenderCard(p, kind) {
             const isDisagree = (kind === 'disagree');
             const badge = isDisagree ? '✕ 불일치' : '✓ 일치';
@@ -2201,10 +3154,7 @@
             const consumerComments = (p.consumer_comments || [])
                 .map(c => _cmRenderQuote(c, quoteKind))
                 .join('');
-            const reviewerSide = '<div class="cmp-evi-box">' +
-                    '<div class="cmp-evi-label">📝 리뷰어 자막</div>' +
-                    '<div class="cmp-evi-body reviewer-quote">' + _cmEsc(quote) + '</div>' +
-                '</div>';
+            const reviewerSide = _cmpReviewerSideHtml(quote);
             const consumerSide = '<div class="cmp-evi-box">' +
                     '<div class="cmp-evi-label">💬 소비자 댓글</div>' +
                     (consumerComments

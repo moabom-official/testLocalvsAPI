@@ -1,6 +1,7 @@
 """
 Product-related API routes
 """
+import asyncio
 import os
 from time import perf_counter
 
@@ -11,12 +12,14 @@ from scripts.database.queries import query_one, query_all, execute_insert, execu
 from scripts.reports.pdf_generator import render_report_pdf
 from scripts.reports.product_integrated_insight import (
     collect_transcript_reports_for_product,
+    ensure_comment_analysis_for_videos,
     build_product_integrated_insight_report,
     save_product_integrated_report,
     get_latest_product_integrated_report,
     get_product_integrated_report,
     get_last_collect_perf,
     get_last_llm_perf,
+    get_last_comment_heal_perf,
 )
 from scripts.utils.markdown_renderer import markdown_to_html
 
@@ -120,8 +123,17 @@ def register_product_routes(app):
 
         route_t0 = perf_counter()
 
+        # ── 자막·댓글 self-healing 병렬 실행 ────────────────────────────
+        # 자막: collect_transcript_reports_for_product (기존)
+        # 댓글: ensure_comment_analysis_for_videos — agent_decisions 미존재 영상에
+        #       기존 process_comments_with_agent (sync.py 의 7-step 댓글 agent) 호출.
+        # 두 self-healing 은 서로 다른 YouTube API endpoint + 다른 LLM 호출 + 다른
+        # DB 테이블을 사용하므로 독립. asyncio.gather 로 동시 실행해 latency 단축.
         collect_t0 = perf_counter()
-        per_video_reports = await collect_transcript_reports_for_product(product_id, video_ids)
+        per_video_reports, comment_heal_stats = await asyncio.gather(
+            collect_transcript_reports_for_product(product_id, video_ids),
+            ensure_comment_analysis_for_videos(product["name"], video_ids),
+        )
         collect_ms = (perf_counter() - collect_t0) * 1000
 
         if len(per_video_reports) < 2:
@@ -130,10 +142,13 @@ def register_product_routes(app):
                 detail="자막 기반 보고서를 생성할 수 있는 영상이 2개 이상 필요합니다 (자막 부재 영상 제외 후 부족)",
             )
 
+        # build_product_integrated_insight_report 가 내부에서 댓글 self-healing 으로
+        # 적재된 DB 를 READ ONLY 로 집계해 ⑤ 소비자 여론 섹션을 채운다.
         build_t0 = perf_counter()
         report_text, model_used = build_product_integrated_insight_report(
             product_name=product["name"],
             per_video_reports=per_video_reports,
+            video_ids=[r["video_id"] for r in per_video_reports],
         )
         build_ms = (perf_counter() - build_t0) * 1000
 
@@ -149,10 +164,14 @@ def register_product_routes(app):
         total_ms = (perf_counter() - route_t0) * 1000
         collect_detail = get_last_collect_perf()
         llm_detail = get_last_llm_perf()
+        comment_heal_detail = get_last_comment_heal_perf()
         print(
             f"[PERF][insight_route] product_id={product_id} total_ms={total_ms:.1f} "
             f"collect_ms={collect_ms:.1f} build_ms={build_ms:.1f} llm_ms={llm_detail.get('llm_ms')} "
             f"save_ms={save_ms:.1f} self_heal={collect_detail.get('self_heal_count')}/{collect_detail.get('self_heal_count', 0) + collect_detail.get('cache_hits', 0)} "
+            f"comment_heal={comment_heal_detail.get('healed', 0)}/{comment_heal_detail.get('total_videos', 0)} "
+            f"comment_already={comment_heal_detail.get('already_analyzed', 0)} "
+            f"comment_failed={comment_heal_detail.get('failed', 0)} "
             f"fallback={llm_detail.get('fallback')}"
         )
 
@@ -172,6 +191,7 @@ def register_product_routes(app):
                 "save_ms": round(save_ms, 1),
                 "llm_fallback": llm_detail.get("fallback"),
                 "collect_detail": collect_detail,
+                "comment_heal_detail": comment_heal_detail,
             },
         }
 

@@ -359,6 +359,40 @@
             font-size: 20px; color: var(--muted);
         }
 
+        /* Section ② — 3-card summary */
+        .pir-s2-row {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+            margin: 4px 0 14px;
+        }
+        .pir-s2-card {
+            background: var(--surface-soft);
+            border: 1px solid var(--border-soft);
+            border-left: 3px solid var(--primary);
+            border-radius: 10px;
+            padding: 10px 14px;
+            min-width: 0;
+        }
+        .pir-s2-title {
+            display: flex; align-items: center; gap: 6px;
+            font-size: 13px; font-weight: 700; color: var(--text);
+            margin-bottom: 6px;
+        }
+        .pir-s2-dot {
+            width: 9px; height: 9px; border-radius: 2px;
+            background: var(--primary); flex-shrink: 0;
+        }
+        .pir-s2-body {
+            font-size: 12px; line-height: 1.55; color: var(--muted);
+        }
+        .pir-s2-pos  { border-left-color: #20c997; }
+        .pir-s2-pos  .pir-s2-dot { background: #20c997; }
+        .pir-s2-warn { border-left-color: #f5a623; }
+        .pir-s2-warn .pir-s2-dot { background: #f5a623; }
+        .pir-s2-neg  { border-left-color: #e35d6a; }
+        .pir-s2-neg  .pir-s2-dot { background: #e35d6a; }
+
         /* Section ③ — radar chart */
         .pir-s3-wrap { display: flex; gap: 16px; align-items: flex-start; }
         .pir-radar-box {
@@ -377,6 +411,235 @@
 
         /* Section ④ — pro/con icons */
         .pir-item-icon { font-style: normal; margin-right: 3px; }
+
+        /* Section ④ — diverging bar (pros above / cons below) */
+        .pir-s4-bars {
+            display: flex; flex-direction: column; gap: 14px;
+            margin: 6px 0 14px;
+            padding: 12px 14px;
+            background: var(--surface-soft);
+            border: 1px solid var(--border-soft);
+            border-radius: 12px;
+        }
+        .pir-s4-group { display: flex; flex-direction: column; gap: 6px; }
+        .pir-s4-group-label {
+            font-size: 11px; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.03em;
+            margin-bottom: 2px;
+        }
+        .pir-s4-group-pros .pir-s4-group-label { color: #19a87c; }
+        .pir-s4-group-cons .pir-s4-group-label { color: #b44454; }
+        .pir-s4-row {
+            display: grid;
+            grid-template-columns: 110px 1fr 44px;
+            align-items: center;
+            gap: 10px;
+        }
+        .pir-s4-row-label {
+            font-size: 12px; color: var(--text); font-weight: 500;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .pir-s4-bar-track {
+            position: relative;
+            display: block;
+            height: 10px;
+            background: rgba(111,66,193,0.08);
+            border-radius: 999px;
+            overflow: hidden;
+        }
+        .pir-s4-bar-fill {
+            position: absolute; left: 0; top: 0; bottom: 0;
+            border-radius: 999px;
+            transition: width 0.4s ease;
+        }
+        .pir-s4-group-pros .pir-s4-bar-fill { background: linear-gradient(90deg, #20c997, #19a87c); }
+        .pir-s4-group-cons .pir-s4-bar-fill { background: linear-gradient(90deg, #e35d6a, #b44454); }
+        .pir-s4-row-count {
+            font-size: 11px; font-weight: 700; color: var(--muted);
+            text-align: right; font-variant-numeric: tabular-nums;
+        }
+
+        /* Section ④ — individual reviewer opinions (1-mention items) as card grid */
+        .pir-s4-individual-wrap {
+            margin: 4px 0 14px;
+        }
+        .pir-s4-individual-title {
+            font-size: 11px; font-weight: 600; color: var(--muted);
+            text-transform: uppercase; letter-spacing: 0.03em;
+            margin: 4px 2px 8px;
+        }
+        .pir-s4-individual-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 8px;
+        }
+        .pir-s4-individual-card {
+            background: var(--surface);
+            border: 1px solid var(--border-soft);
+            border-left: 3px solid var(--primary-soft);
+            border-radius: 8px;
+            padding: 8px 12px;
+            display: flex; flex-direction: column; gap: 4px;
+            min-width: 0;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        .pir-s4-individual-card:hover {
+            border-left-color: var(--primary);
+            box-shadow: var(--shadow);
+        }
+        .pir-s4-individual-text {
+            font-size: 12px; line-height: 1.4; color: var(--text);
+            font-weight: 500;
+        }
+        .pir-s4-individual-source {
+            font-size: 10px; color: var(--primary-strong);
+            font-weight: 600;
+            background: var(--primary-soft);
+            padding: 2px 8px; border-radius: 999px;
+            align-self: flex-start;
+        }
+
+        /* Section ⑤ — consumer opinion (comment-based) */
+        .pir-s5-wrap {
+            display: flex; flex-direction: column; gap: 12px;
+            margin: 6px 0 16px;
+            padding: 14px 16px;
+            background: var(--surface-soft);
+            border: 1px solid var(--border-soft);
+            border-radius: 12px;
+        }
+        .pir-s5-meta {
+            font-size: 12px; color: var(--muted); font-weight: 600;
+        }
+        .pir-s5-stack {
+            display: flex; width: 100%; height: 22px;
+            border-radius: 999px; overflow: hidden;
+            background: var(--border-soft);
+        }
+        .pir-s5-stack-seg {
+            display: inline-flex; align-items: center; justify-content: center;
+            color: white; font-size: 11px; font-weight: 700;
+            white-space: nowrap; overflow: hidden;
+            min-width: 0;
+        }
+        .pir-s5-stack-pos { background: linear-gradient(90deg, #20c997, #19a87c); }
+        .pir-s5-stack-neu { background: #b8b3c4; color: #fff; }
+        .pir-s5-stack-neg { background: linear-gradient(90deg, #e35d6a, #b44454); }
+
+        .pir-s5-aspects {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+        }
+        .pir-s5-aspect-col {
+            background: var(--surface);
+            border: 1px solid var(--border-soft);
+            border-radius: 10px;
+            padding: 10px 12px;
+            min-width: 0;
+        }
+        .pir-s5-aspect-title {
+            font-size: 12px; font-weight: 700; margin-bottom: 8px;
+            text-transform: uppercase; letter-spacing: 0.03em;
+        }
+        .pir-s5-aspect-col-pos .pir-s5-aspect-title { color: #19a87c; }
+        .pir-s5-aspect-col-neg .pir-s5-aspect-title { color: #b44454; }
+        .pir-s5-aspect-row {
+            display: grid; grid-template-columns: 80px 1fr 32px;
+            align-items: center; gap: 8px; margin-bottom: 4px;
+        }
+        .pir-s5-aspect-label {
+            font-size: 12px; color: var(--text); font-weight: 500;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .pir-s5-aspect-track {
+            position: relative; display: block;
+            height: 8px; border-radius: 999px;
+            background: rgba(111,66,193,0.08); overflow: hidden;
+        }
+        .pir-s5-aspect-fill {
+            position: absolute; left: 0; top: 0; bottom: 0;
+            border-radius: 999px;
+            transition: width 0.4s ease;
+        }
+        .pir-s5-aspect-col-pos .pir-s5-aspect-fill { background: linear-gradient(90deg, #20c997, #19a87c); }
+        .pir-s5-aspect-col-neg .pir-s5-aspect-fill { background: linear-gradient(90deg, #e35d6a, #b44454); }
+        .pir-s5-aspect-count {
+            font-size: 11px; font-weight: 700; color: var(--muted);
+            text-align: right; font-variant-numeric: tabular-nums;
+        }
+        .pir-s5-aspect-empty {
+            font-size: 12px; color: var(--muted); font-style: italic; padding: 4px 2px;
+        }
+
+        .pir-s5-quotes {
+            display: flex; flex-direction: column; gap: 6px;
+        }
+        .pir-s5-quote {
+            background: var(--surface);
+            border: 1px solid var(--border-soft);
+            border-radius: 10px;
+            padding: 8px 12px;
+            display: flex; align-items: flex-start; gap: 8px;
+            font-size: 12px; line-height: 1.55; color: var(--text);
+        }
+        .pir-s5-quote-mark {
+            color: var(--primary); font-size: 22px; font-weight: 700;
+            line-height: 0.9; flex-shrink: 0;
+        }
+        .pir-s5-quote-text { flex: 1; min-width: 0; }
+        .pir-s5-quote-like {
+            font-size: 11px; color: var(--muted); font-weight: 600;
+            white-space: nowrap; flex-shrink: 0;
+        }
+
+        /* Section ⑥ — recommend / not-recommend chip matcher */
+        .pir-s6-matcher {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin: 6px 0 14px;
+        }
+        .pir-s6-col {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px 14px;
+            min-width: 0;
+        }
+        .pir-s6-col-rec { border-color: #c5f0de; background: var(--positive-soft, rgba(32,201,151,0.08)); }
+        .pir-s6-col-not { border-color: #f7c2c8; background: var(--negative-soft, rgba(227,93,106,0.08)); }
+        .pir-s6-col-header {
+            display: flex; align-items: center; gap: 6px;
+            font-size: 13px; font-weight: 700; margin-bottom: 10px;
+        }
+        .pir-s6-col-rec .pir-s6-col-title { color: #0d6e4f; }
+        .pir-s6-col-not .pir-s6-col-title { color: #b3303c; }
+        .pir-s6-col-icon { font-size: 14px; }
+        .pir-s6-chips {
+            display: flex; flex-wrap: wrap; gap: 6px;
+        }
+        .pir-s6-chip {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 6px 12px; border-radius: 999px;
+            background: var(--surface);
+            border: 1.5px solid;
+            font-size: 12px; font-weight: 600;
+            line-height: 1.2;
+            cursor: default;
+            transition: transform 0.1s, box-shadow 0.15s;
+        }
+        .pir-s6-chip:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
+        .pir-s6-chip-rec { border-color: #c5f0de; color: #0d6e4f; }
+        .pir-s6-chip-not { border-color: #f7c2c8; color: #b3303c; }
+        .pir-s6-chip-label { white-space: nowrap; }
+        .pir-s6-chip-source {
+            font-size: 10px; font-weight: 500; opacity: 0.7;
+            padding-left: 6px; border-left: 1px solid currentColor;
+            margin-left: 1px;
+        }
+        .pir-s6-empty {
+            font-size: 12px; color: var(--muted);
+            font-style: italic; padding: 4px 2px;
+        }
 
         /* Section ⑦ — change highlights */
         .pir-highlights-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
@@ -397,6 +660,11 @@
             .pir-radar-box { width: 100%; max-width: 280px; margin: 0 auto; }
             .pir-s1-wrap { flex-direction: column; }
             .pir-gauge-box { width: 100%; }
+            .pir-s2-row { grid-template-columns: 1fr; }
+            .pir-s4-row { grid-template-columns: 88px 1fr 40px; gap: 8px; }
+            .pir-s5-aspects { grid-template-columns: 1fr; }
+            .pir-s5-aspect-row { grid-template-columns: 70px 1fr 28px; gap: 6px; }
+            .pir-s6-matcher { grid-template-columns: 1fr; }
         }
 
         /* ── Integrated insight progress overlay ─────────── */
@@ -624,7 +892,7 @@
                 <span>남은 시간 약 <strong id="pirProgressRemain">--</strong>초</span>
             </div>
             <div class="sel-step" data-pir-step="1"><span class="icon">1</span><span>영상별 자막 수집 및 자막 기반 보고서 생성</span></div>
-            <div class="sel-step" data-pir-step="2"><span class="icon">2</span><span>9섹션 통합 인사이트 보고서 합성</span></div>
+            <div class="sel-step" data-pir-step="2"><span class="icon">2</span><span>7섹션 통합 인사이트 보고서 합성</span></div>
         </div>
     </div>
 
@@ -1163,10 +1431,17 @@
         // ── Integrated insight visual enhancements (Option A: frontend post-processing) ──
 
         function enhanceIntegratedReport(bodyEl) {
-            _pirEnhanceSection1Gauge(bodyEl);
-            _pirEnhanceSection3Radar(bodyEl);
-            _pirEnhanceSection4Icons(bodyEl);
-            _pirEnhanceSection7Highlights(bodyEl);
+            // Each enhancer is isolated in try/catch so one parse failure does not
+            // cascade to subsequent enhancers — the original markdown stays visible
+            // for whichever section failed.
+            try { _pirEnhanceSection1Gauge(bodyEl); }       catch (e) { console.warn('[PIR] s1 gauge failed:',   e); }
+            try { _pirEnhanceSection2Cards(bodyEl); }       catch (e) { console.warn('[PIR] s2 cards failed:',   e); }
+            try { _pirEnhanceSection3Radar(bodyEl); }       catch (e) { console.warn('[PIR] s3 radar failed:',   e); }
+            try { _pirEnhanceSection4DivergingBar(bodyEl); } catch (e) { console.warn('[PIR] s4 bar failed:',     e); }
+            try { _pirEnhanceSection4Icons(bodyEl); }       catch (e) { console.warn('[PIR] s4 icons failed:',   e); }
+            try { _pirEnhanceSection5Consumer(bodyEl); }    catch (e) { console.warn('[PIR] s5 consumer failed:', e); }
+            try { _pirEnhanceSection7Highlights(bodyEl); }  catch (e) { console.warn('[PIR] s6 changes failed:', e); }
+            try { _pirEnhanceSectionRecommendChips(bodyEl); } catch (e) { console.warn('[PIR] s7 chips failed:',  e); }
         }
 
         // ── Helper: find heading by keyword, return element or null ──────
@@ -1276,6 +1551,54 @@
             _pirCharts.push(chart);
         }
 
+        // ── Section ②: 3-card summary (parse "[title] body" bullets) ────
+        function _pirEnhanceSection2Cards(bodyEl) {
+            const heading = _pirFindHeading(bodyEl, '핵심 요약');
+            if (!heading) return;
+
+            const siblings = _pirSectionSiblings(heading);
+            const cards = [];
+            // Pattern: "[title] body" — title in brackets, then body. Brackets may be []
+            // or full-width []. Body may be empty (skip).
+            const re = /^\s*[\[［]\s*([^\]］]{1,30})\s*[\]］]\s*(.+?)\s*$/;
+            for (const el of siblings) {
+                for (const li of el.querySelectorAll('li')) {
+                    const text = li.textContent.replace(/\s+/g, ' ').trim();
+                    const m = text.match(re);
+                    if (!m) continue;
+                    const title = m[1].trim();
+                    const body = m[2].trim();
+                    if (!title || !body) continue;
+                    cards.push({ title, body });
+                    if (cards.length >= 3) break;
+                }
+                if (cards.length >= 3) break;
+            }
+            if (cards.length === 0) return; // parse failed → leave original markdown
+
+            // Pick accent color per card index (stable, no data dependency)
+            const ACCENTS = ['pos', 'pos', 'warn'];
+
+            const row = document.createElement('div');
+            row.className = 'pir-s2-row';
+            cards.forEach((c, idx) => {
+                const card = document.createElement('div');
+                card.className = 'pir-s2-card pir-s2-' + (ACCENTS[idx] || 'pos');
+                card.innerHTML =
+                    '<div class="pir-s2-title">' +
+                        '<span class="pir-s2-dot"></span>' +
+                        escapeHtml(c.title) +
+                    '</div>' +
+                    '<div class="pir-s2-body">' + escapeHtml(c.body) + '</div>';
+                row.appendChild(card);
+            });
+
+            // Replace the original list elements with the card row
+            const first = siblings[0];
+            first.parentNode.insertBefore(row, first);
+            siblings.forEach(el => el.remove());
+        }
+
         // ── Section ③: radar chart alongside 6차원 table ───────────────
         function _pirEnhanceSection3Radar(bodyEl) {
             const heading = _pirFindHeading(bodyEl, '6차원');
@@ -1371,6 +1694,173 @@
             _pirCharts.push(chart);
         }
 
+        // ── Section ④: diverging bar (pros above / cons below) ─────────
+        function _pirEnhanceSection4DivergingBar(bodyEl) {
+            const heading = _pirFindHeading(bodyEl, '장점');
+            if (!heading || !heading.textContent.includes('단점')) return;
+            // Only operate on the H2 wrapper for ④ (which contains both 장점 and 단점)
+            if (heading.tagName !== 'H2') return;
+
+            // Walk siblings until next H2/H1, grouping <li> items by their nearest H3 label
+            const groups = { pros: [], cons: [] };
+            let currentGroup = null;
+            let el = heading.nextElementSibling;
+            const sectionEls = [];
+            while (el) {
+                if (/^H[12]$/.test(el.tagName)) break;
+                sectionEls.push(el);
+                if (el.tagName === 'H3') {
+                    const t = el.textContent;
+                    if (t.includes('장점') && !t.includes('단점')) currentGroup = 'pros';
+                    else if (t.includes('단점')) currentGroup = 'cons';
+                    else currentGroup = null;
+                } else if (currentGroup) {
+                    for (const li of el.querySelectorAll('li')) {
+                        const text = li.textContent.replace(/\s+/g, ' ').trim();
+                        // Match "(N/M)" at end. N = mention count, M = total videos.
+                        const m = text.match(/^(.+?)\s*[\(（]\s*(\d+)\s*\/\s*(\d+)\s*[\)）]\s*$/);
+                        if (!m) continue;
+                        const label = m[1].trim();
+                        const n = parseInt(m[2], 10);
+                        const total = parseInt(m[3], 10);
+                        if (!label || !n || !total || n > total) continue;
+                        groups[currentGroup].push({ label, n, total });
+                    }
+                }
+                el = el.nextElementSibling;
+            }
+
+            const all = groups.pros.concat(groups.cons);
+            if (all.length === 0) return; // nothing parseable → leave original list
+
+            // Sort each group by N desc, cap at 6 rows per group
+            const MAX_ROWS = 6;
+            groups.pros.sort((a, b) => b.n - a.n);
+            groups.cons.sort((a, b) => b.n - a.n);
+            groups.pros = groups.pros.slice(0, MAX_ROWS);
+            groups.cons = groups.cons.slice(0, MAX_ROWS);
+
+            // Denominator: use the max total seen (typically the video count, e.g. 6)
+            const denom = Math.max(...all.map(x => x.total));
+
+            function buildGroup(kind, items, title) {
+                if (items.length === 0) return null;
+                const wrap = document.createElement('div');
+                wrap.className = 'pir-s4-group pir-s4-group-' + kind;
+                const label = document.createElement('div');
+                label.className = 'pir-s4-group-label';
+                label.textContent = title;
+                wrap.appendChild(label);
+                for (const it of items) {
+                    const row = document.createElement('div');
+                    row.className = 'pir-s4-row';
+                    const pct = Math.max(4, Math.round((it.n / denom) * 100));
+                    row.innerHTML =
+                        '<span class="pir-s4-row-label" title="' + escapeHtml(it.label) + '">' +
+                            escapeHtml(it.label) +
+                        '</span>' +
+                        '<span class="pir-s4-bar-track">' +
+                            '<span class="pir-s4-bar-fill" style="width:' + pct + '%"></span>' +
+                        '</span>' +
+                        '<span class="pir-s4-row-count">' + it.n + '/' + it.total + '</span>';
+                    wrap.appendChild(row);
+                }
+                return wrap;
+            }
+
+            const container = document.createElement('div');
+            container.className = 'pir-s4-bars';
+            const prosEl = buildGroup('pros', groups.pros, '장점 — 막대 길이는 언급한 영상 수');
+            const consEl = buildGroup('cons', groups.cons, '단점 — 막대 길이는 언급한 영상 수');
+            if (prosEl) container.appendChild(prosEl);
+            if (consEl) container.appendChild(consEl);
+
+            // Insert chart at the top of section ④, before the existing H3/list content
+            const firstSibling = sectionEls[0];
+            if (firstSibling) firstSibling.parentNode.insertBefore(container, firstSibling);
+            else heading.after(container);
+
+            // ── Tidy section ④ body: the diverging bar already encodes ### 장점 /
+            // ### 단점 (label + frequency), so the original markdown list under those
+            // H3s is redundant. Remove them. ### 개별 리뷰어 의견 (1 명만 언급) is
+            // separate data — convert it into a compact card grid.
+            const individualItems = [];
+            let i = 0;
+            while (i < sectionEls.length) {
+                const el = sectionEls[i];
+                if (el.tagName === 'H3') {
+                    const t = el.textContent;
+                    if (t.includes('장점') || t.includes('단점')) {
+                        // Remove this H3 + every following non-H3 sibling (UL etc.) up
+                        // to the next H3 / end of section. Already covered by bars.
+                        el.remove();
+                        let j = i + 1;
+                        while (j < sectionEls.length && sectionEls[j].tagName !== 'H3') {
+                            sectionEls[j].remove();
+                            j += 1;
+                        }
+                        i = j;
+                        continue;
+                    }
+                    if (t.includes('개별') || t.includes('리뷰어')) {
+                        // Collect <li>s under this H3 then strip them out — we re-render
+                        // as a card grid.
+                        let j = i + 1;
+                        while (j < sectionEls.length && sectionEls[j].tagName !== 'H3') {
+                            for (const li of sectionEls[j].querySelectorAll('li')) {
+                                const raw = li.textContent.replace(/\s+/g, ' ').trim();
+                                if (!raw || raw === '데이터 부족') continue;
+                                // "본문 (영상 N)" 또는 "본문 (영상 N,M)" — source 절은 선택.
+                                const mm = raw.match(/^(.+?)\s*(?:[\(（]\s*(영상\s*[\d,\s]+)\s*[\)）])?\s*$/);
+                                if (!mm) continue;
+                                individualItems.push({
+                                    label: mm[1].trim(),
+                                    source: (mm[2] || '').trim(),
+                                });
+                            }
+                            j += 1;
+                        }
+                        // Remove the H3 and its following content (we'll re-insert as cards).
+                        el.remove();
+                        let k = i + 1;
+                        while (k < sectionEls.length && sectionEls[k].tagName !== 'H3') {
+                            sectionEls[k].remove();
+                            k += 1;
+                        }
+                        i = k;
+                        continue;
+                    }
+                }
+                i += 1;
+            }
+
+            if (individualItems.length > 0) {
+                const wrap = document.createElement('div');
+                wrap.className = 'pir-s4-individual-wrap';
+
+                const title = document.createElement('div');
+                title.className = 'pir-s4-individual-title';
+                title.textContent = '개별 리뷰어 의견 — 1명만 언급한 항목';
+                wrap.appendChild(title);
+
+                const grid = document.createElement('div');
+                grid.className = 'pir-s4-individual-grid';
+                for (const it of individualItems) {
+                    const card = document.createElement('div');
+                    card.className = 'pir-s4-individual-card';
+                    const srcHtml = it.source
+                        ? '<span class="pir-s4-individual-source">' + escapeHtml(it.source) + '</span>'
+                        : '';
+                    card.innerHTML =
+                        '<span class="pir-s4-individual-text">' + escapeHtml(it.label) + '</span>' +
+                        srcHtml;
+                    grid.appendChild(card);
+                }
+                wrap.appendChild(grid);
+                container.after(wrap);
+            }
+        }
+
         // ── Section ④: keyword-based category icons ─────────────────────
         function _pirEnhanceSection4Icons(bodyEl) {
             const heading = _pirFindHeading(bodyEl, '장점');
@@ -1405,6 +1895,283 @@
                     li.prepend(span);
                 }
             }
+        }
+
+        // ── Section ⑤: consumer-opinion (sentiment ratio + aspects + quotes) ──
+        // Keyword-based heading lookup ("소비자 여론") — independent of section number.
+        function _pirEnhanceSection5Consumer(bodyEl) {
+            let heading = null;
+            for (const h of bodyEl.querySelectorAll('h2')) {
+                if (h.textContent.includes('소비자 여론')) { heading = h; break; }
+            }
+            if (!heading) return;
+
+            // Walk siblings until next H2/H1. Capture top-level bullets (ratio/count),
+            // H3-grouped lists (강점/불만), and blockquotes (대표 댓글).
+            let total = null;
+            let ratio = null;  // {pos, neu, neg}
+            const groups = { pos: [], neg: [] };
+            const quotes = [];
+            let currentGroup = null;
+            const sectionEls = [];
+
+            let el = heading.nextElementSibling;
+            while (el) {
+                if (/^H[12]$/.test(el.tagName)) break;
+                sectionEls.push(el);
+
+                if (el.tagName === 'H3') {
+                    const t = el.textContent;
+                    if (t.includes('강점')) currentGroup = 'pos';
+                    else if (t.includes('불만')) currentGroup = 'neg';
+                    else if (t.includes('대표 댓글')) currentGroup = 'quote';
+                    else currentGroup = null;
+                } else if (el.tagName === 'BLOCKQUOTE' || el.querySelector?.('blockquote')) {
+                    const bqs = el.tagName === 'BLOCKQUOTE' ? [el] : el.querySelectorAll('blockquote');
+                    for (const bq of bqs) {
+                        // Replace <br> with newlines so consecutive markdown "> " lines
+                        // (which the renderer collapses into one <blockquote><p>line1<br>line2</p>...)
+                        // can be split back into per-line quotes.
+                        const clone = bq.cloneNode(true);
+                        clone.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
+                        const blockText = clone.textContent || '';
+                        for (const rawLine of blockText.split(/\n+/)) {
+                            const line = rawLine.replace(/\s+/g, ' ').trim();
+                            if (!line) continue;
+                            const lm = line.match(/^[\"“”"](.+?)[\"“”"]\s*(?:[\(（]\s*👍\s*(\d+)\s*[\)）])?\s*$/);
+                            if (lm) {
+                                quotes.push({ text: lm[1].trim(), likes: lm[2] ? parseInt(lm[2], 10) : null });
+                            } else {
+                                const lm2 = line.match(/^(.+?)\s*(?:[\(（]\s*👍\s*(\d+)\s*[\)）])?\s*$/);
+                                if (lm2 && lm2[1].trim() && lm2[1].trim() !== '데이터 부족') {
+                                    quotes.push({ text: lm2[1].trim(), likes: lm2[2] ? parseInt(lm2[2], 10) : null });
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    for (const li of el.querySelectorAll('li')) {
+                        const text = li.textContent.replace(/\s+/g, ' ').trim();
+
+                        // Top-level metadata bullets (before any H3)
+                        if (currentGroup === null) {
+                            const totalM = text.match(/분석\s*댓글\s*수\s*[:：]\s*(\d+)\s*건/);
+                            if (totalM) { total = parseInt(totalM[1], 10); continue; }
+                            const ratioM = text.match(/긍정\s*(\d+(?:\.\d+)?)\s*%[^부중]*?중립\s*(\d+(?:\.\d+)?)\s*%[^부]*?부정\s*(\d+(?:\.\d+)?)\s*%/);
+                            if (ratioM) {
+                                ratio = {
+                                    pos: parseFloat(ratioM[1]),
+                                    neu: parseFloat(ratioM[2]),
+                                    neg: parseFloat(ratioM[3]),
+                                };
+                                continue;
+                            }
+                        } else if (currentGroup === 'pos' || currentGroup === 'neg') {
+                            // "aspect (N건)" — N건 ending optional fallback to 0
+                            const aspM = text.match(/^(.+?)\s*[\(（]\s*(\d+)\s*건\s*[\)）]\s*$/);
+                            if (aspM) {
+                                const label = aspM[1].trim();
+                                if (label && label !== '데이터 부족') {
+                                    groups[currentGroup].push({ label, n: parseInt(aspM[2], 10) });
+                                }
+                            }
+                        } else if (currentGroup === 'quote') {
+                            // Fallback: representative comments rendered as bullets (rare)
+                            const qm = text.match(/^[\"“"]?(.+?)[\"”"]?\s*(?:[\(（]\s*👍\s*(\d+)\s*[\)）])?\s*$/);
+                            if (qm && qm[1].trim() && qm[1].trim() !== '데이터 부족') {
+                                quotes.push({ text: qm[1].trim(), likes: qm[2] ? parseInt(qm[2], 10) : null });
+                            }
+                        }
+                    }
+                }
+                el = el.nextElementSibling;
+            }
+
+            const hasAny = total !== null || ratio || groups.pos.length || groups.neg.length || quotes.length;
+            if (!hasAny) return; // 데이터 부족 only — leave original markdown
+
+            // ── Build visualization ──
+            const wrap = document.createElement('div');
+            wrap.className = 'pir-s5-wrap';
+
+            // Header line (total count)
+            if (total !== null) {
+                const meta = document.createElement('div');
+                meta.className = 'pir-s5-meta';
+                meta.textContent = '필터링된 댓글 ' + total + '건 분석';
+                wrap.appendChild(meta);
+            }
+
+            // Stacked sentiment bar
+            if (ratio) {
+                const bar = document.createElement('div');
+                bar.className = 'pir-s5-stack';
+                const segs = [
+                    { kind: 'pos', label: '긍정 ' + ratio.pos + '%', value: ratio.pos },
+                    { kind: 'neu', label: '중립 ' + ratio.neu + '%', value: ratio.neu },
+                    { kind: 'neg', label: ratio.neg + '%',          value: ratio.neg },
+                ];
+                for (const s of segs) {
+                    if (s.value <= 0) continue;
+                    const seg = document.createElement('span');
+                    seg.className = 'pir-s5-stack-seg pir-s5-stack-' + s.kind;
+                    seg.style.flex = String(s.value);
+                    seg.textContent = s.label;
+                    bar.appendChild(seg);
+                }
+                wrap.appendChild(bar);
+            }
+
+            // Aspects grid (left = 강점, right = 불만)
+            if (groups.pos.length || groups.neg.length) {
+                const aspectsRow = document.createElement('div');
+                aspectsRow.className = 'pir-s5-aspects';
+                aspectsRow.appendChild(_pirS5BuildAspectCol('pos', '소비자가 꼽은 강점', groups.pos));
+                aspectsRow.appendChild(_pirS5BuildAspectCol('neg', '소비자가 꼽은 불만', groups.neg));
+                wrap.appendChild(aspectsRow);
+            }
+
+            // Representative quotes
+            if (quotes.length) {
+                const qWrap = document.createElement('div');
+                qWrap.className = 'pir-s5-quotes';
+                for (const q of quotes.slice(0, 3)) {
+                    const card = document.createElement('div');
+                    card.className = 'pir-s5-quote';
+                    const likeHtml = q.likes !== null
+                        ? '<span class="pir-s5-quote-like">👍 ' + q.likes + '</span>'
+                        : '';
+                    card.innerHTML =
+                        '<span class="pir-s5-quote-mark">“</span>' +
+                        '<span class="pir-s5-quote-text">' + escapeHtml(q.text) + '</span>' +
+                        likeHtml;
+                    qWrap.appendChild(card);
+                }
+                wrap.appendChild(qWrap);
+            }
+
+            const firstSibling = sectionEls[0];
+            if (firstSibling) firstSibling.parentNode.insertBefore(wrap, firstSibling);
+            else heading.after(wrap);
+            sectionEls.forEach(node => node.remove());
+        }
+
+        function _pirS5BuildAspectCol(kind, title, items) {
+            const col = document.createElement('div');
+            col.className = 'pir-s5-aspect-col pir-s5-aspect-col-' + kind;
+            const h = document.createElement('div');
+            h.className = 'pir-s5-aspect-title';
+            h.textContent = title;
+            col.appendChild(h);
+            if (!items.length) {
+                const empty = document.createElement('div');
+                empty.className = 'pir-s5-aspect-empty';
+                empty.textContent = '데이터 부족';
+                col.appendChild(empty);
+                return col;
+            }
+            const maxN = Math.max(...items.map(x => x.n)) || 1;
+            for (const it of items.slice(0, 5)) {
+                const pct = Math.max(6, Math.round((it.n / maxN) * 100));
+                const row = document.createElement('div');
+                row.className = 'pir-s5-aspect-row';
+                row.innerHTML =
+                    '<span class="pir-s5-aspect-label">' + escapeHtml(it.label) + '</span>' +
+                    '<span class="pir-s5-aspect-track">' +
+                        '<span class="pir-s5-aspect-fill" style="width:' + pct + '%"></span>' +
+                    '</span>' +
+                    '<span class="pir-s5-aspect-count">' + it.n + '</span>';
+                col.appendChild(row);
+            }
+            return col;
+        }
+
+        // ── Recommend / Not-recommend: 2-column chip matcher ────────────
+        // Finds the H2 containing both '추천' and '비추' (avoids depending on section number).
+        function _pirEnhanceSectionRecommendChips(bodyEl) {
+            let heading = null;
+            for (const h of bodyEl.querySelectorAll('h2')) {
+                const t = h.textContent;
+                if (t.includes('추천') && t.includes('비추')) { heading = h; break; }
+            }
+            if (!heading) return;
+
+            // Walk siblings until next H2/H1, grouping <li> items under H3 boundaries.
+            const groups = { rec: [], not: [] };
+            let currentGroup = null;
+            const sectionEls = [];
+            let el = heading.nextElementSibling;
+            while (el) {
+                if (/^H[12]$/.test(el.tagName)) break;
+                sectionEls.push(el);
+                if (el.tagName === 'H3') {
+                    const t = el.textContent;
+                    if (t.includes('추천') && !t.includes('비추')) currentGroup = 'rec';
+                    else if (t.includes('비추')) currentGroup = 'not';
+                    else currentGroup = null;
+                } else if (currentGroup) {
+                    for (const li of el.querySelectorAll('li')) {
+                        const text = li.textContent.replace(/\s+/g, ' ').trim();
+                        // "페르소나 (근거: 영상 N)" — source clause optional, brackets may be []/()/full-width
+                        const m = text.match(/^(.+?)\s*(?:[\(（]\s*근거\s*[:：]\s*([^\)）]+?)\s*[\)）])?\s*$/);
+                        if (!m) continue;
+                        const label = (m[1] || '').trim();
+                        const source = (m[2] || '').trim();
+                        if (!label) continue;
+                        if (label === '데이터 부족') continue; // skip fallback placeholders
+                        groups[currentGroup].push({ label, source });
+                    }
+                }
+                el = el.nextElementSibling;
+            }
+
+            const total = groups.rec.length + groups.not.length;
+            if (total === 0) return; // nothing parseable → leave original list
+
+            function buildCol(kind, items, title, emptyMsg) {
+                const col = document.createElement('div');
+                col.className = 'pir-s6-col pir-s6-col-' + kind;
+                const header = document.createElement('div');
+                header.className = 'pir-s6-col-header';
+                header.innerHTML =
+                    '<span class="pir-s6-col-icon">' + (kind === 'rec' ? '👍' : '👎') + '</span>' +
+                    '<span class="pir-s6-col-title">' + escapeHtml(title) + '</span>';
+                col.appendChild(header);
+
+                const chips = document.createElement('div');
+                chips.className = 'pir-s6-chips';
+                if (items.length === 0) {
+                    const empty = document.createElement('div');
+                    empty.className = 'pir-s6-empty';
+                    empty.textContent = emptyMsg;
+                    chips.appendChild(empty);
+                } else {
+                    for (const it of items) {
+                        const chip = document.createElement('span');
+                        chip.className = 'pir-s6-chip pir-s6-chip-' + kind;
+                        if (it.source) chip.title = '근거: ' + it.source;
+                        chip.innerHTML =
+                            '<span class="pir-s6-chip-label">' + escapeHtml(it.label) + '</span>' +
+                            (it.source
+                                ? '<span class="pir-s6-chip-source">' + escapeHtml(it.source) + '</span>'
+                                : '');
+                        chips.appendChild(chip);
+                    }
+                }
+                col.appendChild(chips);
+                return col;
+            }
+
+            const matcher = document.createElement('div');
+            matcher.className = 'pir-s6-matcher';
+            matcher.appendChild(buildCol('rec', groups.rec, '추천',  '추천 페르소나 데이터 부족'));
+            matcher.appendChild(buildCol('not', groups.not, '비추',  '비추 페르소나 데이터 부족'));
+
+            const firstSibling = sectionEls[0];
+            if (firstSibling) firstSibling.parentNode.insertBefore(matcher, firstSibling);
+            else heading.after(matcher);
+            // Remove original list/heading siblings so only the chip matcher shows.
+            sectionEls.forEach(node => node.remove());
         }
 
         // ── Section ⑦: change highlight cards ───────────────────────────
