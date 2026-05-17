@@ -1979,17 +1979,50 @@
                     .filter(li => !li.classList.contains('tr-hidden'));
                 if (remaining.length === 0) ul.classList.add('tr-hidden');
             });
+            // A line counts as "safe to hide together with the bullets" if it is
+            // either a symbol bullet (◎○△✕) OR a plain '장점' / '단점' label —
+            // markdown's nl2br often flattens "**장점**\n- ◎ ..." into a single
+            // <p>장점<br>- ◎ ...</p>, and without this whitelist the label keeps
+            // the entire <p> alive (the bug just reported).
+            const LABEL_RE = /^(장점|단점|장점\s*\/\s*단점|장점\/단점|pros|cons|good|bad)\s*$/i;
+            function isLabelOnly(text) { return LABEL_RE.test(text); }
+
             touchedPs.forEach((_, p) => {
                 const html = p.innerHTML || '';
                 const lines = html.split(/<br\s*\/?>/i);
-                const allSymbolic = lines.every(line => {
+                const allHideable = lines.every(line => {
                     const tmp = document.createElement('div');
                     tmp.innerHTML = line;
                     const text = (tmp.textContent || '').replace(/^[\-\*]\s*/, '').trim();
                     if (!text) return true; // blank line OK
+                    if (isLabelOnly(text)) return true; // 장점 / 단점 라벨 라인은 같이 사라져도 OK
                     return _trClassifyLi(text) !== null;
                 });
-                if (allSymbolic) p.classList.add('tr-hidden');
+                if (allHideable) p.classList.add('tr-hidden');
+            });
+
+            // Standalone label-only <p> or <strong>장점</strong> blocks that
+            // weren't picked up by _trCollectAllLis (because they have no symbol)
+            // also need to disappear, otherwise a dangling "장점" / "단점"
+            // heading sits above the new card grid. Scope the cleanup to the
+            // section siblings of the pros/cons heading so we never touch
+            // unrelated paragraphs.
+            const labelHeadings = [];
+            const hPos = _trFindHeading(bodyEl, '장점');
+            const hNeg = _trFindHeading(bodyEl, '단점');
+            if (hPos) labelHeadings.push(hPos);
+            if (hNeg && hNeg !== hPos) labelHeadings.push(hNeg);
+            labelHeadings.forEach(h => {
+                _trSectionSiblings(h).forEach(el => {
+                    if (!el || el.classList.contains('tr-hidden')) return;
+                    // Skip nodes that still carry a bullet (already handled above
+                    // and they own real content).
+                    const html = el.innerHTML || '';
+                    if (/[◎○△✕✗×]/.test(html)) return;
+                    const text = (el.textContent || '').trim();
+                    if (!text) return;
+                    if (isLabelOnly(text)) el.classList.add('tr-hidden');
+                });
             });
         }
 
