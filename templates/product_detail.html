@@ -376,6 +376,38 @@
         .pir-s1-card-extra .pir-s1-card-body {
             color: var(--muted); font-style: italic;
         }
+        /* Section ① — reviewer consensus 3-step meter */
+        .pir-s1-consensus-meter {
+            display: flex; align-items: center; gap: 6px;
+            margin-top: 6px; min-width: 0;
+        }
+        .pir-s1-consensus-step {
+            flex: 1; min-width: 0;
+            height: 8px; border-radius: 999px;
+            background: var(--border-soft);
+            transition: background 0.2s ease;
+        }
+        .pir-s1-consensus-high .pir-s1-consensus-step.filled { background: #19a87c; }
+        .pir-s1-consensus-mid  .pir-s1-consensus-step.filled { background: #b07008; }
+        .pir-s1-consensus-low  .pir-s1-consensus-step.filled { background: #b44454; }
+        .pir-s1-consensus-grade {
+            flex-shrink: 0;
+            font-size: 12px; font-weight: 700;
+            margin-left: 4px;
+            white-space: nowrap;
+        }
+        .pir-s1-consensus-high .pir-s1-consensus-grade { color: #19a87c; }
+        .pir-s1-consensus-mid  .pir-s1-consensus-grade { color: #b07008; }
+        .pir-s1-consensus-low  .pir-s1-consensus-grade { color: #b44454; }
+        .pir-s1-consensus-desc {
+            font-size: 12px; line-height: 1.5;
+            color: var(--muted); margin-top: 6px;
+            word-break: keep-all;
+        }
+        @media (max-width: 380px) {
+            .pir-s1-consensus-meter { gap: 4px; }
+            .pir-s1-consensus-grade { font-size: 11px; margin-left: 2px; }
+        }
 
         /* Section ② — 3-card summary */
         .pir-s2-row {
@@ -1484,9 +1516,11 @@
 
         // ── Section ①: score gauge + consensus badge ────────────────────
         // Parse Section ① siblings into a small set of labelled cards.
-        // Returns an array of DOM elements (.pir-s1-card …) — empty if nothing
-        // parseable was found, in which case the caller falls back to plain.
-        function _pirS1ParseToCards(siblings) {
+        // `consensus` is the already-extracted '높음'|'중간'|'낮음'|null from
+        // the caller's regex — used to drive the 3-step meter inside the
+        // reviewer-consensus card. Returns an array of DOM elements — empty
+        // if nothing parseable was found, in which case the caller falls back.
+        function _pirS1ParseToCards(siblings, consensus) {
             const SCORE_RE = /종합\s*평가/;
             const CONSENSUS_RE = /(?:리뷰어\s*)?합의도/;
 
@@ -1531,7 +1565,7 @@
                 cards.push(_pirS1MakeCard('score', '☆ 종합 평가', scoreLine));
             }
             if (consensusLine) {
-                cards.push(_pirS1MakeCard('consensus', '👥 리뷰어 합의도', consensusLine));
+                cards.push(_pirS1MakeConsensusCard(consensus, consensusLine));
             }
             if (residual.length > 0) {
                 cards.push(_pirS1MakeCard('extra', '추가 메모', residual.join(' · ')));
@@ -1550,6 +1584,53 @@
             body.textContent = bodyText;
             card.appendChild(label);
             card.appendChild(body);
+            return card;
+        }
+
+        // Reviewer-consensus card with 3-step indicator (높음 3 / 중간 2 / 낮음 1)
+        // plus a short interpretation line. When level is null/unknown, falls
+        // back to plain body text so the original line is never lost.
+        function _pirS1MakeConsensusCard(level, fullText) {
+            const meta = level === '높음' ? { variant: 'high', filled: 3, desc: '리뷰어들의 평가가 대체로 일치 — 신뢰도 높은 결론' }
+                       : level === '중간' ? { variant: 'mid',  filled: 2, desc: '리뷰어 간 이견이 일부 있음 — 추가 정보 확인 권장' }
+                       : level === '낮음' ? { variant: 'low',  filled: 1, desc: '리뷰어 간 평가가 갈리는 영역 — 본인 우선순위에 맞춰 판단 필요' }
+                       : null;
+
+            const card = document.createElement('div');
+            card.className = 'pir-s1-card pir-s1-card-consensus';
+
+            const label = document.createElement('div');
+            label.className = 'pir-s1-card-label';
+            label.textContent = '👥 리뷰어 합의도';
+            card.appendChild(label);
+
+            if (!meta) {
+                // Unknown level — keep raw text intact (graceful fallback).
+                const body = document.createElement('div');
+                body.className = 'pir-s1-card-body';
+                body.textContent = fullText;
+                card.appendChild(body);
+                return card;
+            }
+
+            const meter = document.createElement('div');
+            meter.className = 'pir-s1-consensus-meter pir-s1-consensus-' + meta.variant;
+            for (let i = 0; i < 3; i++) {
+                const step = document.createElement('span');
+                step.className = 'pir-s1-consensus-step' + (i < meta.filled ? ' filled' : '');
+                meter.appendChild(step);
+            }
+            const grade = document.createElement('span');
+            grade.className = 'pir-s1-consensus-grade';
+            grade.textContent = level;
+            meter.appendChild(grade);
+            card.appendChild(meter);
+
+            const desc = document.createElement('div');
+            desc.className = 'pir-s1-consensus-desc';
+            desc.textContent = meta.desc;
+            card.appendChild(desc);
+
             return card;
         }
 
@@ -1605,7 +1686,7 @@
             // contentDiv as-is — so the raw markdown remains visible.
             let cardStackBuilt = false;
             try {
-                const cards = _pirS1ParseToCards(siblings);
+                const cards = _pirS1ParseToCards(siblings, consensus);
                 if (cards.length > 0) {
                     cards.forEach(c => contentDiv.appendChild(c));
                     // Hide the source siblings so the new cards aren't duplicated.
