@@ -142,13 +142,20 @@ def register_product_routes(app):
                 detail="자막 기반 보고서를 생성할 수 있는 영상이 2개 이상 필요합니다 (자막 부재 영상 제외 후 부족)",
             )
 
+        # 선정 영상 수 vs 실제 분석 영상 수 — 자막 부재로 일부가 제외됐을 수
+        # 있다. 보고서·UI 모두 정직 표기하도록 분리해 추적.
+        selected_video_count = len(video_ids)
+        analyzed_video_ids = [r["video_id"] for r in per_video_reports]
+        excluded_video_ids = [v for v in video_ids if v not in set(analyzed_video_ids)]
+
         # build_product_integrated_insight_report 가 내부에서 댓글 self-healing 으로
         # 적재된 DB 를 READ ONLY 로 집계해 ⑤ 소비자 여론 섹션을 채운다.
         build_t0 = perf_counter()
         report_text, model_used = build_product_integrated_insight_report(
             product_name=product["name"],
             per_video_reports=per_video_reports,
-            video_ids=[r["video_id"] for r in per_video_reports],
+            video_ids=analyzed_video_ids,
+            selected_video_count=selected_video_count,
         )
         build_ms = (perf_counter() - build_t0) * 1000
 
@@ -180,8 +187,12 @@ def register_product_routes(app):
             "product_id": product_id,
             "report_text": report_text,
             "report_html": markdown_to_html(report_text),
-            "source_video_count": len(per_video_reports),
-            "video_ids": [r["video_id"] for r in per_video_reports],
+            "source_video_count": len(per_video_reports),       # 실제 분석된 영상 수 (분모 기준)
+            "selected_video_count": selected_video_count,        # 사용자가 선정한 총 수
+            "analyzed_video_count": len(per_video_reports),      # source_video_count 와 동일, 명확성 위해 중복
+            "excluded_video_count": len(excluded_video_ids),     # 자막 부재로 제외된 수
+            "excluded_video_ids": excluded_video_ids,            # 제외된 video_id 리스트 (디버그/UI 보조)
+            "video_ids": analyzed_video_ids,
             "model_used": model_used,
             "perf_breakdown": {
                 "total_ms": round(total_ms, 1),
