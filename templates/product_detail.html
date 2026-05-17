@@ -335,28 +335,81 @@
 
         /* ── Visual enhancements for integrated insight ─── */
         /* Section ① — score gauge */
-        .pir-s1-wrap { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; margin: 4px 0; }
-        .pir-gauge-box { flex-shrink: 0; width: 150px; text-align: center; }
+        .pir-s1-wrap { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; margin: 4px 0 28px; }
+        .pir-gauge-box {
+            flex-shrink: 0; width: 150px; text-align: center;
+            display: flex; flex-direction: column; align-items: center; gap: 6px;
+        }
         .pir-gauge-box canvas { display: block; margin: 0 auto; }
-        .pir-gauge-score { font-size: 12px; font-weight: 700; color: var(--text); margin-top: 6px; }
-        .pir-consensus-badge {
-            display: inline-block; margin-top: 6px;
-            padding: 3px 10px; border-radius: 999px;
-            font-size: 11px; font-weight: 600; letter-spacing: 0.01em;
+        .pir-gauge-headline {
+            font-size: 12px; color: var(--muted); font-weight: 600;
+            letter-spacing: 0.01em;
         }
-        .pir-consensus-high { background: rgba(32,201,151,0.15); color: #19a87c; }
-        .pir-consensus-mid  { background: rgba(245,166,35,0.15);  color: #b07008; }
-        .pir-consensus-low  { background: rgba(227,93,106,0.15);  color: #b44454; }
-        .pir-s1-content { flex: 1; min-width: 200px; }
-        /* product image placeholder (for future pipeline) */
-        .pir-product-images {
-            display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px;
+        .pir-gauge-sub {
+            font-size: 12px; color: var(--muted); font-weight: 500;
+            line-height: 1.4;
         }
-        .pir-product-img-placeholder {
-            width: 72px; height: 72px; border-radius: 8px;
-            background: var(--primary-soft); border: 1px dashed var(--border);
-            display: grid; place-items: center;
-            font-size: 20px; color: var(--muted);
+        .pir-s1-content { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 10px; }
+
+        /* Section ① content cards (verdict / score / consensus / extra) */
+        .pir-s1-card {
+            background: var(--surface);
+            border: 1px solid var(--border-soft);
+            border-radius: 10px;
+            padding: 10px 14px;
+            display: flex; flex-direction: column; gap: 4px;
+            min-width: 0;
+        }
+        .pir-s1-card-label {
+            font-size: 11px; color: var(--muted); font-weight: 600;
+            letter-spacing: 0.02em;
+        }
+        .pir-s1-card-body {
+            font-size: 13px; line-height: 1.55; color: var(--text);
+            font-weight: 500; word-break: keep-all;
+        }
+        /* Verdict gets the strongest emphasis — accent border + larger body */
+        .pir-s1-card-verdict {
+            border-left: 3px solid var(--primary);
+        }
+        .pir-s1-card-verdict .pir-s1-card-body {
+            font-size: 14px; font-weight: 600;
+        }
+        .pir-s1-card-extra .pir-s1-card-body {
+            color: var(--muted); font-style: italic;
+        }
+        /* Section ① — reviewer consensus 3-step meter */
+        .pir-s1-consensus-meter {
+            display: flex; align-items: center; gap: 6px;
+            margin-top: 6px; min-width: 0;
+            max-width: 360px;
+        }
+        .pir-s1-consensus-step {
+            flex: 1; min-width: 0;
+            height: 8px; border-radius: 999px;
+            background: var(--border-soft);
+            transition: background 0.2s ease;
+        }
+        .pir-s1-consensus-high .pir-s1-consensus-step.filled { background: #19a87c; }
+        .pir-s1-consensus-mid  .pir-s1-consensus-step.filled { background: #b07008; }
+        .pir-s1-consensus-low  .pir-s1-consensus-step.filled { background: #b44454; }
+        .pir-s1-consensus-grade {
+            flex-shrink: 0;
+            font-size: 12px; font-weight: 700;
+            margin-left: 4px;
+            white-space: nowrap;
+        }
+        .pir-s1-consensus-high .pir-s1-consensus-grade { color: #19a87c; }
+        .pir-s1-consensus-mid  .pir-s1-consensus-grade { color: #b07008; }
+        .pir-s1-consensus-low  .pir-s1-consensus-grade { color: #b44454; }
+        .pir-s1-consensus-desc {
+            font-size: 12px; line-height: 1.5;
+            color: var(--muted); margin-top: 6px;
+            word-break: keep-all;
+        }
+        @media (max-width: 380px) {
+            .pir-s1-consensus-meter { gap: 4px; }
+            .pir-s1-consensus-grade { font-size: 11px; margin-left: 2px; }
         }
 
         /* Section ② — 3-card summary */
@@ -429,32 +482,46 @@
         }
         .pir-s4-group-pros .pir-s4-group-label { color: #19a87c; }
         .pir-s4-group-cons .pir-s4-group-label { color: #b44454; }
-        .pir-s4-row {
+        /* Segment-bar row layout — 4 columns: 라벨 / 강도 칩 / 세그먼트 / 수치 */
+        .pir-s4-seg-row {
             display: grid;
-            grid-template-columns: 110px 1fr 44px;
+            grid-template-columns: minmax(0, 1fr) auto auto 40px;
             align-items: center;
-            gap: 10px;
+            column-gap: 12px;
+            padding: 6px 0;
+            border-bottom: 1px solid var(--border-soft);
         }
-        .pir-s4-row-label {
-            font-size: 12px; color: var(--text); font-weight: 500;
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        .pir-s4-seg-row:last-child { border-bottom: none; }
+        .pir-s4-seg-label {
+            font-size: 13px; font-weight: 600; color: var(--text);
+            display: inline-flex; align-items: center; gap: 6px;
+            min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
-        .pir-s4-bar-track {
-            position: relative;
-            display: block;
-            height: 10px;
-            background: rgba(111,66,193,0.08);
-            border-radius: 999px;
-            overflow: hidden;
+        .pir-s4-seg-chip {
+            display: inline-flex; align-items: center;
+            padding: 3px 10px; border-radius: 999px;
+            font-size: 11px; font-weight: 700;
+            white-space: nowrap;
         }
-        .pir-s4-bar-fill {
-            position: absolute; left: 0; top: 0; bottom: 0;
-            border-radius: 999px;
-            transition: width 0.4s ease;
+        .pir-s4-group-pros .pir-s4-seg-chip-full     { background: #19a87c; color: #fff; }
+        .pir-s4-group-pros .pir-s4-seg-chip-majority { background: var(--positive-soft); color: #0d6e4f; border: 1px solid #c5f0de; }
+        .pir-s4-group-pros .pir-s4-seg-chip-partial  { background: transparent;          color: #19a87c; border: 1px dashed #c5f0de; }
+        .pir-s4-group-cons .pir-s4-seg-chip-full     { background: #b3303c; color: #fff; }
+        .pir-s4-group-cons .pir-s4-seg-chip-majority { background: var(--negative-soft); color: #b3303c; border: 1px solid #f7c2c8; }
+        .pir-s4-group-cons .pir-s4-seg-chip-partial  { background: transparent;          color: #b3303c; border: 1px dashed #f7c2c8; }
+        .pir-s4-seg-cells {
+            display: flex; flex-wrap: wrap; gap: 4px;
+            min-width: 0;
         }
-        .pir-s4-group-pros .pir-s4-bar-fill { background: linear-gradient(90deg, #20c997, #19a87c); }
-        .pir-s4-group-cons .pir-s4-bar-fill { background: linear-gradient(90deg, #e35d6a, #b44454); }
-        .pir-s4-row-count {
+        .pir-s4-seg-cell {
+            display: inline-block;
+            width: 28px; height: 12px; border-radius: 4px;
+            background: var(--border-soft);
+            flex-shrink: 0;
+        }
+        .pir-s4-group-pros .pir-s4-seg-cell.filled { background: linear-gradient(180deg, #20c997, #19a87c); }
+        .pir-s4-group-cons .pir-s4-seg-cell.filled { background: linear-gradient(180deg, #e35d6a, #b44454); }
+        .pir-s4-seg-count {
             font-size: 11px; font-weight: 700; color: var(--muted);
             text-align: right; font-variant-numeric: tabular-nums;
         }
@@ -641,19 +708,92 @@
             font-style: italic; padding: 4px 2px;
         }
 
-        /* Section ⑦ — change highlights */
-        .pir-highlights-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+        /* Section ⑥ — change highlights (C안: 좌우 비교 + 변화 평가) */
+        .pir-highlights-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 12px;
+            margin-bottom: 14px;
+        }
         .pir-highlight-card {
-            background: var(--surface-soft); border: 1px solid var(--border-soft);
-            border-radius: 10px; padding: 10px 14px; min-width: 130px; flex: 1;
+            background: var(--surface);
+            border: 1px solid var(--border-soft);
+            border-radius: 12px;
+            padding: 12px 14px;
+            display: flex; flex-direction: column; gap: 10px;
+            min-width: 0;
         }
-        .pir-highlight-item { font-size: 11px; color: var(--muted); margin-bottom: 4px; font-weight: 500; }
-        .pir-highlight-change {
-            display: flex; align-items: center; gap: 5px;
-            font-size: 12px; font-weight: 700; color: var(--text); flex-wrap: wrap;
+        .pir-highlight-item {
+            font-size: 13px; font-weight: 700; color: var(--text);
+            display: inline-flex; align-items: center; gap: 6px;
+            min-width: 0;
         }
-        .pir-highlight-arrow { color: var(--primary); font-size: 14px; font-weight: 800; }
-        .pir-highlight-delta { font-size: 11px; color: var(--primary); font-weight: 600; margin-top: 3px; }
+        .pir-highlight-item-icon { font-size: 14px; line-height: 1; }
+        /* Comparison body: 전작 | › | 현재 */
+        .pir-highlight-cmp {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: stretch;
+            gap: 8px;
+            min-width: 0;
+        }
+        .pir-highlight-side {
+            background: var(--surface-soft);
+            border: 1px solid var(--border-soft);
+            border-radius: 8px;
+            padding: 8px 10px;
+            display: flex; flex-direction: column; gap: 4px;
+            min-width: 0;
+        }
+        /* '현재' 칸과 단일 카드 모두 동일한 연한 초록 톤. var(--positive-soft) 는
+           일부 환경(다크 모드 등) 에서 거의 보이지 않아 rgba 로 명시 — 라이트
+           모드에서는 옅은 초록, 다크 모드에서도 분명한 초록 띤 강조로 보임. */
+        .pir-highlight-side-after,
+        .pir-highlight-single {
+            background: rgba(32, 201, 151, 0.22);
+            border: 1px solid rgba(32, 201, 151, 0.55);
+        }
+        .pir-highlight-side-label {
+            font-size: 10px; font-weight: 600; color: var(--muted);
+            text-transform: uppercase; letter-spacing: 0.04em;
+        }
+        .pir-highlight-side-after .pir-highlight-side-label,
+        .pir-highlight-single .pir-highlight-side-label { color: #19a87c; }
+        .pir-highlight-side-value {
+            font-size: 12px; line-height: 1.45; color: var(--text);
+            font-weight: 500;
+            /* keep-all 만 쓰면 슬래시/괄호 섞인 영문·숫자가 카드 밖으로 흘러
+               나옴. overflow-wrap: anywhere 로 어디서든 줄바꿈 허용. */
+            word-break: keep-all;
+            overflow-wrap: anywhere;
+        }
+        .pir-highlight-arrow {
+            align-self: center; justify-self: center;
+            color: var(--muted);
+            font-size: 20px; font-weight: 700; line-height: 1;
+        }
+        /* Single (current-only) body — no-predecessor rows */
+        .pir-highlight-single {
+            border-radius: 8px;
+            padding: 8px 10px;
+            display: flex; flex-direction: column; gap: 4px;
+            min-width: 0;
+        }
+        /* 변화 평가 줄 — 가운데 정렬 + 초록 굵게. "어떤 부분이 좋아졌는지"
+           한눈에 들어오도록 강조. 카드 하단에 단독 행. */
+        .pir-highlight-change-line {
+            font-size: 12px; line-height: 1.4;
+            color: #19a87c; font-weight: 700;
+            display: flex; align-items: center; justify-content: center;
+            gap: 4px;
+            text-align: center;
+            word-break: keep-all;
+            overflow-wrap: anywhere;
+        }
+        .pir-highlight-change-icon {
+            font-size: 14px; line-height: 1;
+            color: #19a87c;
+        }
 
         @media (max-width: 660px) {
             .pir-s3-wrap { flex-direction: column; }
@@ -661,10 +801,17 @@
             .pir-s1-wrap { flex-direction: column; }
             .pir-gauge-box { width: 100%; }
             .pir-s2-row { grid-template-columns: 1fr; }
-            .pir-s4-row { grid-template-columns: 88px 1fr 40px; gap: 8px; }
+            .pir-s4-seg-row {
+                grid-template-columns: minmax(0, 1fr) auto;
+                column-gap: 8px; row-gap: 4px;
+            }
+            .pir-s4-seg-cells, .pir-s4-seg-count { grid-column: 1 / -1; }
+            .pir-s4-seg-cell { width: 22px; height: 10px; }
             .pir-s5-aspects { grid-template-columns: 1fr; }
             .pir-s5-aspect-row { grid-template-columns: 70px 1fr 28px; gap: 6px; }
             .pir-s6-matcher { grid-template-columns: 1fr; }
+            .pir-highlight-cmp { grid-template-columns: 1fr; gap: 6px; }
+            .pir-highlight-arrow { transform: rotate(90deg); font-size: 18px; }
         }
 
         /* ── Integrated insight progress overlay ─────────── */
@@ -1465,6 +1612,132 @@
         }
 
         // ── Section ①: score gauge + consensus badge ────────────────────
+        // Parse Section ① siblings into a small set of labelled cards.
+        //   - `consensus` is the already-extracted '높음'|'중간'|'낮음'|null
+        //   - `videoCount` (or null) is the analysis-video count used by the
+        //     consensus card to render a "리뷰어 N명의 평가가 ..." subtitle
+        //
+        // The score line is parsed out and *intentionally not rendered as a
+        // card* — the donut already shows the number. Returns an array of DOM
+        // elements (verdict + consensus + optional extra). Empty array → caller
+        // falls back to plain siblings.
+        function _pirS1ParseToCards(siblings, consensus, videoCount) {
+            const SCORE_RE = /종합\s*평가/;
+            const CONSENSUS_RE = /(?:리뷰어\s*)?합의도/;
+
+            // Flatten siblings to candidate "lines": one per <li> inside <ul>/<ol>,
+            // or the element's own textContent otherwise. blockquote is flagged
+            // so we can prioritize it as the verdict.
+            const lines = [];
+            siblings.forEach(el => {
+                if (!el || el.nodeType !== 1) return;
+                if (el.tagName === 'UL' || el.tagName === 'OL') {
+                    el.querySelectorAll('li').forEach(li => {
+                        const text = (li.textContent || '').replace(/\s+/g, ' ').trim();
+                        if (text) lines.push({ text, isBlockquote: false });
+                    });
+                } else if (el.tagName === 'BLOCKQUOTE') {
+                    const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
+                    if (text) lines.push({ text, isBlockquote: true });
+                } else {
+                    const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
+                    if (text) lines.push({ text, isBlockquote: false });
+                }
+            });
+
+            let verdictText = '';
+            let scoreLine = '';
+            let consensusLine = '';
+            const residual = [];
+
+            for (const item of lines) {
+                const t = item.text;
+                if (!scoreLine && SCORE_RE.test(t)) { scoreLine = t; continue; }
+                if (!consensusLine && CONSENSUS_RE.test(t)) { consensusLine = t; continue; }
+                if (!verdictText && (item.isBlockquote || true)) { verdictText = t; continue; }
+                residual.push(t);
+            }
+
+            const cards = [];
+            if (verdictText) {
+                cards.push(_pirS1MakeCard('verdict', '✎ 한줄 구매 판정', verdictText));
+            }
+            // scoreLine은 의도적으로 카드로 만들지 않음 — 도넛이 점수를 이미
+            // 표시하므로 오른쪽에서 큰 숫자로 다시 보여주면 시각적 중복.
+            if (consensusLine) {
+                cards.push(_pirS1MakeConsensusCard(consensus, consensusLine, videoCount));
+            }
+            if (residual.length > 0) {
+                cards.push(_pirS1MakeCard('extra', '추가 메모', residual.join(' · ')));
+            }
+            return cards;
+        }
+
+        function _pirS1MakeCard(kind, labelText, bodyText) {
+            const card = document.createElement('div');
+            card.className = 'pir-s1-card pir-s1-card-' + kind;
+            const label = document.createElement('div');
+            label.className = 'pir-s1-card-label';
+            label.textContent = labelText;
+            const body = document.createElement('div');
+            body.className = 'pir-s1-card-body';
+            body.textContent = bodyText;
+            card.appendChild(label);
+            card.appendChild(body);
+            return card;
+        }
+
+        // Reviewer-consensus card with 3-step indicator (높음 3 / 중간 2 / 낮음 1)
+        // plus a short interpretation line that references "위 점수" so the
+        // donut and this card read as one story. videoCount is folded into the
+        // copy when present ("리뷰어 N명…"); falls back to "리뷰어들…" otherwise.
+        // When level is null/unknown, fully falls back to plain body text so
+        // the original line is never lost.
+        function _pirS1MakeConsensusCard(level, fullText, videoCount) {
+            const who = (videoCount && videoCount > 0) ? ('리뷰어 ' + videoCount + '명') : '리뷰어들';
+            const meta = level === '높음' ? { variant: 'high', filled: 3, desc: who + '의 평가가 대체로 일치 — 위 점수의 신뢰도 높음' }
+                       : level === '중간' ? { variant: 'mid',  filled: 2, desc: who + ' 사이 이견이 일부 — 위 점수는 참고 수준으로 보기' }
+                       : level === '낮음' ? { variant: 'low',  filled: 1, desc: who + ' 사이 평가가 갈림 — 위 점수만으로 판단 주의' }
+                       : null;
+
+            const card = document.createElement('div');
+            card.className = 'pir-s1-card pir-s1-card-consensus';
+
+            const label = document.createElement('div');
+            label.className = 'pir-s1-card-label';
+            label.textContent = '👥 리뷰어 합의도';
+            card.appendChild(label);
+
+            if (!meta) {
+                // Unknown level — keep raw text intact (graceful fallback).
+                const body = document.createElement('div');
+                body.className = 'pir-s1-card-body';
+                body.textContent = fullText;
+                card.appendChild(body);
+                return card;
+            }
+
+            const meter = document.createElement('div');
+            meter.className = 'pir-s1-consensus-meter pir-s1-consensus-' + meta.variant;
+            for (let i = 0; i < 3; i++) {
+                const step = document.createElement('span');
+                step.className = 'pir-s1-consensus-step' + (i < meta.filled ? ' filled' : '');
+                meter.appendChild(step);
+            }
+            const grade = document.createElement('span');
+            grade.className = 'pir-s1-consensus-grade';
+            grade.textContent = level;
+            meter.appendChild(grade);
+            card.appendChild(meter);
+
+            const desc = document.createElement('div');
+            desc.className = 'pir-s1-consensus-desc';
+            desc.textContent = meta.desc;
+            card.appendChild(desc);
+
+            return card;
+        }
+
         function _pirEnhanceSection1Gauge(bodyEl) {
             const heading = _pirFindHeading(bodyEl, '한줄 구매 판정');
             if (!heading) return;
@@ -1480,39 +1753,64 @@
             const consensusMatch = fullText.match(/리뷰어\s*합의도[^높중낮]*(높음|중간|낮음)/);
             const consensus = consensusMatch ? consensusMatch[1] : null;
 
-            // Build gauge box
+            // 분석 영상 수 — LLM 의 score 라인 (예: "종합 평가: 8.3 / 10 (분석
+            // 영상 5개 기반)") 에서 추출. 없으면 null — 도넛 하단/합의도 desc
+            // 양쪽 모두에서 graceful 하게 생략 처리.
+            const videoCountMatch = fullText.match(/분석\s*영상\s*(\d+)\s*개/);
+            const videoCount = videoCountMatch ? parseInt(videoCountMatch[1], 10) : null;
+
+            // Build gauge box — '제품 종합 점수' 라벨 위 / 도넛 / '분석 영상
+            // N개 종합' 보조 / 합의도 배지. 점수 숫자는 도넛 중앙에만 두고
+            // 별도 점수 텍스트 줄은 제거됨 (도넛 중앙 텍스트와 중복).
             const gaugeBox = document.createElement('div');
             gaugeBox.className = 'pir-gauge-box';
+
+            const headline = document.createElement('div');
+            headline.className = 'pir-gauge-headline';
+            headline.textContent = '제품 종합 점수';
+            gaugeBox.appendChild(headline);
 
             const canvas = document.createElement('canvas');
             canvas.width = 130; canvas.height = 130;
             gaugeBox.appendChild(canvas);
 
-            const scoreLabel = document.createElement('div');
-            scoreLabel.className = 'pir-gauge-score';
-            scoreLabel.textContent = score.toFixed(1) + ' / 10';
-            gaugeBox.appendChild(scoreLabel);
-
-            if (consensus) {
-                const badge = document.createElement('div');
-                const cls = consensus === '높음' ? 'high' : consensus === '중간' ? 'mid' : 'low';
-                badge.className = 'pir-consensus-badge pir-consensus-' + cls;
-                badge.textContent = '합의도 ' + consensus;
-                gaugeBox.appendChild(badge);
+            if (videoCount && videoCount > 0) {
+                const sub = document.createElement('div');
+                sub.className = 'pir-gauge-sub';
+                sub.textContent = '분석 영상 ' + videoCount + '개 종합';
+                gaugeBox.appendChild(sub);
             }
 
-            // Product image placeholder (future pipeline hook)
-            const imgPlaceholder = document.createElement('div');
-            imgPlaceholder.className = 'pir-product-images';
-            imgPlaceholder.innerHTML = '<div class="pir-product-img-placeholder" title="제품 이미지 (준비 중)">🖼</div>';
-            gaugeBox.appendChild(imgPlaceholder);
+            // (도넛 아래 합의도 배지 제거됨 — 오른쪽 '리뷰어 합의도' 카드와
+            //  정보가 중복돼 시각적 혼동만 유발. consensus 변수 자체는 오른쪽
+            //  카드 빌더에 계속 전달됨.)
 
             // Wrap heading's siblings in flex layout
             const wrapper = document.createElement('div');
             wrapper.className = 'pir-s1-wrap';
             const contentDiv = document.createElement('div');
             contentDiv.className = 'pir-s1-content';
-            siblings.forEach(el => contentDiv.appendChild(el));
+
+            // ── Right column: verdict + consensus 2 cards (score card removed
+            // because the donut already conveys score; redundancy added clutter).
+            // try/catch fallback preserves original sibling rendering on parse error.
+            let cardStackBuilt = false;
+            try {
+                const cards = _pirS1ParseToCards(siblings, consensus, videoCount);
+                if (cards.length > 0) {
+                    cards.forEach(c => contentDiv.appendChild(c));
+                    // Hide the source siblings so the new cards aren't duplicated.
+                    // Inline style only — no global hide utility exists in this file.
+                    siblings.forEach(el => { el.style.display = 'none'; });
+                    cardStackBuilt = true;
+                }
+            } catch (e) {
+                console.warn('[PIR] s1 card stack build failed, falling back to plain siblings:', e);
+            }
+            if (!cardStackBuilt) {
+                siblings.forEach(el => contentDiv.appendChild(el));
+            }
+
             wrapper.appendChild(gaugeBox);
             wrapper.appendChild(contentDiv);
             heading.after(wrapper);
@@ -1539,11 +1837,18 @@
                     afterDraw(ch) {
                         const { ctx, chartArea: { left, top, width, height } } = ch;
                         ctx.save();
-                        ctx.font = 'bold 22px Pretendard, sans-serif';
-                        ctx.fillStyle = color;
+                        const cx = left + width / 2;
+                        const cy = top + height / 2;
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'middle';
-                        ctx.fillText(score.toFixed(1), left + width / 2, top + height / 2);
+                        // Big score number — sits slightly above center
+                        ctx.font = 'bold 26px Pretendard, sans-serif';
+                        ctx.fillStyle = color;
+                        ctx.fillText(score.toFixed(1), cx, cy - 7);
+                        // Small "/ 10" denominator — muted, sits below
+                        ctx.font = '500 11px Pretendard, sans-serif';
+                        ctx.fillStyle = '#6b6880';
+                        ctx.fillText('/ 10', cx, cy + 15);
                         ctx.restore();
                     }
                 }]
@@ -1743,6 +2048,38 @@
             // Denominator: use the max total seen (typically the video count, e.g. 6)
             const denom = Math.max(...all.map(x => x.total));
 
+            // 합의 강도 분류 (N/M 비율 기반).
+            //   전원 합의 : N === M
+            //   다수       : N/M > 0.5 이고 N !== M (과반)
+            //   일부       : 그 외
+            function _pirS4ConsensusLabel(n, m) {
+                if (m <= 0) return { text: '일부', level: 'partial' };
+                if (n === m) return { text: '전원 합의', level: 'full' };
+                if (n / m > 0.5) return { text: '다수', level: 'majority' };
+                return { text: '일부', level: 'partial' };
+            }
+
+            // 카테고리 아이콘 매핑 — _pirEnhanceSection4Icons 의 ICON_MAP 과 동일
+            // 키워드. 그 함수가 li 에 prepend 하는 동작은 그대로 두지만, 세그먼
+            // 트 row 의 라벨에도 같은 아이콘을 직접 붙여 시각적 일관성 유지.
+            const PIR_S4_ICON_MAP = [
+                { keys: ['카메라','렌즈','조리개','화소','광학'], icon: '📷' },
+                { keys: ['배터리','충전','발열','mah','wh'],        icon: '🔋' },
+                { keys: ['디스플레이','화면','밝기','색상','주사율','nit'], icon: '🖥️' },
+                { keys: ['가격','원','비용','만원','가성비'],         icon: '💰' },
+                { keys: ['디자인','소재','무게','두께','그립','프레임'], icon: '✨' },
+                { keys: ['성능','칩셋','cpu','ap','벤치','프로세서'], icon: '⚡' },
+                { keys: ['ai','인공지능'],                           icon: '🤖' },
+                { keys: ['소리','음질','스피커'],                     icon: '🔊' },
+            ];
+            function _pirS4IconFor(text) {
+                const lower = (text || '').toLowerCase();
+                for (const { keys, icon } of PIR_S4_ICON_MAP) {
+                    if (keys.some(k => lower.includes(k))) return icon;
+                }
+                return '💡';
+            }
+
             function buildGroup(kind, items, title) {
                 if (items.length === 0) return null;
                 const wrap = document.createElement('div');
@@ -1752,17 +2089,27 @@
                 label.textContent = title;
                 wrap.appendChild(label);
                 for (const it of items) {
+                    const consensus = _pirS4ConsensusLabel(it.n, it.total);
+                    const icon = _pirS4IconFor(it.label);
                     const row = document.createElement('div');
-                    row.className = 'pir-s4-row';
-                    const pct = Math.max(4, Math.round((it.n / denom) * 100));
+                    row.className = 'pir-s4-seg-row';
+                    // M cells, first N filled — total cell count tracks the
+                    // analysis-video count so a 5-video product and an 8-video
+                    // product naturally show different counts of cells.
+                    const cellsHtml = [];
+                    for (let i = 0; i < it.total; i++) {
+                        cellsHtml.push('<span class="pir-s4-seg-cell' + (i < it.n ? ' filled' : '') + '"></span>');
+                    }
                     row.innerHTML =
-                        '<span class="pir-s4-row-label" title="' + escapeHtml(it.label) + '">' +
+                        '<span class="pir-s4-seg-label" title="' + escapeHtml(it.label) + '">' +
+                            '<span class="pir-item-icon" aria-hidden="true">' + icon + '</span>' +
                             escapeHtml(it.label) +
                         '</span>' +
-                        '<span class="pir-s4-bar-track">' +
-                            '<span class="pir-s4-bar-fill" style="width:' + pct + '%"></span>' +
+                        '<span class="pir-s4-seg-chip pir-s4-seg-chip-' + consensus.level + '">' +
+                            consensus.text +
                         '</span>' +
-                        '<span class="pir-s4-row-count">' + it.n + '/' + it.total + '</span>';
+                        '<span class="pir-s4-seg-cells">' + cellsHtml.join('') + '</span>' +
+                        '<span class="pir-s4-seg-count">' + it.n + '/' + it.total + '</span>';
                     wrap.appendChild(row);
                 }
                 return wrap;
@@ -1770,8 +2117,8 @@
 
             const container = document.createElement('div');
             container.className = 'pir-s4-bars';
-            const prosEl = buildGroup('pros', groups.pros, '장점 — 막대 길이는 언급한 영상 수');
-            const consEl = buildGroup('cons', groups.cons, '단점 — 막대 길이는 언급한 영상 수');
+            const prosEl = buildGroup('pros', groups.pros, '장점 — 영상 ' + denom + '개 중 동의한 수·합의 강한 순');
+            const consEl = buildGroup('cons', groups.cons, '단점 — 영상 ' + denom + '개 중 지적한 수·지적 많은 순');
             if (prosEl) container.appendChild(prosEl);
             if (consEl) container.appendChild(consEl);
 
@@ -2175,6 +2522,33 @@
         }
 
         // ── Section ⑦: change highlight cards ───────────────────────────
+        // 전작 칸이 비었거나 "데이터 부족" / "언급 없음" 류면 좌우 비교가
+        // 의미가 없으므로 현재 특징 단일 카드로 폴백.
+        function _pirS6IsNoPredecessor(text) {
+            if (!text || !text.trim()) return true;
+            return /(데이터\s*부족|비교\s*언급\s*없음|언급\s*없음|미언급|정보\s*없음|해당\s*없음)/.test(text);
+        }
+
+        // 카테고리 아이콘 — Section ④ 의 ICON_MAP 과 동일 키워드 사용. 함수
+        // 자체는 손대지 않고 카드 라벨 prepend 용으로만 별도 인스턴스 보관.
+        const PIR_S6_ICON_MAP = [
+            { keys: ['카메라','렌즈','조리개','화소','광학'], icon: '📷' },
+            { keys: ['배터리','충전','발열','mah','wh'],        icon: '🔋' },
+            { keys: ['디스플레이','화면','밝기','색상','주사율','nit'], icon: '🖥️' },
+            { keys: ['가격','원','비용','만원','가성비'],         icon: '💰' },
+            { keys: ['디자인','소재','무게','두께','그립','프레임'], icon: '✨' },
+            { keys: ['성능','칩셋','cpu','ap','벤치','프로세서','그래픽','gpu'], icon: '⚡' },
+            { keys: ['ai','인공지능'],                           icon: '🤖' },
+            { keys: ['소리','음질','스피커'],                     icon: '🔊' },
+        ];
+        function _pirS6IconFor(text) {
+            const lower = (text || '').toLowerCase();
+            for (const { keys, icon } of PIR_S6_ICON_MAP) {
+                if (keys.some(k => lower.includes(k))) return icon;
+            }
+            return '🧩';
+        }
+
         function _pirEnhanceSection7Highlights(bodyEl) {
             const heading = _pirFindHeading(bodyEl, '전작 대비');
             if (!heading) return;
@@ -2188,37 +2562,88 @@
             }
             if (!tableEl) return;
 
-            // Parse rows with both "전작" and "현재" columns (cols 0,1,2 = 항목/전작/현재)
-            const highlights = [];
-            for (const row of tableEl.querySelectorAll('tbody tr')) {
-                const cells = row.querySelectorAll('td');
+            try {
+                _pirS6BuildHighlightCards(tableEl);
+            } catch (e) {
+                console.warn('[PIR] s6 highlight cards failed:', e);
+                // Fallback: leave the original table intact — no cards inserted.
+            }
+        }
+
+        function _pirS6BuildHighlightCards(tableEl) {
+            // Parse cells 0..3 = item / before / after / change-assessment.
+            // change cell is optional (older formats may have only 3 columns).
+            const rows = [];
+            for (const tr of tableEl.querySelectorAll('tbody tr')) {
+                const cells = tr.querySelectorAll('td');
                 if (cells.length < 3) continue;
                 const item   = cells[0].textContent.trim();
                 const before = cells[1].textContent.trim();
                 const after  = cells[2].textContent.trim();
-                if (!item || before === after) continue;
-                if (before.includes('데이터 부족') || after.includes('데이터 부족')) continue;
-                if (before.includes('비교 언급 없음') || after.includes('비교 언급 없음')) continue;
-                highlights.push({ item, before, after });
-                if (highlights.length >= 3) break;
+                const change = cells.length >= 4 ? cells[3].textContent.trim() : '';
+                if (!item) continue;
+                if (!after || /데이터\s*부족/.test(after)) continue;   // 현재가 비면 카드 의미 없음
+                if (before === after) continue;                         // 변화 없는 행
+                rows.push({ item, before, after, change });
+                if (rows.length >= 3) break;
             }
-            if (highlights.length === 0) return;
+            if (rows.length === 0) return;
 
-            const row = document.createElement('div');
-            row.className = 'pir-highlights-row';
-            for (const { item, before, after } of highlights) {
+            const container = document.createElement('div');
+            container.className = 'pir-highlights-row';
+
+            for (const r of rows) {
+                const noPrev = _pirS6IsNoPredecessor(r.before);
+                const icon = _pirS6IconFor(r.item);
                 const card = document.createElement('div');
-                card.className = 'pir-highlight-card';
-                card.innerHTML =
-                    '<div class="pir-highlight-item">' + escapeHtml(item) + '</div>' +
-                    '<div class="pir-highlight-change">' +
-                        '<span>' + escapeHtml(before) + '</span>' +
-                        '<span class="pir-highlight-arrow">→</span>' +
-                        '<span>' + escapeHtml(after) + '</span>' +
-                    '</div>';
-                row.appendChild(card);
+                card.className = 'pir-highlight-card' + (noPrev ? ' pir-highlight-card-single' : '');
+
+                const itemEl = document.createElement('div');
+                itemEl.className = 'pir-highlight-item';
+                itemEl.innerHTML =
+                    '<span class="pir-highlight-item-icon" aria-hidden="true">' + icon + '</span>' +
+                    escapeHtml(r.item);
+                card.appendChild(itemEl);
+
+                if (noPrev) {
+                    // 현재 특징 단일 칸 — 전작 정보가 없는 행
+                    const single = document.createElement('div');
+                    single.className = 'pir-highlight-single';
+                    single.innerHTML =
+                        '<div class="pir-highlight-side-label">현재</div>' +
+                        '<div class="pir-highlight-side-value">' + escapeHtml(r.after) + '</div>';
+                    card.appendChild(single);
+                } else {
+                    // 좌우 비교 — 전작 / › / 현재
+                    const cmp = document.createElement('div');
+                    cmp.className = 'pir-highlight-cmp';
+                    cmp.innerHTML =
+                        '<div class="pir-highlight-side pir-highlight-side-before">' +
+                            '<div class="pir-highlight-side-label">전작</div>' +
+                            '<div class="pir-highlight-side-value">' + escapeHtml(r.before) + '</div>' +
+                        '</div>' +
+                        '<span class="pir-highlight-arrow" aria-hidden="true">›</span>' +
+                        '<div class="pir-highlight-side pir-highlight-side-after">' +
+                            '<div class="pir-highlight-side-label">현재</div>' +
+                            '<div class="pir-highlight-side-value">' + escapeHtml(r.after) + '</div>' +
+                        '</div>';
+                    card.appendChild(cmp);
+                }
+
+                // 변화 평가 줄 — 의미 있는 텍스트일 때만
+                if (r.change && !/^[-—–]\s*$/.test(r.change) && !/(데이터\s*부족|언급\s*없음|미언급)/.test(r.change)) {
+                    const changeLine = document.createElement('div');
+                    changeLine.className = 'pir-highlight-change-line';
+                    changeLine.innerHTML =
+                        '<span class="pir-highlight-change-icon" aria-hidden="true">↗</span>' +
+                        '<span>' + escapeHtml(r.change) + '</span>';
+                    card.appendChild(changeLine);
+                }
+
+                container.appendChild(card);
             }
-            tableEl.parentNode.insertBefore(row, tableEl);
+
+            tableEl.parentNode.insertBefore(container, tableEl);
         }
 
         // ── Video card click → inline progress bar + badge on the clicked card
