@@ -459,6 +459,98 @@
             text-align: right; font-variant-numeric: tabular-nums;
         }
 
+        /* Section ⑤ — consumer opinion (comment-based) */
+        .pir-s5-wrap {
+            display: flex; flex-direction: column; gap: 12px;
+            margin: 6px 0 16px;
+            padding: 14px 16px;
+            background: var(--surface-soft);
+            border: 1px solid var(--border-soft);
+            border-radius: 12px;
+        }
+        .pir-s5-meta {
+            font-size: 12px; color: var(--muted); font-weight: 600;
+        }
+        .pir-s5-stack {
+            display: flex; width: 100%; height: 22px;
+            border-radius: 999px; overflow: hidden;
+            background: var(--border-soft);
+        }
+        .pir-s5-stack-seg {
+            display: inline-flex; align-items: center; justify-content: center;
+            color: white; font-size: 11px; font-weight: 700;
+            white-space: nowrap; overflow: hidden;
+            min-width: 0;
+        }
+        .pir-s5-stack-pos { background: linear-gradient(90deg, #20c997, #19a87c); }
+        .pir-s5-stack-neu { background: #b8b3c4; color: #fff; }
+        .pir-s5-stack-neg { background: linear-gradient(90deg, #e35d6a, #b44454); }
+
+        .pir-s5-aspects {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+        }
+        .pir-s5-aspect-col {
+            background: var(--surface);
+            border: 1px solid var(--border-soft);
+            border-radius: 10px;
+            padding: 10px 12px;
+            min-width: 0;
+        }
+        .pir-s5-aspect-title {
+            font-size: 12px; font-weight: 700; margin-bottom: 8px;
+            text-transform: uppercase; letter-spacing: 0.03em;
+        }
+        .pir-s5-aspect-col-pos .pir-s5-aspect-title { color: #19a87c; }
+        .pir-s5-aspect-col-neg .pir-s5-aspect-title { color: #b44454; }
+        .pir-s5-aspect-row {
+            display: grid; grid-template-columns: 80px 1fr 32px;
+            align-items: center; gap: 8px; margin-bottom: 4px;
+        }
+        .pir-s5-aspect-label {
+            font-size: 12px; color: var(--text); font-weight: 500;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .pir-s5-aspect-track {
+            position: relative; display: block;
+            height: 8px; border-radius: 999px;
+            background: rgba(111,66,193,0.08); overflow: hidden;
+        }
+        .pir-s5-aspect-fill {
+            position: absolute; left: 0; top: 0; bottom: 0;
+            border-radius: 999px;
+            transition: width 0.4s ease;
+        }
+        .pir-s5-aspect-col-pos .pir-s5-aspect-fill { background: linear-gradient(90deg, #20c997, #19a87c); }
+        .pir-s5-aspect-col-neg .pir-s5-aspect-fill { background: linear-gradient(90deg, #e35d6a, #b44454); }
+        .pir-s5-aspect-count {
+            font-size: 11px; font-weight: 700; color: var(--muted);
+            text-align: right; font-variant-numeric: tabular-nums;
+        }
+        .pir-s5-aspect-empty {
+            font-size: 12px; color: var(--muted); font-style: italic; padding: 4px 2px;
+        }
+
+        .pir-s5-quotes {
+            display: flex; flex-direction: column; gap: 6px;
+        }
+        .pir-s5-quote {
+            background: var(--surface);
+            border: 1px solid var(--border-soft);
+            border-radius: 10px;
+            padding: 8px 12px;
+            display: flex; align-items: flex-start; gap: 8px;
+            font-size: 12px; line-height: 1.55; color: var(--text);
+        }
+        .pir-s5-quote-mark {
+            color: var(--primary); font-size: 22px; font-weight: 700;
+            line-height: 0.9; flex-shrink: 0;
+        }
+        .pir-s5-quote-text { flex: 1; min-width: 0; }
+        .pir-s5-quote-like {
+            font-size: 11px; color: var(--muted); font-weight: 600;
+            white-space: nowrap; flex-shrink: 0;
+        }
+
         /* Section ⑥ — recommend / not-recommend chip matcher */
         .pir-s6-matcher {
             display: grid;
@@ -530,6 +622,8 @@
             .pir-gauge-box { width: 100%; }
             .pir-s2-row { grid-template-columns: 1fr; }
             .pir-s4-row { grid-template-columns: 88px 1fr 40px; gap: 8px; }
+            .pir-s5-aspects { grid-template-columns: 1fr; }
+            .pir-s5-aspect-row { grid-template-columns: 70px 1fr 28px; gap: 6px; }
             .pir-s6-matcher { grid-template-columns: 1fr; }
         }
 
@@ -758,7 +852,7 @@
                 <span>남은 시간 약 <strong id="pirProgressRemain">--</strong>초</span>
             </div>
             <div class="sel-step" data-pir-step="1"><span class="icon">1</span><span>영상별 자막 수집 및 자막 기반 보고서 생성</span></div>
-            <div class="sel-step" data-pir-step="2"><span class="icon">2</span><span>6섹션 통합 인사이트 보고서 합성</span></div>
+            <div class="sel-step" data-pir-step="2"><span class="icon">2</span><span>7섹션 통합 인사이트 보고서 합성</span></div>
         </div>
     </div>
 
@@ -1302,6 +1396,7 @@
             _pirEnhanceSection3Radar(bodyEl);
             try { _pirEnhanceSection4DivergingBar(bodyEl); } catch (e) { console.warn('[PIR] s4 bar failed:', e); }
             _pirEnhanceSection4Icons(bodyEl);
+            try { _pirEnhanceSection5Consumer(bodyEl); } catch (e) { console.warn('[PIR] s5 consumer failed:', e); }
             _pirEnhanceSection7Highlights(bodyEl);
             try { _pirEnhanceSectionRecommendChips(bodyEl); } catch (e) { console.warn('[PIR] rec chips failed:', e); }
         }
@@ -1677,6 +1772,195 @@
                     li.prepend(span);
                 }
             }
+        }
+
+        // ── Section ⑤: consumer-opinion (sentiment ratio + aspects + quotes) ──
+        // Keyword-based heading lookup ("소비자 여론") — independent of section number.
+        function _pirEnhanceSection5Consumer(bodyEl) {
+            let heading = null;
+            for (const h of bodyEl.querySelectorAll('h2')) {
+                if (h.textContent.includes('소비자 여론')) { heading = h; break; }
+            }
+            if (!heading) return;
+
+            // Walk siblings until next H2/H1. Capture top-level bullets (ratio/count),
+            // H3-grouped lists (강점/불만), and blockquotes (대표 댓글).
+            let total = null;
+            let ratio = null;  // {pos, neu, neg}
+            const groups = { pos: [], neg: [] };
+            const quotes = [];
+            let currentGroup = null;
+            const sectionEls = [];
+
+            let el = heading.nextElementSibling;
+            while (el) {
+                if (/^H[12]$/.test(el.tagName)) break;
+                sectionEls.push(el);
+
+                if (el.tagName === 'H3') {
+                    const t = el.textContent;
+                    if (t.includes('강점')) currentGroup = 'pos';
+                    else if (t.includes('불만')) currentGroup = 'neg';
+                    else if (t.includes('대표 댓글')) currentGroup = 'quote';
+                    else currentGroup = null;
+                } else if (el.tagName === 'BLOCKQUOTE' || el.querySelector?.('blockquote')) {
+                    const bqs = el.tagName === 'BLOCKQUOTE' ? [el] : el.querySelectorAll('blockquote');
+                    for (const bq of bqs) {
+                        // Replace <br> with newlines so consecutive markdown "> " lines
+                        // (which the renderer collapses into one <blockquote><p>line1<br>line2</p>...)
+                        // can be split back into per-line quotes.
+                        const clone = bq.cloneNode(true);
+                        clone.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
+                        const blockText = clone.textContent || '';
+                        for (const rawLine of blockText.split(/\n+/)) {
+                            const line = rawLine.replace(/\s+/g, ' ').trim();
+                            if (!line) continue;
+                            const lm = line.match(/^[\"“”"](.+?)[\"“”"]\s*(?:[\(（]\s*👍\s*(\d+)\s*[\)）])?\s*$/);
+                            if (lm) {
+                                quotes.push({ text: lm[1].trim(), likes: lm[2] ? parseInt(lm[2], 10) : null });
+                            } else {
+                                const lm2 = line.match(/^(.+?)\s*(?:[\(（]\s*👍\s*(\d+)\s*[\)）])?\s*$/);
+                                if (lm2 && lm2[1].trim() && lm2[1].trim() !== '데이터 부족') {
+                                    quotes.push({ text: lm2[1].trim(), likes: lm2[2] ? parseInt(lm2[2], 10) : null });
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    for (const li of el.querySelectorAll('li')) {
+                        const text = li.textContent.replace(/\s+/g, ' ').trim();
+
+                        // Top-level metadata bullets (before any H3)
+                        if (currentGroup === null) {
+                            const totalM = text.match(/분석\s*댓글\s*수\s*[:：]\s*(\d+)\s*건/);
+                            if (totalM) { total = parseInt(totalM[1], 10); continue; }
+                            const ratioM = text.match(/긍정\s*(\d+(?:\.\d+)?)\s*%[^부중]*?중립\s*(\d+(?:\.\d+)?)\s*%[^부]*?부정\s*(\d+(?:\.\d+)?)\s*%/);
+                            if (ratioM) {
+                                ratio = {
+                                    pos: parseFloat(ratioM[1]),
+                                    neu: parseFloat(ratioM[2]),
+                                    neg: parseFloat(ratioM[3]),
+                                };
+                                continue;
+                            }
+                        } else if (currentGroup === 'pos' || currentGroup === 'neg') {
+                            // "aspect (N건)" — N건 ending optional fallback to 0
+                            const aspM = text.match(/^(.+?)\s*[\(（]\s*(\d+)\s*건\s*[\)）]\s*$/);
+                            if (aspM) {
+                                const label = aspM[1].trim();
+                                if (label && label !== '데이터 부족') {
+                                    groups[currentGroup].push({ label, n: parseInt(aspM[2], 10) });
+                                }
+                            }
+                        } else if (currentGroup === 'quote') {
+                            // Fallback: representative comments rendered as bullets (rare)
+                            const qm = text.match(/^[\"“"]?(.+?)[\"”"]?\s*(?:[\(（]\s*👍\s*(\d+)\s*[\)）])?\s*$/);
+                            if (qm && qm[1].trim() && qm[1].trim() !== '데이터 부족') {
+                                quotes.push({ text: qm[1].trim(), likes: qm[2] ? parseInt(qm[2], 10) : null });
+                            }
+                        }
+                    }
+                }
+                el = el.nextElementSibling;
+            }
+
+            const hasAny = total !== null || ratio || groups.pos.length || groups.neg.length || quotes.length;
+            if (!hasAny) return; // 데이터 부족 only — leave original markdown
+
+            // ── Build visualization ──
+            const wrap = document.createElement('div');
+            wrap.className = 'pir-s5-wrap';
+
+            // Header line (total count)
+            if (total !== null) {
+                const meta = document.createElement('div');
+                meta.className = 'pir-s5-meta';
+                meta.textContent = '필터링된 댓글 ' + total + '건 분석';
+                wrap.appendChild(meta);
+            }
+
+            // Stacked sentiment bar
+            if (ratio) {
+                const bar = document.createElement('div');
+                bar.className = 'pir-s5-stack';
+                const segs = [
+                    { kind: 'pos', label: '긍정 ' + ratio.pos + '%', value: ratio.pos },
+                    { kind: 'neu', label: '중립 ' + ratio.neu + '%', value: ratio.neu },
+                    { kind: 'neg', label: ratio.neg + '%',          value: ratio.neg },
+                ];
+                for (const s of segs) {
+                    if (s.value <= 0) continue;
+                    const seg = document.createElement('span');
+                    seg.className = 'pir-s5-stack-seg pir-s5-stack-' + s.kind;
+                    seg.style.flex = String(s.value);
+                    seg.textContent = s.label;
+                    bar.appendChild(seg);
+                }
+                wrap.appendChild(bar);
+            }
+
+            // Aspects grid (left = 강점, right = 불만)
+            if (groups.pos.length || groups.neg.length) {
+                const aspectsRow = document.createElement('div');
+                aspectsRow.className = 'pir-s5-aspects';
+                aspectsRow.appendChild(_pirS5BuildAspectCol('pos', '소비자가 꼽은 강점', groups.pos));
+                aspectsRow.appendChild(_pirS5BuildAspectCol('neg', '소비자가 꼽은 불만', groups.neg));
+                wrap.appendChild(aspectsRow);
+            }
+
+            // Representative quotes
+            if (quotes.length) {
+                const qWrap = document.createElement('div');
+                qWrap.className = 'pir-s5-quotes';
+                for (const q of quotes.slice(0, 3)) {
+                    const card = document.createElement('div');
+                    card.className = 'pir-s5-quote';
+                    const likeHtml = q.likes !== null
+                        ? '<span class="pir-s5-quote-like">👍 ' + q.likes + '</span>'
+                        : '';
+                    card.innerHTML =
+                        '<span class="pir-s5-quote-mark">“</span>' +
+                        '<span class="pir-s5-quote-text">' + escapeHtml(q.text) + '</span>' +
+                        likeHtml;
+                    qWrap.appendChild(card);
+                }
+                wrap.appendChild(qWrap);
+            }
+
+            const firstSibling = sectionEls[0];
+            if (firstSibling) firstSibling.parentNode.insertBefore(wrap, firstSibling);
+            else heading.after(wrap);
+            sectionEls.forEach(node => node.remove());
+        }
+
+        function _pirS5BuildAspectCol(kind, title, items) {
+            const col = document.createElement('div');
+            col.className = 'pir-s5-aspect-col pir-s5-aspect-col-' + kind;
+            const h = document.createElement('div');
+            h.className = 'pir-s5-aspect-title';
+            h.textContent = title;
+            col.appendChild(h);
+            if (!items.length) {
+                const empty = document.createElement('div');
+                empty.className = 'pir-s5-aspect-empty';
+                empty.textContent = '데이터 부족';
+                col.appendChild(empty);
+                return col;
+            }
+            const maxN = Math.max(...items.map(x => x.n)) || 1;
+            for (const it of items.slice(0, 5)) {
+                const pct = Math.max(6, Math.round((it.n / maxN) * 100));
+                const row = document.createElement('div');
+                row.className = 'pir-s5-aspect-row';
+                row.innerHTML =
+                    '<span class="pir-s5-aspect-label">' + escapeHtml(it.label) + '</span>' +
+                    '<span class="pir-s5-aspect-track">' +
+                        '<span class="pir-s5-aspect-fill" style="width:' + pct + '%"></span>' +
+                    '</span>' +
+                    '<span class="pir-s5-aspect-count">' + it.n + '</span>';
+                col.appendChild(row);
+            }
+            return col;
         }
 
         // ── Recommend / Not-recommend: 2-column chip matcher ────────────

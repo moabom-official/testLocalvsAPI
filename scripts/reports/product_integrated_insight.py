@@ -1,9 +1,12 @@
 """
 제품 단위 통합 인사이트 보고서 (RunYourAI / openai/gpt-4.1-2025-04-14)
 
-입력: 동일 제품에 대한 N개 영상의 자막 기반 보고서(video_reports.transcript_report).
-출력: 영상별 보고서들만을 근거로 합성한 6섹션 통합 인사이트 보고서.
-환각 방지: 입력 보고서에 등장하지 않은 사실은 절대 만들어 내지 않는다.
+입력:
+  - 동일 제품에 대한 N개 영상의 자막 기반 보고서(video_reports.transcript_report).
+  - comment_filtering_agent 가 DB 에 저장한 댓글/감성/aspect 결과를 READ ONLY 로
+    제품 단위로 집계한 소비자 여론 입력 (scripts.reports._pir_comment_aggregator).
+출력: 위 두 입력만을 근거로 합성한 7섹션 통합 인사이트 보고서.
+환각 방지: 입력에 등장하지 않은 사실은 절대 만들어 내지 않는다.
 """
 import asyncio
 import json
@@ -20,14 +23,15 @@ from scripts.reports.transcript_report import (
     REPORT_LLM_DEPLOYMENT,
 )
 from scripts.reports.integrated_report import upsert_video_report
+from scripts.reports._pir_comment_aggregator import aggregate_pir_consumer_inputs
 from scripts.utils.prompt_manager import build_product_integrated_insight_prompt
 from scripts.youtube.transcript_service import fetch_video_transcript
 
 
 # 영상별 보고서 1건당 입력 시 잘라낼 최대 길이 (토큰 한도 보호)
 PER_VIDEO_REPORT_MAX_CHARS = 1500
-# 통합 입력 전체에 대한 안전 상한
-TOTAL_INPUT_MAX_CHARS = 18000
+# 통합 입력 전체에 대한 안전 상한 — 댓글 집계 입력(약 2~3K) 추가분 반영해 상향
+TOTAL_INPUT_MAX_CHARS = 21000
 
 HEURISTIC_MODEL_LABEL = "heuristic"
 
@@ -288,12 +292,67 @@ def _truncate_per_video(per_video_reports: List[Dict]) -> List[Dict]:
     return shrunk
 
 
-def _heuristic_fallback_report(product_name: str, per_video_reports: List[Dict]) -> str:
-    """LLM 미사용 모드. 6개 섹션 헤더만 깔끔히 출력하고 본문은 '데이터 부족'으로 채운다.
-    환각을 만들지 않는 것이 최우선.
+def _fallback_render_consumer_section(consumer_aggregate: Optional[Dict]) -> List[str]:
+    """LLM 미사용 모드용 ⑤ 소비자 여론 섹션 본문을 렌더한다.
+    집계가 없으면 단순히 "데이터 부족" 한 줄.
+    """
+    if not consumer_aggregate or consumer_aggregate.get("total_analyzed_comments", 0) <= 0:
+        return ["- 데이터 부족 (분석 가능한 댓글 없음)"]
+
+    total = int(consumer_aggregate.get("total_analyzed_comments", 0))
+    wr = consumer_aggregate.get("weighted_ratio") or {}
+    pos = wr.get("positive_pct", 0.0)
+    neu = wr.get("neutral_pct", 0.0)
+    neg = wr.get("negative_pct", 0.0)
+
+    lines: List[str] = [
+        f"- 분석 댓글 수: {total}건",
+        f"- 가중 비율: 긍정 {pos}% / 중립 {neu}% / 부정 {neg}%",
+    ]
+
+    pos_aspects = consumer_aggregate.get("top_positive_aspects") or []
+    neg_aspects = consumer_aggregate.get("top_negative_aspects") or []
+    reps = consumer_aggregate.get("representative_comments") or []
+
+    lines.append("### 소비자가 꼽은 강점")
+    if pos_aspects:
+        for a in pos_aspects[:5]:
+            lines.append(f"- {a.get('aspect_name','')} ({int(a.get('comment_count',0))}건)")
+    else:
+        lines.append("- 데이터 부족")
+
+    lines.append("### 소비자가 꼽은 불만")
+    if neg_aspects:
+        for a in neg_aspects[:5]:
+            lines.append(f"- {a.get('aspect_name','')} ({int(a.get('comment_count',0))}건)")
+    else:
+        lines.append("- 데이터 부족")
+
+    lines.append("### 대표 댓글")
+    if reps:
+        for c in reps[:3]:
+            text = (c.get("text_raw") or "").replace("\n", " ").strip()
+            like = int(c.get("like_count", 0))
+            lines.append(f'> "{text}" (👍 {like})')
+    else:
+        lines.append("- 데이터 부족")
+    return lines
+
+
+def _heuristic_fallback_report(
+    product_name: str,
+    per_video_reports: List[Dict],
+    consumer_aggregate: Optional[Dict] = None,
+) -> str:
+    """LLM 미사용 모드. 7개 섹션 헤더만 깔끔히 출력하고 본문은 '데이터 부족'으로 채운다.
+    환각을 만들지 않는 것이 최우선. ⑤ 소비자 여론 섹션만은 댓글 집계가 존재하면
+    수치/aspect/대표 댓글을 LLM 없이 그대로 렌더해 정보를 보존한다.
     """
     n = len(per_video_reports)
     today_str = date.today().isoformat()
+
+    section5_lines = _fallback_render_consumer_section(consumer_aggregate)
+
     sections = [
         f"# {product_name} 종합 인사이트 보고서 (LLM 미사용 모드)",
         "",
@@ -314,10 +373,13 @@ def _heuristic_fallback_report(product_name: str, per_video_reports: List[Dict])
         "### 단점",
         "- 데이터 부족",
         "",
-        "## ⑤ 전작 대비 달라진 점",
+        "## ⑤ 소비자 여론 (댓글 기반)",
+        *section5_lines,
+        "",
+        "## ⑥ 전작 대비 달라진 점",
         "- 데이터 부족 (LLM 미사용 모드)",
         "",
-        "## ⑥ 이런 사람에게 추천 / 비추",
+        "## ⑦ 이런 사람에게 추천 / 비추",
         "### 추천",
         "- 데이터 부족",
         "### 비추",
@@ -343,15 +405,20 @@ def _heuristic_fallback_report(product_name: str, per_video_reports: List[Dict])
 def build_product_integrated_insight_report(
     product_name: str,
     per_video_reports: List[Dict],
+    video_ids: Optional[List[str]] = None,
 ) -> Tuple[str, str]:
     """
-    6섹션 통합 인사이트 보고서를 생성한다.
+    7섹션 통합 인사이트 보고서를 생성한다.
     RunYourAI 우선 사용, 미설정/실패 시 heuristic fallback.
+
+    video_ids: ⑤ 소비자 여론 섹션을 위한 제품 단위 댓글 집계 대상. None / 빈 리스트면
+               집계를 건너뛰고 ⑤ 섹션은 "데이터 부족" 으로 처리된다. 호환을 위해
+               기본값은 None — 호출부가 per_video_reports.video_id 로 자동 도출.
 
     반환: (report_text, model_used)
     """
     global _LAST_LLM_PERF
-    _LAST_LLM_PERF = {"llm_ms": None, "fallback": False}
+    _LAST_LLM_PERF = {"llm_ms": None, "fallback": False, "consumer_aggregate_ms": None}
 
     if not per_video_reports:
         _LAST_LLM_PERF["fallback"] = True
@@ -359,19 +426,41 @@ def build_product_integrated_insight_report(
 
     truncated = _truncate_per_video(per_video_reports)
     today_str = date.today().isoformat()
-    prompt = build_product_integrated_insight_prompt(product_name, truncated, today_str=today_str)
+
+    # ⑤ 소비자 여론 — 제품 단위 댓글 집계 (READ ONLY)
+    if video_ids is None:
+        video_ids = [r.get("video_id", "") for r in per_video_reports if r.get("video_id")]
+    consumer_aggregate: Optional[Dict] = None
+    if video_ids:
+        agg_t0 = perf_counter()
+        try:
+            consumer_aggregate = aggregate_pir_consumer_inputs(video_ids)
+        except Exception as e:
+            print(f"[WARN] _pir_comment_aggregator failed: {type(e).__name__}: {e} — ⑤ section will be 'data insufficient'")
+            consumer_aggregate = None
+        _LAST_LLM_PERF["consumer_aggregate_ms"] = round((perf_counter() - agg_t0) * 1000, 1)
+        if consumer_aggregate:
+            print(
+                f"[DEBUG] PIR consumer aggregate: comments={consumer_aggregate.get('total_analyzed_comments', 0)} "
+                f"pos_aspects={len(consumer_aggregate.get('top_positive_aspects', []))} "
+                f"neg_aspects={len(consumer_aggregate.get('top_negative_aspects', []))}"
+            )
+
+    prompt = build_product_integrated_insight_prompt(
+        product_name, truncated, today_str=today_str, consumer_aggregate=consumer_aggregate
+    )
 
     if not RUNYOURAI_API_KEY:
         print("[WARN] RUNYOURAI_API_KEY not configured — using heuristic fallback")
         _LAST_LLM_PERF["fallback"] = True
-        return (_heuristic_fallback_report(product_name, truncated), HEURISTIC_MODEL_LABEL)
+        return (_heuristic_fallback_report(product_name, truncated, consumer_aggregate), HEURISTIC_MODEL_LABEL)
 
     try:
         client = get_report_llm_client()
     except ValueError as e:
         print(f"[WARN] RunYourAI client unavailable: {e} — using heuristic fallback")
         _LAST_LLM_PERF["fallback"] = True
-        return (_heuristic_fallback_report(product_name, truncated), HEURISTIC_MODEL_LABEL)
+        return (_heuristic_fallback_report(product_name, truncated, consumer_aggregate), HEURISTIC_MODEL_LABEL)
 
     try:
         print(f"[DEBUG] product_integrated_insight: calling {REPORT_LLM_DEPLOYMENT} for {product_name} (n={len(truncated)})")
@@ -380,7 +469,7 @@ def build_product_integrated_insight_report(
             model=REPORT_LLM_DEPLOYMENT,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.2,
-            max_tokens=2200,
+            max_tokens=2800,  # ⑤ 댓글 섹션 추가분 반영해 상향
         )
         llm_ms = (perf_counter() - llm_t0) * 1000
         _LAST_LLM_PERF["llm_ms"] = round(llm_ms, 1)
@@ -388,19 +477,19 @@ def build_product_integrated_insight_report(
         if not response.choices:
             print("[WARN] product_integrated_insight: empty response — using heuristic fallback")
             _LAST_LLM_PERF["fallback"] = True
-            return (_heuristic_fallback_report(product_name, truncated), HEURISTIC_MODEL_LABEL)
+            return (_heuristic_fallback_report(product_name, truncated, consumer_aggregate), HEURISTIC_MODEL_LABEL)
         text = response.choices[0].message.content or ""
         text = fix_encoding(text.strip())
         if not text:
             print("[WARN] product_integrated_insight: empty text — using heuristic fallback")
             _LAST_LLM_PERF["fallback"] = True
-            return (_heuristic_fallback_report(product_name, truncated), HEURISTIC_MODEL_LABEL)
+            return (_heuristic_fallback_report(product_name, truncated, consumer_aggregate), HEURISTIC_MODEL_LABEL)
         print(f"[DEBUG] product_integrated_insight: report length={len(text)}")
         return (text, REPORT_LLM_DEPLOYMENT)
     except Exception as e:
         print(f"[ERROR] product_integrated_insight LLM call failed: {type(e).__name__}: {e}")
         _LAST_LLM_PERF["fallback"] = True
-        return (_heuristic_fallback_report(product_name, truncated), HEURISTIC_MODEL_LABEL)
+        return (_heuristic_fallback_report(product_name, truncated, consumer_aggregate), HEURISTIC_MODEL_LABEL)
 
 
 # ── 3) 저장 / 조회 ───────────────────────────────────────────────

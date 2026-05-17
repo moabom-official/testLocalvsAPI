@@ -2,7 +2,7 @@
 Centralized prompt definitions for LLM calls.
 
 활성 프롬프트:
-- build_product_integrated_insight_prompt: 보고서 ④ 제품 단위 6 섹션 통합 보고서
+- build_product_integrated_insight_prompt: 보고서 ④ 제품 단위 7 섹션 통합 보고서
 - build_comment_analysis_prompt:           보고서 ② 댓글 기반 소비자 여론 보고서 (JSON 응답)
 - build_comparison_report_prompt:          보고서 ③ 리뷰어 vs 소비자 비교 보고서 (JSON 응답)
 
@@ -64,14 +64,18 @@ def build_product_integrated_insight_prompt(
     product_name: str,
     per_video_reports: list,
     today_str: str = "",
+    consumer_aggregate: dict | None = None,
 ) -> str:
     """
-    제품 단위 통합 인사이트 보고서 프롬프트 (6 섹션).
+    제품 단위 통합 인사이트 보고서 프롬프트 (7 섹션).
 
     per_video_reports: [{"video_id": str, "title": str, "transcript_report": str}, ...]
+    consumer_aggregate: scripts.reports._pir_comment_aggregator.aggregate_pir_consumer_inputs
+                        결과 dict 또는 None (댓글 0건/미수집 제품).
 
-    환각 방지를 위해 절대 규칙을 강하게 명시한다 — 입력 보고서에 등장하지 않은
+    환각 방지를 위해 절대 규칙을 강하게 명시한다 — 입력 보고서/집계에 등장하지 않은
     사실/수치/사양/가격/비교 제품/출시일/리뷰어 이름을 만들어 내지 못하도록 한다.
+    댓글 원문은 전달된 representative_comments 의 text_raw 만 인용 가능.
     """
     joined_blocks = []
     for i, r in enumerate(per_video_reports):
@@ -84,25 +88,44 @@ def build_product_integrated_insight_prompt(
     n = len(per_video_reports)
     today_line = f"보고서 생성일: {today_str}" if today_str else "보고서 생성일: (오늘 날짜)"
 
+    # 댓글 집계 블록을 구성. 없으면 "데이터 부족" 강제.
+    if consumer_aggregate and consumer_aggregate.get("total_analyzed_comments", 0) > 0:
+        consumer_json = json.dumps(consumer_aggregate, ensure_ascii=False, indent=2)
+        consumer_block = (
+            "아래 집계는 comment_filtering_agent 파이프라인이 산출한 결과를 READ ONLY 로\n"
+            "조회한 것이다. 모든 수치(비율·건수)는 이 집계값을 그대로 사용한다.\n\n"
+            + consumer_json
+        )
+        consumer_status = "available"
+    else:
+        consumer_block = "집계된 댓글 데이터 없음. ⑤ 섹션은 반드시 '데이터 부족'으로 출력."
+        consumer_status = "empty"
+
     return f"""당신은 테크 제품 리뷰 메타분석 전문가입니다.
 
 아래는 동일 제품 "{product_name}"에 대한 서로 다른 유튜브 리뷰 영상 {n}건의
-"자막 기반 분석 보고서"입니다. 이 보고서들만을 유일한 근거로 사용하여,
-제품 단위 통합 인사이트 보고서를 작성하세요.
+"자막 기반 분석 보고서"와 영상 댓글에서 집계된 "소비자 여론 집계"입니다.
+이 두 입력만을 유일한 근거로 사용하여, 제품 단위 통합 인사이트 보고서를 작성하세요.
 
 ================ 절대 규칙 (위반 시 작성 실패로 간주) ================
-1. 아래 영상별 보고서에 등장하지 않은 사실, 수치, 사양, 가격, 비교 제품, 출시일,
-   리뷰어 이름 등을 새로 만들어 내지 않는다.
-2. 어떤 차원/항목에 대해 입력 보고서에 정보가 없으면 반드시 "데이터 부족"으로 표기한다.
+1. 아래 영상별 보고서/댓글 집계에 등장하지 않은 사실, 수치, 사양, 가격, 비교 제품,
+   출시일, 리뷰어 이름 등을 새로 만들어 내지 않는다.
+2. 어떤 차원/항목에 대해 입력에 정보가 없으면 반드시 "데이터 부족"으로 표기한다.
    추정, 일반 상식, 사전 지식으로 빈칸을 채우지 않는다.
-3. 점수, 합의도, 빈도수는 입력 보고서에 등장한 표현을 근거로만 산출한다.
+3. 점수, 합의도, 빈도수는 입력에 등장한 표현/집계값을 근거로만 산출한다.
    계산 근거가 없으면 "데이터 부족".
 4. 인용 시 어느 영상(영상 N)에서 나온 의견인지 표기한다.
+5. ⑤ 소비자 여론 섹션의 비율·건수는 댓글 집계 입력의 값을 그대로 사용한다.
+   직접 계산·반올림·재추정하지 않는다. 대표 댓글은 representative_comments 의
+   text_raw 만 인용 가능. 다른 댓글을 창작·재구성하지 않는다.
 
-================ 입력: 영상별 자막 기반 보고서 ================
+================ 입력 A: 영상별 자막 기반 보고서 ================
 {joined}
 
-================ 출력 형식 (마크다운, 6개 섹션 + 메타 박스) ================
+================ 입력 B: 소비자 여론 집계 (status={consumer_status}) ================
+{consumer_block}
+
+================ 출력 형식 (마크다운, 7개 섹션 + 메타 박스) ================
 ## ① 한줄 구매 판정 + 종합 점수
 - 한 문장 결론
 - 종합 평가: X.X / 10  (분석 영상 {n}개 기반)
@@ -145,10 +168,36 @@ def build_product_integrated_insight_prompt(
    "- 항목명 (영상 N)" 형식으로 분리. 이 그룹에는 N/{n} 표기를 쓰지 않는다.
  - 합의 항목이 0개인 그룹은 해당 ### 헤딩 아래에 "- 데이터 부족" 한 줄만 둔다.)
 
-## ⑤ 전작 대비 달라진 점 (표)
+## ⑤ 소비자 여론 (댓글 기반)
+- 분석 댓글 수: N건
+- 가중 비율: 긍정 X% / 중립 Y% / 부정 Z%
+### 소비자가 꼽은 강점
+- aspect (N건)
+- aspect (N건)
+### 소비자가 꼽은 불만
+- aspect (N건)
+- aspect (N건)
+### 대표 댓글
+> "대표 댓글 본문 그대로" (👍 N)
+> "대표 댓글 본문 그대로" (👍 N)
+
+(절대 규칙:
+ - "분석 댓글 수: N건" 의 N 은 입력 B 의 total_analyzed_comments 정수 그대로.
+ - "가중 비율" 줄의 X/Y/Z 는 입력 B 의 weighted_ratio.positive_pct / neutral_pct /
+   negative_pct 소수 그대로 (반올림·재계산 금지).
+ - "### 소비자가 꼽은 강점/불만" 항목은 입력 B 의 top_positive_aspects /
+   top_negative_aspects 의 aspect_name 만 사용. 각 항목 끝에 "(N건)" 형식으로
+   comment_count 그대로 표기. 항목당 한 줄. 최대 5개씩.
+ - "### 대표 댓글" 인용은 입력 B 의 representative_comments 의 text_raw 를
+   "> ..." 인용 블록으로. 끝에 "(👍 N)" 으로 like_count 정수 그대로 표기. 댓글
+   본문은 절대 수정·요약·재작성하지 않는다.
+ - 입력 B status=empty 인 경우 위 모든 줄을 생략하고 "- 데이터 부족 (분석 가능한
+   댓글 없음)" 한 줄만 둔다.)
+
+## ⑥ 전작 대비 달라진 점 (표)
 | 항목 | 전작 | 현재 | 변화 평가 | 언급 영상 수 |
 
-## ⑥ 이런 사람에게 추천 / 비추
+## ⑦ 이런 사람에게 추천 / 비추
 ### 추천
 - 페르소나 한 줄 (근거: 영상 N)
 - 페르소나 한 줄 (근거: 영상 N)
