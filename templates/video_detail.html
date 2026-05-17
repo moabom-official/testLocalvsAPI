@@ -218,28 +218,46 @@
         }
 
         /* ── Transcript report visualizations (.tr-*) ─────────────── */
+        /* .tr-hero is now a thin outer stack — the mood box and reliability box
+           are independent cards stacked vertically. */
         .tr-hero {
-            display: grid;
-            grid-template-columns: 1fr 280px;
-            gap: 18px;
+            display: flex; flex-direction: column;
+            gap: 14px;
             margin: 4px 0 22px;
-            padding: 20px 22px;
+        }
+
+        /* (1) 평가 무드 박스 */
+        .tr-mood-box {
             background: linear-gradient(135deg, #f8f4ff 0%, #fff5f8 100%);
             border: 1px solid var(--border);
-            border-radius: 16px;
+            border-radius: 14px;
             box-shadow: var(--shadow);
+            padding: 18px 20px;
+            display: flex; flex-direction: column; gap: 12px;
         }
-        .tr-hero-main { display: flex; flex-direction: column; gap: 12px; min-width: 0; justify-content: center; }
+        .tr-mood-box-head {
+            display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+        }
+        .tr-mood-title {
+            font-size: 15px; font-weight: 700; color: var(--text);
+            letter-spacing: -0.01em;
+        }
+        .tr-mood-sub {
+            font-size: 12px; color: var(--muted); font-weight: 500;
+        }
         .tr-mood-headline {
             display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
         }
         .tr-mood-label-strong {
-            font-size: 22px; font-weight: 800; letter-spacing: -0.02em;
+            font-size: 24px; font-weight: 800; letter-spacing: -0.02em;
         }
+        .tr-mood-tone-pos     { color: #19a87c; }
+        .tr-mood-tone-neutral { color: #8a5a00; }
+        .tr-mood-tone-neg     { color: #b3303c; }
         .tr-mood-pct {
-            font-size: 14px; font-weight: 600; color: var(--muted);
+            font-size: 13px; font-weight: 600; color: var(--muted);
         }
-        .tr-mood-bar-wrap { position: relative; padding: 10px 0 4px; }
+        .tr-mood-bar-wrap { position: relative; padding: 6px 0 2px; }
         .tr-mood-bar {
             position: relative;
             height: 14px; border-radius: 999px;
@@ -262,6 +280,8 @@
             font-size: 11px; color: var(--muted); margin-top: 6px;
             font-weight: 500;
         }
+
+        /* 한 줄 구매 판정 — 두 박스 사이에 단독 카드로 둠 */
         .tr-verdict {
             background: var(--surface);
             border: 1px solid var(--border);
@@ -274,16 +294,32 @@
         .tr-verdict-label {
             color: var(--primary-strong); font-weight: 700; margin-right: 6px;
         }
-        .tr-reliability-card {
+
+        /* (2) 리뷰 정보 충실도 박스 */
+        .tr-rel-box {
             background: var(--surface);
             border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 14px 16px;
-            display: flex; flex-direction: column; gap: 6px;
+            border-radius: 14px;
+            box-shadow: var(--shadow);
+            padding: 18px 20px;
+            display: flex; flex-direction: column; gap: 14px;
         }
-        .tr-reliability-title { font-size: 12px; color: var(--muted); font-weight: 600; }
-        .tr-reliability-pct-row {
+        .tr-rel-head {
+            display: flex; align-items: flex-start; justify-content: space-between;
+            gap: 12px; flex-wrap: wrap;
+        }
+        .tr-rel-head-left { flex: 1; min-width: 0; }
+        .tr-rel-title {
+            font-size: 15px; font-weight: 700; color: var(--text);
+            letter-spacing: -0.01em; margin-bottom: 4px;
+        }
+        .tr-rel-sub {
+            font-size: 12px; color: var(--muted); font-weight: 500;
+            line-height: 1.45; word-break: keep-all;
+        }
+        .tr-rel-pct-row {
             display: flex; align-items: baseline; gap: 6px;
+            flex-shrink: 0;
         }
         .tr-reliability-pct {
             font-size: 26px; font-weight: 800; letter-spacing: -0.02em;
@@ -297,16 +333,44 @@
         .tr-reliability-badge.good { background: var(--positive-soft); color: #0d6e4f; }
         .tr-reliability-badge.mid { background: var(--neutral-soft); color: #8a5a00; }
         .tr-reliability-badge.low { background: #eee; color: #555; }
-        .tr-reliability-list {
-            list-style: none; margin: 4px 0 0; padding: 0;
-            display: flex; flex-direction: column; gap: 4px;
-            font-size: 12.5px;
+
+        /* 4개 체크 항목 2 × 2 그리드 */
+        .tr-rel-checks {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
         }
-        .tr-reliability-list li {
-            display: flex; align-items: center; gap: 6px;
-            color: var(--text);
+        .tr-rel-check {
+            display: flex; align-items: center; gap: 10px;
+            padding: 12px 14px;
+            border: 1px solid;
+            border-radius: 10px;
+            min-width: 0;
         }
-        .tr-reliability-list li.miss { color: var(--muted); text-decoration: line-through; opacity: 0.7; }
+        .tr-rel-check-ok {
+            background: var(--positive-soft); border-color: #c5f0de;
+        }
+        .tr-rel-check-no {
+            background: var(--negative-soft); border-color: #f7c2c8;
+        }
+        .tr-rel-check-icon {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 24px; height: 24px; border-radius: 999px;
+            font-size: 13px; font-weight: 800;
+            flex-shrink: 0;
+        }
+        .tr-rel-check-ok .tr-rel-check-icon { background: #19a87c; color: #fff; }
+        .tr-rel-check-no .tr-rel-check-icon { background: #b3303c; color: #fff; }
+        .tr-rel-check-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+        .tr-rel-check-label {
+            font-size: 13px; font-weight: 700; color: var(--text);
+            word-break: keep-all;
+        }
+        .tr-rel-check-status {
+            font-size: 11px; font-weight: 600;
+        }
+        .tr-rel-check-ok .tr-rel-check-status { color: #0d6e4f; }
+        .tr-rel-check-no .tr-rel-check-status { color: #b3303c; }
 
         /* ── #2 Balance diagram ────────────────────── */
         .tr-balance {
@@ -745,7 +809,8 @@
             .stats { grid-template-columns: repeat(2, 1fr); }
             .sentiment-summary { grid-template-columns: 1fr; }
             .report-box { padding: 18px; }
-            .tr-hero { grid-template-columns: 1fr; }
+            .tr-rel-checks { grid-template-columns: 1fr; }
+            .tr-rel-head { flex-direction: column; align-items: stretch; }
             .tr-heatmap-grid { grid-template-columns: repeat(4, 1fr); }
             .tr-changes-row { grid-template-columns: 1fr; }
             .tr-balance-row { grid-template-columns: 50px 1fr 56px; }
@@ -1713,17 +1778,35 @@
             const reliabilityPct = Math.round((okCount / 4) * 100);
             const reliabilityClass = reliabilityPct >= 75 ? 'good' : (reliabilityPct >= 50 ? 'mid' : 'low');
 
+            // ── Outer stack: 두 박스를 세로로 쌓는 단순 wrapper. 기존 grid 2-col
+            //    레이아웃은 폐기 — 평가 무드(리뷰어 평가 톤)와 충실도(보고서 정보
+            //    충실도)는 성격이 무관하므로 별도 카드로 분리해 시각적 혼동 제거.
             const hero = document.createElement('div');
             hero.className = 'tr-hero';
-            const main = document.createElement('div');
-            main.className = 'tr-hero-main';
+
+            // ── (1) 평가 무드 박스 ──────────────────────────────────────
+            const moodBox = document.createElement('div');
+            moodBox.className = 'tr-mood-box';
+
+            // 톤 클래스 매핑 — mood.pct 기반. label 색상에만 사용.
+            const moodTone = mood.pct >= 60 ? 'pos'
+                          : mood.pct >= 40 ? 'neutral'
+                          : 'neg';
+
+            const moodHead = document.createElement('div');
+            moodHead.className = 'tr-mood-box-head';
+            moodHead.innerHTML =
+                '<span class="tr-mood-title">📊 평가 무드</span>' +
+                '<span class="tr-mood-sub">리뷰어의 전반적 평가 톤</span>';
 
             const headline = document.createElement('div');
             headline.className = 'tr-mood-headline';
             headline.innerHTML =
-                '<div class="tr-mood-label-strong">📊 평가 무드: ' + mood.label + '</div>' +
-                '<div class="tr-mood-pct">긍정 강도 ' + mood.pct + '% · ◎' + symbols.strongPos +
-                ' ○' + symbols.pos + ' △' + symbols.neg + ' ✕' + symbols.strongNeg + '</div>';
+                '<span class="tr-mood-label-strong tr-mood-tone-' + moodTone + '">' +
+                    _trEscape(mood.label) +
+                '</span>' +
+                '<span class="tr-mood-pct">긍정 강도 ' + mood.pct + '% · ◎' + symbols.strongPos +
+                ' ○' + symbols.pos + ' △' + symbols.neg + ' ✕' + symbols.strongNeg + '</span>';
 
             const barWrap = document.createElement('div');
             barWrap.className = 'tr-mood-bar-wrap';
@@ -1732,33 +1815,56 @@
                 '<div class="tr-mood-bar"><div class="tr-mood-marker" style="left:' + safePct + '%"></div></div>' +
                 '<div class="tr-mood-scale"><span>매우 부정</span><span>부정</span><span>중립</span><span>긍정</span><span>매우 긍정</span></div>';
 
-            main.appendChild(headline);
-            main.appendChild(barWrap);
+            moodBox.appendChild(moodHead);
+            moodBox.appendChild(headline);
+            moodBox.appendChild(barWrap);
+            hero.appendChild(moodBox);
 
+            // ── (옵션) 한 줄 구매 판정 ──────────────────────────────────
+            // verdictText 가 있으면 두 박스 사이에 별도 .tr-verdict 노드로 둠.
+            // 원본 "### 🛒 한 줄 구매 판정" 섹션은 verdictToHide 로 숨김 처리 유지.
             if (verdictText) {
                 const verdict = document.createElement('div');
                 verdict.className = 'tr-verdict';
                 verdict.innerHTML = '<span class="tr-verdict-label">🛒 한 줄 구매 판정</span>' + _trEscape(verdictText);
-                main.appendChild(verdict);
+                hero.appendChild(verdict);
             }
 
-            const rel = document.createElement('div');
-            rel.className = 'tr-reliability-card';
-            const listHtml = checks.map(c =>
-                '<li class="' + (c.ok ? '' : 'miss') + '">' + (c.ok ? '✅' : '❌') + ' ' + c.label + '</li>'
-            ).join('');
-            rel.innerHTML =
-                '<div class="tr-reliability-title">📋 리뷰 정보 충실도</div>' +
-                '<div class="tr-reliability-pct-row">' +
-                    '<span class="tr-reliability-pct">' + reliabilityPct + '%</span>' +
-                    '<span class="tr-reliability-badge ' + reliabilityClass + '">' +
-                        (reliabilityPct >= 75 ? '충실' : reliabilityPct >= 50 ? '보통' : '부족') +
-                    '</span>' +
-                '</div>' +
-                '<ul class="tr-reliability-list">' + listHtml + '</ul>';
+            // ── (2) 리뷰 정보 충실도 박스 ──────────────────────────────
+            const relBox = document.createElement('div');
+            relBox.className = 'tr-rel-box';
 
-            hero.appendChild(main);
-            hero.appendChild(rel);
+            const badgeLabel = reliabilityPct >= 75 ? '충실'
+                            : reliabilityPct >= 50 ? '보통'
+                            : '부족';
+            const cardsHtml = checks.map(c => {
+                const variant = c.ok ? 'ok' : 'no';
+                const icon = c.ok ? '✓' : '✕';
+                const status = c.ok ? '충족' : '미충족';
+                return '<div class="tr-rel-check tr-rel-check-' + variant + '">' +
+                        '<span class="tr-rel-check-icon">' + icon + '</span>' +
+                        '<div class="tr-rel-check-body">' +
+                            '<div class="tr-rel-check-label">' + _trEscape(c.label) + '</div>' +
+                            '<div class="tr-rel-check-status">' + status + '</div>' +
+                        '</div>' +
+                    '</div>';
+            }).join('');
+
+            relBox.innerHTML =
+                '<div class="tr-rel-head">' +
+                    '<div class="tr-rel-head-left">' +
+                        '<div class="tr-rel-title">📋 리뷰 정보 충실도</div>' +
+                        '<div class="tr-rel-sub">이 보고서가 구매 판단에 필요한 정보를 얼마나 담고 있는지 — 4개 항목 충족도</div>' +
+                    '</div>' +
+                    '<div class="tr-rel-pct-row">' +
+                        '<span class="tr-reliability-pct">' + reliabilityPct + '%</span>' +
+                        '<span class="tr-reliability-badge ' + reliabilityClass + '">' + badgeLabel + '</span>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="tr-rel-checks">' + cardsHtml + '</div>';
+
+            hero.appendChild(relBox);
+
             bodyEl.insertBefore(hero, bodyEl.firstChild);
             // safe to hide originals now
             verdictToHide.forEach(el => el && el.classList && el.classList.add('tr-hidden'));
