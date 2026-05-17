@@ -21,7 +21,14 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
-# Import comment filtering agent
+# Import comment filtering agent.
+#
+# 진단 정보 강화 (2026-05-18): 이전엔 `except ImportError as e` 한 줄만 출력해
+# 원인 추적이 어려웠다 (모듈 경로 문제 / 의존성 누락 / Python 버전 / 모듈 init
+# 시점 다른 예외 등 어느 쪽인지 분간 불가). 이제 traceback 까지 출력하고
+# AGENT_IMPORT_ERROR 모듈 변수에 저장해 호출부가 같은 정보를 노출할 수 있게
+# 한다. 일반 Exception 까지 잡는 이유: 일부 모듈은 init 시점에 ValueError /
+# RuntimeError 등 ImportError 가 아닌 예외를 던질 수 있다 (예: 환경변수 누락).
 try:
     from comment_filtering_agent.services.comment_collector import YouTubeCommentCollector
     from comment_filtering_agent.filters.rule_based_filter import RuleBasedFilter
@@ -31,9 +38,20 @@ try:
     from comment_filtering_agent.core.models import AgentAction
     from comment_filtering_agent.analyzers.groq_analyzer import GroqAspectSentimentAnalyzer
     AGENT_AVAILABLE = True
-except ImportError as e:
-    print(f"[WARN] Comment filtering agent not available: {e}")
+    AGENT_IMPORT_ERROR = None
+except Exception as _agent_import_exc:  # ImportError + 그 외 모듈 init 예외
+    import traceback as _tb
     AGENT_AVAILABLE = False
+    AGENT_IMPORT_ERROR = f"{type(_agent_import_exc).__name__}: {_agent_import_exc}"
+    print(f"[WARN] Comment filtering agent unavailable — self-healing 가 자동으로 비활성화됩니다.")
+    print(f"[WARN] AGENT_IMPORT_ERROR = {AGENT_IMPORT_ERROR}")
+    print(f"[WARN] Traceback (어떤 import / 모듈 init 에서 실패했는지 확인):")
+    print(_tb.format_exc())
+    print(f"[WARN] 진단 가이드:")
+    print(f"[WARN]   (a) ImportError on comment_filtering_agent.*: 모듈 경로 확인 — cwd 가 프로젝트 루트인지, sys.path 에 '.' 가 포함되는지")
+    print(f"[WARN]   (b) ImportError on 외부 패키지 (groq / transformers 등): 'pip install -r requirements.txt' 재실행")
+    print(f"[WARN]   (c) 그 외 예외 (ValueError 등): 모듈 init 시점 환경변수 / 자격증명 누락 가능성")
+    print(f"[WARN]   * Python 3.9 환경이라면 일부 라이브러리 deprecation. requirements.txt 권장 3.12+")
 
 
 DAILY_TOKEN_BUDGET = 60000

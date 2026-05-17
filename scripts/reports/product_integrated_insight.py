@@ -362,29 +362,45 @@ async def ensure_comment_analysis_for_videos(
 
     # Pass 2: 미처리 영상에 댓글 agent 호출 (병렬)
     # sync.py 에서 import — 모듈 import 실패 시 (AGENT_AVAILABLE=False) self-healing 자체 skip.
+    # sync.py 모듈 자체의 import 가 깨졌으면 (드문 케이스) traceback 까지 출력.
     try:
         from scripts.api.sync import process_comments_with_agent, AGENT_AVAILABLE
+        # AGENT_IMPORT_ERROR 는 sync.py 의 새 진단 변수. 옛 버전과 호환 위해 getattr.
+        from scripts.api import sync as _sync_module
+        agent_import_error = getattr(_sync_module, 'AGENT_IMPORT_ERROR', None)
     except Exception as e:
-        print(f"[WARN] comment self-healing unavailable: import failed — {type(e).__name__}: {e}")
+        import traceback as _tb
+        msg = f"{type(e).__name__}: {e}"
+        print(f"[WARN] comment self-healing unavailable: sync.py import failed — {msg}")
+        print(_tb.format_exc())
         for vid in pending:
             base_stats["per_video"].append({
                 "video_id": vid, "status": "skipped_no_agent",
-                "duration_ms": 0.0, "error": "import_failed",
+                "duration_ms": 0.0, "error": "sync_import_failed",
             })
         base_stats["agent_available"] = False
+        base_stats["agent_import_error"] = msg
         base_stats["failed"] = len(pending)
         base_stats["total_ms"] = round((perf_counter() - route_t0) * 1000, 1)
         _LAST_COMMENT_HEAL_PERF = base_stats
         return base_stats
 
     if not AGENT_AVAILABLE:
-        print("[WARN] comment self-healing skipped — AGENT_AVAILABLE=False in sync.py")
+        # sync.py 가 startup 시 AGENT_IMPORT_ERROR 에 원인을 저장해 둠. 사용자
+        # 환경 진단 자체가 핵심이므로 자세히 노출.
+        print("[WARN] comment self-healing skipped — AGENT_AVAILABLE=False in sync.py.")
+        if agent_import_error:
+            print(f"[WARN]   AGENT_IMPORT_ERROR (sync.py startup): {agent_import_error}")
+            print(f"[WARN]   서버 startup 로그의 첫 [WARN] 블록에 traceback 이 출력돼 있습니다.")
+        else:
+            print(f"[WARN]   원인 변수 미노출 (sync.py 옛 버전). 서버 startup 로그 확인 권장.")
         for vid in pending:
             base_stats["per_video"].append({
                 "video_id": vid, "status": "skipped_no_agent",
                 "duration_ms": 0.0, "error": "agent_unavailable",
             })
         base_stats["agent_available"] = False
+        base_stats["agent_import_error"] = agent_import_error
         base_stats["failed"] = len(pending)
         base_stats["total_ms"] = round((perf_counter() - route_t0) * 1000, 1)
         _LAST_COMMENT_HEAL_PERF = base_stats
