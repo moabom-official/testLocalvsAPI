@@ -2,7 +2,7 @@
 제품 단위 통합 인사이트 보고서 (RunYourAI / openai/gpt-4.1-2025-04-14)
 
 입력: 동일 제품에 대한 N개 영상의 자막 기반 보고서(video_reports.transcript_report).
-출력: 영상별 보고서들만을 근거로 합성한 9섹션 통합 인사이트 보고서.
+출력: 영상별 보고서들만을 근거로 합성한 6섹션 통합 인사이트 보고서.
 환각 방지: 입력 보고서에 등장하지 않은 사실은 절대 만들어 내지 않는다.
 """
 import asyncio
@@ -289,7 +289,7 @@ def _truncate_per_video(per_video_reports: List[Dict]) -> List[Dict]:
 
 
 def _heuristic_fallback_report(product_name: str, per_video_reports: List[Dict]) -> str:
-    """LLM 미사용 모드. 9개 섹션 헤더만 깔끔히 출력하고 본문은 '데이터 부족'으로 채운다.
+    """LLM 미사용 모드. 6개 섹션 헤더만 깔끔히 출력하고 본문은 '데이터 부족'으로 채운다.
     환각을 만들지 않는 것이 최우선.
     """
     n = len(per_video_reports)
@@ -309,19 +309,10 @@ def _heuristic_fallback_report(product_name: str, per_video_reports: List[Dict])
         "## ④ 장점 / 단점 (합의 기반)",
         "- 데이터 부족 (LLM 미사용 모드)",
         "",
-        "## ⑤ 리뷰어 간 의견이 갈리는 지점 (Divergence)",
+        "## ⑤ 전작 대비 달라진 점",
         "- 데이터 부족 (LLM 미사용 모드)",
         "",
-        "## ⑥ 리뷰어 vs 실사용자 갭",
-        "- 데이터 부족 (LLM 미사용 모드)",
-        "",
-        "## ⑦ 전작 대비 달라진 점",
-        "- 데이터 부족 (LLM 미사용 모드)",
-        "",
-        "## ⑧ 이런 사람에게 추천 / 비추",
-        "- 데이터 부족 (LLM 미사용 모드)",
-        "",
-        "## ⑨ 경쟁/대체 제품 비교",
+        "## ⑥ 이런 사람에게 추천 / 비추",
         "- 데이터 부족 (LLM 미사용 모드)",
         "",
         "---",
@@ -346,7 +337,7 @@ def build_product_integrated_insight_report(
     per_video_reports: List[Dict],
 ) -> Tuple[str, str]:
     """
-    9섹션 통합 인사이트 보고서를 생성한다.
+    6섹션 통합 인사이트 보고서를 생성한다.
     RunYourAI 우선 사용, 미설정/실패 시 heuristic fallback.
 
     반환: (report_text, model_used)

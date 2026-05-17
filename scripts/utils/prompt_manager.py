@@ -2,7 +2,7 @@
 Centralized prompt definitions for LLM calls.
 
 활성 프롬프트:
-- build_product_integrated_insight_prompt: 보고서 ④ 제품 단위 9 섹션 통합 보고서
+- build_product_integrated_insight_prompt: 보고서 ④ 제품 단위 6 섹션 통합 보고서
 - build_comment_analysis_prompt:           보고서 ② 댓글 기반 소비자 여론 보고서 (JSON 응답)
 - build_comparison_report_prompt:          보고서 ③ 리뷰어 vs 소비자 비교 보고서 (JSON 응답)
 
@@ -66,7 +66,7 @@ def build_product_integrated_insight_prompt(
     today_str: str = "",
 ) -> str:
     """
-    제품 단위 통합 인사이트 보고서 프롬프트.
+    제품 단위 통합 인사이트 보고서 프롬프트 (6 섹션).
 
     per_video_reports: [{"video_id": str, "title": str, "transcript_report": str}, ...]
 
@@ -102,7 +102,7 @@ def build_product_integrated_insight_prompt(
 ================ 입력: 영상별 자막 기반 보고서 ================
 {joined}
 
-================ 출력 형식 (마크다운, 9개 섹션 + 메타 박스) ================
+================ 출력 형식 (마크다운, 6개 섹션 + 메타 박스) ================
 ## ① 한줄 구매 판정 + 종합 점수
 - 한 문장 결론
 - 종합 평가: X.X / 10  (분석 영상 {n}개 기반)
@@ -125,23 +125,11 @@ def build_product_integrated_insight_prompt(
 - 2명 이상 영상에서 언급된 항목만 합의 항목으로 채택, 빈도수(N/{n})를 함께 표기
 - 1명만 언급한 항목은 별도 "개별 리뷰어 의견"으로 분리
 
-## ⑤ 리뷰어 간 의견이 갈리는 지점 (Divergence)
-- 같은 항목에 대해 영상별 평가가 다른 케이스를 그대로 노출
-- 가능한 경우 리뷰어 성향(엄격/관대)도 함께 표기
-
-## ⑥ 리뷰어 vs 실사용자 갭
-- 영상별 보고서 안에 댓글/실사용자 언급이 있는 경우만 작성
-- 입력 보고서에 없는 댓글 데이터를 새로 만들지 말 것
-- 해당 정보가 없으면 "데이터 부족"
-
-## ⑦ 전작 대비 달라진 점 (표)
+## ⑤ 전작 대비 달라진 점 (표)
 | 항목 | 전작 | 현재 | 변화 평가 | 언급 영상 수 |
 
-## ⑧ 이런 사람에게 추천 / 비추
+## ⑥ 이런 사람에게 추천 / 비추
 - 각 항목 옆에 근거(영상 N) 표기
-
-## ⑨ 경쟁/대체 제품 비교
-- 입력 보고서에 등장한 경쟁 제품에 한해서만 비교
 
 ---
 📊 분석 기반
