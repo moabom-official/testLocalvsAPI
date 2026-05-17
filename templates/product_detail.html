@@ -482,32 +482,46 @@
         }
         .pir-s4-group-pros .pir-s4-group-label { color: #19a87c; }
         .pir-s4-group-cons .pir-s4-group-label { color: #b44454; }
-        .pir-s4-row {
+        /* Segment-bar row layout — 4 columns: 라벨 / 강도 칩 / 세그먼트 / 수치 */
+        .pir-s4-seg-row {
             display: grid;
-            grid-template-columns: 110px 1fr 44px;
+            grid-template-columns: minmax(0, 1fr) auto auto 40px;
             align-items: center;
-            gap: 10px;
+            column-gap: 12px;
+            padding: 6px 0;
+            border-bottom: 1px solid var(--border-soft);
         }
-        .pir-s4-row-label {
-            font-size: 12px; color: var(--text); font-weight: 500;
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        .pir-s4-seg-row:last-child { border-bottom: none; }
+        .pir-s4-seg-label {
+            font-size: 13px; font-weight: 600; color: var(--text);
+            display: inline-flex; align-items: center; gap: 6px;
+            min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
-        .pir-s4-bar-track {
-            position: relative;
-            display: block;
-            height: 10px;
-            background: rgba(111,66,193,0.08);
-            border-radius: 999px;
-            overflow: hidden;
+        .pir-s4-seg-chip {
+            display: inline-flex; align-items: center;
+            padding: 3px 10px; border-radius: 999px;
+            font-size: 11px; font-weight: 700;
+            white-space: nowrap;
         }
-        .pir-s4-bar-fill {
-            position: absolute; left: 0; top: 0; bottom: 0;
-            border-radius: 999px;
-            transition: width 0.4s ease;
+        .pir-s4-group-pros .pir-s4-seg-chip-full     { background: #19a87c; color: #fff; }
+        .pir-s4-group-pros .pir-s4-seg-chip-majority { background: var(--positive-soft); color: #0d6e4f; border: 1px solid #c5f0de; }
+        .pir-s4-group-pros .pir-s4-seg-chip-partial  { background: transparent;          color: #19a87c; border: 1px dashed #c5f0de; }
+        .pir-s4-group-cons .pir-s4-seg-chip-full     { background: #b3303c; color: #fff; }
+        .pir-s4-group-cons .pir-s4-seg-chip-majority { background: var(--negative-soft); color: #b3303c; border: 1px solid #f7c2c8; }
+        .pir-s4-group-cons .pir-s4-seg-chip-partial  { background: transparent;          color: #b3303c; border: 1px dashed #f7c2c8; }
+        .pir-s4-seg-cells {
+            display: flex; flex-wrap: wrap; gap: 4px;
+            min-width: 0;
         }
-        .pir-s4-group-pros .pir-s4-bar-fill { background: linear-gradient(90deg, #20c997, #19a87c); }
-        .pir-s4-group-cons .pir-s4-bar-fill { background: linear-gradient(90deg, #e35d6a, #b44454); }
-        .pir-s4-row-count {
+        .pir-s4-seg-cell {
+            display: inline-block;
+            width: 28px; height: 12px; border-radius: 4px;
+            background: var(--border-soft);
+            flex-shrink: 0;
+        }
+        .pir-s4-group-pros .pir-s4-seg-cell.filled { background: linear-gradient(180deg, #20c997, #19a87c); }
+        .pir-s4-group-cons .pir-s4-seg-cell.filled { background: linear-gradient(180deg, #e35d6a, #b44454); }
+        .pir-s4-seg-count {
             font-size: 11px; font-weight: 700; color: var(--muted);
             text-align: right; font-variant-numeric: tabular-nums;
         }
@@ -714,7 +728,12 @@
             .pir-s1-wrap { flex-direction: column; }
             .pir-gauge-box { width: 100%; }
             .pir-s2-row { grid-template-columns: 1fr; }
-            .pir-s4-row { grid-template-columns: 88px 1fr 40px; gap: 8px; }
+            .pir-s4-seg-row {
+                grid-template-columns: minmax(0, 1fr) auto;
+                column-gap: 8px; row-gap: 4px;
+            }
+            .pir-s4-seg-cells, .pir-s4-seg-count { grid-column: 1 / -1; }
+            .pir-s4-seg-cell { width: 22px; height: 10px; }
             .pir-s5-aspects { grid-template-columns: 1fr; }
             .pir-s5-aspect-row { grid-template-columns: 70px 1fr 28px; gap: 6px; }
             .pir-s6-matcher { grid-template-columns: 1fr; }
@@ -1954,6 +1973,38 @@
             // Denominator: use the max total seen (typically the video count, e.g. 6)
             const denom = Math.max(...all.map(x => x.total));
 
+            // 합의 강도 분류 (N/M 비율 기반).
+            //   전원 합의 : N === M
+            //   다수       : N/M > 0.5 이고 N !== M (과반)
+            //   일부       : 그 외
+            function _pirS4ConsensusLabel(n, m) {
+                if (m <= 0) return { text: '일부', level: 'partial' };
+                if (n === m) return { text: '전원 합의', level: 'full' };
+                if (n / m > 0.5) return { text: '다수', level: 'majority' };
+                return { text: '일부', level: 'partial' };
+            }
+
+            // 카테고리 아이콘 매핑 — _pirEnhanceSection4Icons 의 ICON_MAP 과 동일
+            // 키워드. 그 함수가 li 에 prepend 하는 동작은 그대로 두지만, 세그먼
+            // 트 row 의 라벨에도 같은 아이콘을 직접 붙여 시각적 일관성 유지.
+            const PIR_S4_ICON_MAP = [
+                { keys: ['카메라','렌즈','조리개','화소','광학'], icon: '📷' },
+                { keys: ['배터리','충전','발열','mah','wh'],        icon: '🔋' },
+                { keys: ['디스플레이','화면','밝기','색상','주사율','nit'], icon: '🖥️' },
+                { keys: ['가격','원','비용','만원','가성비'],         icon: '💰' },
+                { keys: ['디자인','소재','무게','두께','그립','프레임'], icon: '✨' },
+                { keys: ['성능','칩셋','cpu','ap','벤치','프로세서'], icon: '⚡' },
+                { keys: ['ai','인공지능'],                           icon: '🤖' },
+                { keys: ['소리','음질','스피커'],                     icon: '🔊' },
+            ];
+            function _pirS4IconFor(text) {
+                const lower = (text || '').toLowerCase();
+                for (const { keys, icon } of PIR_S4_ICON_MAP) {
+                    if (keys.some(k => lower.includes(k))) return icon;
+                }
+                return '💡';
+            }
+
             function buildGroup(kind, items, title) {
                 if (items.length === 0) return null;
                 const wrap = document.createElement('div');
@@ -1963,17 +2014,27 @@
                 label.textContent = title;
                 wrap.appendChild(label);
                 for (const it of items) {
+                    const consensus = _pirS4ConsensusLabel(it.n, it.total);
+                    const icon = _pirS4IconFor(it.label);
                     const row = document.createElement('div');
-                    row.className = 'pir-s4-row';
-                    const pct = Math.max(4, Math.round((it.n / denom) * 100));
+                    row.className = 'pir-s4-seg-row';
+                    // M cells, first N filled — total cell count tracks the
+                    // analysis-video count so a 5-video product and an 8-video
+                    // product naturally show different counts of cells.
+                    const cellsHtml = [];
+                    for (let i = 0; i < it.total; i++) {
+                        cellsHtml.push('<span class="pir-s4-seg-cell' + (i < it.n ? ' filled' : '') + '"></span>');
+                    }
                     row.innerHTML =
-                        '<span class="pir-s4-row-label" title="' + escapeHtml(it.label) + '">' +
+                        '<span class="pir-s4-seg-label" title="' + escapeHtml(it.label) + '">' +
+                            '<span class="pir-item-icon" aria-hidden="true">' + icon + '</span>' +
                             escapeHtml(it.label) +
                         '</span>' +
-                        '<span class="pir-s4-bar-track">' +
-                            '<span class="pir-s4-bar-fill" style="width:' + pct + '%"></span>' +
+                        '<span class="pir-s4-seg-chip pir-s4-seg-chip-' + consensus.level + '">' +
+                            consensus.text +
                         '</span>' +
-                        '<span class="pir-s4-row-count">' + it.n + '/' + it.total + '</span>';
+                        '<span class="pir-s4-seg-cells">' + cellsHtml.join('') + '</span>' +
+                        '<span class="pir-s4-seg-count">' + it.n + '/' + it.total + '</span>';
                     wrap.appendChild(row);
                 }
                 return wrap;
@@ -1981,8 +2042,8 @@
 
             const container = document.createElement('div');
             container.className = 'pir-s4-bars';
-            const prosEl = buildGroup('pros', groups.pros, '장점 — 막대 길이는 언급한 영상 수');
-            const consEl = buildGroup('cons', groups.cons, '단점 — 막대 길이는 언급한 영상 수');
+            const prosEl = buildGroup('pros', groups.pros, '장점 — 영상 ' + denom + '개 중 동의한 수·합의 강한 순');
+            const consEl = buildGroup('cons', groups.cons, '단점 — 영상 ' + denom + '개 중 지적한 수·지적 많은 순');
             if (prosEl) container.appendChild(prosEl);
             if (consEl) container.appendChild(consEl);
 
