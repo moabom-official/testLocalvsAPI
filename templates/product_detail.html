@@ -708,19 +708,79 @@
             font-style: italic; padding: 4px 2px;
         }
 
-        /* Section ⑦ — change highlights */
-        .pir-highlights-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+        /* Section ⑥ — change highlights (C안: 좌우 비교 + 변화 평가) */
+        .pir-highlights-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 12px;
+            margin-bottom: 14px;
+        }
         .pir-highlight-card {
-            background: var(--surface-soft); border: 1px solid var(--border-soft);
-            border-radius: 10px; padding: 10px 14px; min-width: 130px; flex: 1;
+            background: var(--surface);
+            border: 1px solid var(--border-soft);
+            border-radius: 12px;
+            padding: 12px 14px;
+            display: flex; flex-direction: column; gap: 10px;
+            min-width: 0;
         }
-        .pir-highlight-item { font-size: 11px; color: var(--muted); margin-bottom: 4px; font-weight: 500; }
-        .pir-highlight-change {
-            display: flex; align-items: center; gap: 5px;
-            font-size: 12px; font-weight: 700; color: var(--text); flex-wrap: wrap;
+        .pir-highlight-item {
+            font-size: 13px; font-weight: 700; color: var(--text);
+            display: inline-flex; align-items: center; gap: 6px;
+            min-width: 0;
         }
-        .pir-highlight-arrow { color: var(--primary); font-size: 14px; font-weight: 800; }
-        .pir-highlight-delta { font-size: 11px; color: var(--primary); font-weight: 600; margin-top: 3px; }
+        .pir-highlight-item-icon { font-size: 14px; line-height: 1; }
+        /* Comparison body: 전작 | › | 현재 */
+        .pir-highlight-cmp {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: stretch;
+            gap: 8px;
+            min-width: 0;
+        }
+        .pir-highlight-side {
+            background: var(--surface-soft);
+            border: 1px solid var(--border-soft);
+            border-radius: 8px;
+            padding: 8px 10px;
+            display: flex; flex-direction: column; gap: 4px;
+            min-width: 0;
+        }
+        .pir-highlight-side-after {
+            background: var(--positive-soft);
+            border-color: #c5f0de;
+        }
+        .pir-highlight-side-label {
+            font-size: 10px; font-weight: 600; color: var(--muted);
+            text-transform: uppercase; letter-spacing: 0.04em;
+        }
+        .pir-highlight-side-after .pir-highlight-side-label { color: #0d6e4f; }
+        .pir-highlight-side-value {
+            font-size: 12px; line-height: 1.45; color: var(--text);
+            font-weight: 500; word-break: keep-all;
+        }
+        .pir-highlight-arrow {
+            align-self: center; justify-self: center;
+            color: var(--muted);
+            font-size: 20px; font-weight: 700; line-height: 1;
+        }
+        /* Single (current-only) body — no-predecessor rows */
+        .pir-highlight-single {
+            background: var(--positive-soft);
+            border: 1px solid #c5f0de;
+            border-radius: 8px;
+            padding: 8px 10px;
+            display: flex; flex-direction: column; gap: 4px;
+            min-width: 0;
+        }
+        .pir-highlight-single .pir-highlight-side-label { color: #0d6e4f; }
+        /* Bottom change-assessment line */
+        .pir-highlight-change-line {
+            font-size: 11px; line-height: 1.4;
+            color: var(--primary-strong); font-weight: 600;
+            display: inline-flex; align-items: center; gap: 4px;
+            word-break: keep-all;
+        }
+        .pir-highlight-change-icon { font-size: 12px; line-height: 1; }
 
         @media (max-width: 660px) {
             .pir-s3-wrap { flex-direction: column; }
@@ -737,6 +797,8 @@
             .pir-s5-aspects { grid-template-columns: 1fr; }
             .pir-s5-aspect-row { grid-template-columns: 70px 1fr 28px; gap: 6px; }
             .pir-s6-matcher { grid-template-columns: 1fr; }
+            .pir-highlight-cmp { grid-template-columns: 1fr; gap: 6px; }
+            .pir-highlight-arrow { transform: rotate(90deg); font-size: 18px; }
         }
 
         /* ── Integrated insight progress overlay ─────────── */
@@ -2447,6 +2509,33 @@
         }
 
         // ── Section ⑦: change highlight cards ───────────────────────────
+        // 전작 칸이 비었거나 "데이터 부족" / "언급 없음" 류면 좌우 비교가
+        // 의미가 없으므로 현재 특징 단일 카드로 폴백.
+        function _pirS6IsNoPredecessor(text) {
+            if (!text || !text.trim()) return true;
+            return /(데이터\s*부족|비교\s*언급\s*없음|언급\s*없음|미언급|정보\s*없음|해당\s*없음)/.test(text);
+        }
+
+        // 카테고리 아이콘 — Section ④ 의 ICON_MAP 과 동일 키워드 사용. 함수
+        // 자체는 손대지 않고 카드 라벨 prepend 용으로만 별도 인스턴스 보관.
+        const PIR_S6_ICON_MAP = [
+            { keys: ['카메라','렌즈','조리개','화소','광학'], icon: '📷' },
+            { keys: ['배터리','충전','발열','mah','wh'],        icon: '🔋' },
+            { keys: ['디스플레이','화면','밝기','색상','주사율','nit'], icon: '🖥️' },
+            { keys: ['가격','원','비용','만원','가성비'],         icon: '💰' },
+            { keys: ['디자인','소재','무게','두께','그립','프레임'], icon: '✨' },
+            { keys: ['성능','칩셋','cpu','ap','벤치','프로세서','그래픽','gpu'], icon: '⚡' },
+            { keys: ['ai','인공지능'],                           icon: '🤖' },
+            { keys: ['소리','음질','스피커'],                     icon: '🔊' },
+        ];
+        function _pirS6IconFor(text) {
+            const lower = (text || '').toLowerCase();
+            for (const { keys, icon } of PIR_S6_ICON_MAP) {
+                if (keys.some(k => lower.includes(k))) return icon;
+            }
+            return '🧩';
+        }
+
         function _pirEnhanceSection7Highlights(bodyEl) {
             const heading = _pirFindHeading(bodyEl, '전작 대비');
             if (!heading) return;
@@ -2460,37 +2549,88 @@
             }
             if (!tableEl) return;
 
-            // Parse rows with both "전작" and "현재" columns (cols 0,1,2 = 항목/전작/현재)
-            const highlights = [];
-            for (const row of tableEl.querySelectorAll('tbody tr')) {
-                const cells = row.querySelectorAll('td');
+            try {
+                _pirS6BuildHighlightCards(tableEl);
+            } catch (e) {
+                console.warn('[PIR] s6 highlight cards failed:', e);
+                // Fallback: leave the original table intact — no cards inserted.
+            }
+        }
+
+        function _pirS6BuildHighlightCards(tableEl) {
+            // Parse cells 0..3 = item / before / after / change-assessment.
+            // change cell is optional (older formats may have only 3 columns).
+            const rows = [];
+            for (const tr of tableEl.querySelectorAll('tbody tr')) {
+                const cells = tr.querySelectorAll('td');
                 if (cells.length < 3) continue;
                 const item   = cells[0].textContent.trim();
                 const before = cells[1].textContent.trim();
                 const after  = cells[2].textContent.trim();
-                if (!item || before === after) continue;
-                if (before.includes('데이터 부족') || after.includes('데이터 부족')) continue;
-                if (before.includes('비교 언급 없음') || after.includes('비교 언급 없음')) continue;
-                highlights.push({ item, before, after });
-                if (highlights.length >= 3) break;
+                const change = cells.length >= 4 ? cells[3].textContent.trim() : '';
+                if (!item) continue;
+                if (!after || /데이터\s*부족/.test(after)) continue;   // 현재가 비면 카드 의미 없음
+                if (before === after) continue;                         // 변화 없는 행
+                rows.push({ item, before, after, change });
+                if (rows.length >= 3) break;
             }
-            if (highlights.length === 0) return;
+            if (rows.length === 0) return;
 
-            const row = document.createElement('div');
-            row.className = 'pir-highlights-row';
-            for (const { item, before, after } of highlights) {
+            const container = document.createElement('div');
+            container.className = 'pir-highlights-row';
+
+            for (const r of rows) {
+                const noPrev = _pirS6IsNoPredecessor(r.before);
+                const icon = _pirS6IconFor(r.item);
                 const card = document.createElement('div');
-                card.className = 'pir-highlight-card';
-                card.innerHTML =
-                    '<div class="pir-highlight-item">' + escapeHtml(item) + '</div>' +
-                    '<div class="pir-highlight-change">' +
-                        '<span>' + escapeHtml(before) + '</span>' +
-                        '<span class="pir-highlight-arrow">→</span>' +
-                        '<span>' + escapeHtml(after) + '</span>' +
-                    '</div>';
-                row.appendChild(card);
+                card.className = 'pir-highlight-card' + (noPrev ? ' pir-highlight-card-single' : '');
+
+                const itemEl = document.createElement('div');
+                itemEl.className = 'pir-highlight-item';
+                itemEl.innerHTML =
+                    '<span class="pir-highlight-item-icon" aria-hidden="true">' + icon + '</span>' +
+                    escapeHtml(r.item);
+                card.appendChild(itemEl);
+
+                if (noPrev) {
+                    // 현재 특징 단일 칸 — 전작 정보가 없는 행
+                    const single = document.createElement('div');
+                    single.className = 'pir-highlight-single';
+                    single.innerHTML =
+                        '<div class="pir-highlight-side-label">현재</div>' +
+                        '<div class="pir-highlight-side-value">' + escapeHtml(r.after) + '</div>';
+                    card.appendChild(single);
+                } else {
+                    // 좌우 비교 — 전작 / › / 현재
+                    const cmp = document.createElement('div');
+                    cmp.className = 'pir-highlight-cmp';
+                    cmp.innerHTML =
+                        '<div class="pir-highlight-side pir-highlight-side-before">' +
+                            '<div class="pir-highlight-side-label">전작</div>' +
+                            '<div class="pir-highlight-side-value">' + escapeHtml(r.before) + '</div>' +
+                        '</div>' +
+                        '<span class="pir-highlight-arrow" aria-hidden="true">›</span>' +
+                        '<div class="pir-highlight-side pir-highlight-side-after">' +
+                            '<div class="pir-highlight-side-label">현재</div>' +
+                            '<div class="pir-highlight-side-value">' + escapeHtml(r.after) + '</div>' +
+                        '</div>';
+                    card.appendChild(cmp);
+                }
+
+                // 변화 평가 줄 — 의미 있는 텍스트일 때만
+                if (r.change && !/^[-—–]\s*$/.test(r.change) && !/(데이터\s*부족|언급\s*없음|미언급)/.test(r.change)) {
+                    const changeLine = document.createElement('div');
+                    changeLine.className = 'pir-highlight-change-line';
+                    changeLine.innerHTML =
+                        '<span class="pir-highlight-change-icon" aria-hidden="true">↗</span>' +
+                        '<span>' + escapeHtml(r.change) + '</span>';
+                    card.appendChild(changeLine);
+                }
+
+                container.appendChild(card);
             }
-            tableEl.parentNode.insertBefore(row, tableEl);
+
+            tableEl.parentNode.insertBefore(container, tableEl);
         }
 
         // ── Video card click → inline progress bar + badge on the clicked card
