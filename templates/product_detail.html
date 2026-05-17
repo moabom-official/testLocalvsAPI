@@ -412,6 +412,53 @@
         /* Section ④ — pro/con icons */
         .pir-item-icon { font-style: normal; margin-right: 3px; }
 
+        /* Section ④ — diverging bar (pros above / cons below) */
+        .pir-s4-bars {
+            display: flex; flex-direction: column; gap: 14px;
+            margin: 6px 0 14px;
+            padding: 12px 14px;
+            background: var(--surface-soft);
+            border: 1px solid var(--border-soft);
+            border-radius: 12px;
+        }
+        .pir-s4-group { display: flex; flex-direction: column; gap: 6px; }
+        .pir-s4-group-label {
+            font-size: 11px; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.03em;
+            margin-bottom: 2px;
+        }
+        .pir-s4-group-pros .pir-s4-group-label { color: #19a87c; }
+        .pir-s4-group-cons .pir-s4-group-label { color: #b44454; }
+        .pir-s4-row {
+            display: grid;
+            grid-template-columns: 110px 1fr 44px;
+            align-items: center;
+            gap: 10px;
+        }
+        .pir-s4-row-label {
+            font-size: 12px; color: var(--text); font-weight: 500;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .pir-s4-bar-track {
+            position: relative;
+            display: block;
+            height: 10px;
+            background: rgba(111,66,193,0.08);
+            border-radius: 999px;
+            overflow: hidden;
+        }
+        .pir-s4-bar-fill {
+            position: absolute; left: 0; top: 0; bottom: 0;
+            border-radius: 999px;
+            transition: width 0.4s ease;
+        }
+        .pir-s4-group-pros .pir-s4-bar-fill { background: linear-gradient(90deg, #20c997, #19a87c); }
+        .pir-s4-group-cons .pir-s4-bar-fill { background: linear-gradient(90deg, #e35d6a, #b44454); }
+        .pir-s4-row-count {
+            font-size: 11px; font-weight: 700; color: var(--muted);
+            text-align: right; font-variant-numeric: tabular-nums;
+        }
+
         /* Section ⑦ — change highlights */
         .pir-highlights-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
         .pir-highlight-card {
@@ -432,6 +479,7 @@
             .pir-s1-wrap { flex-direction: column; }
             .pir-gauge-box { width: 100%; }
             .pir-s2-row { grid-template-columns: 1fr; }
+            .pir-s4-row { grid-template-columns: 88px 1fr 40px; gap: 8px; }
         }
 
         /* ── Integrated insight progress overlay ─────────── */
@@ -1201,6 +1249,7 @@
             _pirEnhanceSection1Gauge(bodyEl);
             try { _pirEnhanceSection2Cards(bodyEl); } catch (e) { console.warn('[PIR] s2 cards failed:', e); }
             _pirEnhanceSection3Radar(bodyEl);
+            try { _pirEnhanceSection4DivergingBar(bodyEl); } catch (e) { console.warn('[PIR] s4 bar failed:', e); }
             _pirEnhanceSection4Icons(bodyEl);
             _pirEnhanceSection7Highlights(bodyEl);
         }
@@ -1453,6 +1502,93 @@
                 }
             });
             _pirCharts.push(chart);
+        }
+
+        // ── Section ④: diverging bar (pros above / cons below) ─────────
+        function _pirEnhanceSection4DivergingBar(bodyEl) {
+            const heading = _pirFindHeading(bodyEl, '장점');
+            if (!heading || !heading.textContent.includes('단점')) return;
+            // Only operate on the H2 wrapper for ④ (which contains both 장점 and 단점)
+            if (heading.tagName !== 'H2') return;
+
+            // Walk siblings until next H2/H1, grouping <li> items by their nearest H3 label
+            const groups = { pros: [], cons: [] };
+            let currentGroup = null;
+            let el = heading.nextElementSibling;
+            const sectionEls = [];
+            while (el) {
+                if (/^H[12]$/.test(el.tagName)) break;
+                sectionEls.push(el);
+                if (el.tagName === 'H3') {
+                    const t = el.textContent;
+                    if (t.includes('장점') && !t.includes('단점')) currentGroup = 'pros';
+                    else if (t.includes('단점')) currentGroup = 'cons';
+                    else currentGroup = null;
+                } else if (currentGroup) {
+                    for (const li of el.querySelectorAll('li')) {
+                        const text = li.textContent.replace(/\s+/g, ' ').trim();
+                        // Match "(N/M)" at end. N = mention count, M = total videos.
+                        const m = text.match(/^(.+?)\s*[\(（]\s*(\d+)\s*\/\s*(\d+)\s*[\)）]\s*$/);
+                        if (!m) continue;
+                        const label = m[1].trim();
+                        const n = parseInt(m[2], 10);
+                        const total = parseInt(m[3], 10);
+                        if (!label || !n || !total || n > total) continue;
+                        groups[currentGroup].push({ label, n, total });
+                    }
+                }
+                el = el.nextElementSibling;
+            }
+
+            const all = groups.pros.concat(groups.cons);
+            if (all.length === 0) return; // nothing parseable → leave original list
+
+            // Sort each group by N desc, cap at 6 rows per group
+            const MAX_ROWS = 6;
+            groups.pros.sort((a, b) => b.n - a.n);
+            groups.cons.sort((a, b) => b.n - a.n);
+            groups.pros = groups.pros.slice(0, MAX_ROWS);
+            groups.cons = groups.cons.slice(0, MAX_ROWS);
+
+            // Denominator: use the max total seen (typically the video count, e.g. 6)
+            const denom = Math.max(...all.map(x => x.total));
+
+            function buildGroup(kind, items, title) {
+                if (items.length === 0) return null;
+                const wrap = document.createElement('div');
+                wrap.className = 'pir-s4-group pir-s4-group-' + kind;
+                const label = document.createElement('div');
+                label.className = 'pir-s4-group-label';
+                label.textContent = title;
+                wrap.appendChild(label);
+                for (const it of items) {
+                    const row = document.createElement('div');
+                    row.className = 'pir-s4-row';
+                    const pct = Math.max(4, Math.round((it.n / denom) * 100));
+                    row.innerHTML =
+                        '<span class="pir-s4-row-label" title="' + escapeHtml(it.label) + '">' +
+                            escapeHtml(it.label) +
+                        '</span>' +
+                        '<span class="pir-s4-bar-track">' +
+                            '<span class="pir-s4-bar-fill" style="width:' + pct + '%"></span>' +
+                        '</span>' +
+                        '<span class="pir-s4-row-count">' + it.n + '/' + it.total + '</span>';
+                    wrap.appendChild(row);
+                }
+                return wrap;
+            }
+
+            const container = document.createElement('div');
+            container.className = 'pir-s4-bars';
+            const prosEl = buildGroup('pros', groups.pros, '장점 — 막대 길이는 언급한 영상 수');
+            const consEl = buildGroup('cons', groups.cons, '단점 — 막대 길이는 언급한 영상 수');
+            if (prosEl) container.appendChild(prosEl);
+            if (consEl) container.appendChild(consEl);
+
+            // Insert chart at the top of section ④, before the existing H3/list content
+            const firstSibling = sectionEls[0];
+            if (firstSibling) firstSibling.parentNode.insertBefore(container, firstSibling);
+            else heading.after(container);
         }
 
         // ── Section ④: keyword-based category icons ─────────────────────
