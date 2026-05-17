@@ -19,8 +19,13 @@ def render_report_pdf(report_title: str, report_text: str) -> bytes:
         raise Exception("reportlab is not installed") from e
 
     buffer = BytesIO()
-    
-    # Register Korean font
+
+    # Default fonts — used when Korean TTF is unavailable (Linux/macOS containers,
+    # missing Windows font, or registration error). Without this default a code
+    # path on non-Windows hosts hit UnboundLocalError before the Paragraph styles
+    # were built, blocking PDF generation for every report including ④.
+    title_font = "Helvetica"
+    body_font = "Helvetica"
     try:
         font_path = "C:\\Windows\\Fonts\\malgun.ttf"
         if Path(font_path).exists():
@@ -30,8 +35,6 @@ def render_report_pdf(report_title: str, report_text: str) -> bytes:
             body_font = "Korean"
     except Exception as e:
         print(f"[WARN] Failed to register Korean font: {e}")
-        title_font = "Helvetica"
-        body_font = "Helvetica"
 
     # Create PDF document
     doc = SimpleDocTemplate(

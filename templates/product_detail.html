@@ -1391,14 +1391,17 @@
         // ── Integrated insight visual enhancements (Option A: frontend post-processing) ──
 
         function enhanceIntegratedReport(bodyEl) {
-            _pirEnhanceSection1Gauge(bodyEl);
-            try { _pirEnhanceSection2Cards(bodyEl); } catch (e) { console.warn('[PIR] s2 cards failed:', e); }
-            _pirEnhanceSection3Radar(bodyEl);
-            try { _pirEnhanceSection4DivergingBar(bodyEl); } catch (e) { console.warn('[PIR] s4 bar failed:', e); }
-            _pirEnhanceSection4Icons(bodyEl);
-            try { _pirEnhanceSection5Consumer(bodyEl); } catch (e) { console.warn('[PIR] s5 consumer failed:', e); }
-            _pirEnhanceSection7Highlights(bodyEl);
-            try { _pirEnhanceSectionRecommendChips(bodyEl); } catch (e) { console.warn('[PIR] rec chips failed:', e); }
+            // Each enhancer is isolated in try/catch so one parse failure does not
+            // cascade to subsequent enhancers — the original markdown stays visible
+            // for whichever section failed.
+            try { _pirEnhanceSection1Gauge(bodyEl); }       catch (e) { console.warn('[PIR] s1 gauge failed:',   e); }
+            try { _pirEnhanceSection2Cards(bodyEl); }       catch (e) { console.warn('[PIR] s2 cards failed:',   e); }
+            try { _pirEnhanceSection3Radar(bodyEl); }       catch (e) { console.warn('[PIR] s3 radar failed:',   e); }
+            try { _pirEnhanceSection4DivergingBar(bodyEl); } catch (e) { console.warn('[PIR] s4 bar failed:',     e); }
+            try { _pirEnhanceSection4Icons(bodyEl); }       catch (e) { console.warn('[PIR] s4 icons failed:',   e); }
+            try { _pirEnhanceSection5Consumer(bodyEl); }    catch (e) { console.warn('[PIR] s5 consumer failed:', e); }
+            try { _pirEnhanceSection7Highlights(bodyEl); }  catch (e) { console.warn('[PIR] s6 changes failed:', e); }
+            try { _pirEnhanceSectionRecommendChips(bodyEl); } catch (e) { console.warn('[PIR] s7 chips failed:',  e); }
         }
 
         // ── Helper: find heading by keyword, return element or null ──────
