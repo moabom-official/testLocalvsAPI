@@ -995,6 +995,45 @@
         }
         .cmp-evi-comments { display: flex; flex-direction: column; gap: 6px; }
 
+        /* ── ③ S1/S2 reviewer-quote structured card (.cmp-rq-*) ─── */
+        .cmp-rq-body {
+            display: flex; flex-direction: column; gap: 8px;
+        }
+        .cmp-rq-badge {
+            display: inline-flex; align-items: center;
+            align-self: flex-start;
+            font-size: 11px; font-weight: 700;
+            padding: 3px 9px; border-radius: 999px;
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+        }
+        .cmp-rq-badge-strong-pos { background: #19a87c; color: #fff; }
+        .cmp-rq-badge-pos        { background: var(--positive-soft); color: #0d6e4f; border: 1px solid #c5f0de; }
+        .cmp-rq-badge-strong-neg { background: #b3303c; color: #fff; }
+        .cmp-rq-badge-neg        { background: var(--negative-soft); color: #b3303c; border: 1px solid #f7c2c8; }
+        .cmp-rq-headline {
+            font-size: 14px; font-weight: 700; line-height: 1.4;
+            color: var(--text);
+            word-break: keep-all;
+        }
+        .cmp-rq-chips {
+            display: flex; flex-wrap: wrap; gap: 5px;
+        }
+        .cmp-rq-chip {
+            font-size: 11.5px; font-weight: 500;
+            color: var(--text);
+            background: var(--surface);
+            border: 1px solid var(--border-soft);
+            padding: 3px 9px; border-radius: 999px;
+            white-space: nowrap;
+            line-height: 1.3;
+        }
+        .cmp-rq-sub {
+            font-size: 11.5px; line-height: 1.45;
+            color: var(--muted);
+            font-style: italic;
+        }
+
         /* ── ③ S3 리뷰어만 vs 소비자만 (좌우 칼럼) ─────────── */
         .cmp-only-grid {
             display: grid;
@@ -2604,6 +2643,94 @@
                 points.map(p => _cmpRenderCard(p, kind)).join('') +
             '</div>';
         }
+        // ── reviewer_quote 를 평가 카드 구조로 파싱 ──
+        // 입력: raw reviewer_quote 문자열
+        // 출력: { badge: {label, variant}|null, headline: str, chips: [str], subText: str }
+        //   - leading ◎○△✕ 기호는 강도 배지로 변환 (◎='강한 호평', ○='호평',
+        //     △='아쉬움 지적', ✕='단점 지적'). 기호 없으면 badge=null.
+        //   - 끝의 (...) 또는 （...） 안 내용은 '/', ',', '·' 로 분리해 칩.
+        //     단 토큰에 "미언급/언급 없음/데이터 부족/정보 부족" 이 포함되거나 한
+        //     토큰이 너무 길면 칩 대신 subText 로 빠짐 (목업의 "자막 내 구체 수치
+        //     언급 없음" 같은 케이스).
+        //   - 괄호 앞 본문 = headline. 괄호가 없으면 전체가 headline.
+        function _cmpFormatReviewerQuote(quote) {
+            const raw = (quote == null ? '' : String(quote)).trim();
+            if (!raw) return { badge: null, headline: '', chips: [], subText: '' };
+
+            let text = raw;
+            let badge = null;
+            const first = text.charAt(0);
+            if (first === '◎')      { badge = { label: '강한 호평',  variant: 'strong-pos' }; text = text.slice(1).trim(); }
+            else if (first === '○') { badge = { label: '호평',        variant: 'pos' };        text = text.slice(1).trim(); }
+            else if (first === '△') { badge = { label: '아쉬움 지적', variant: 'neg' };        text = text.slice(1).trim(); }
+            else if (first === '✕' || first === '✗' || first === '×') {
+                badge = { label: '단점 지적', variant: 'strong-neg' };
+                text = text.slice(1).trim();
+            }
+
+            // Trailing (..) or （..）. Capture the LAST balanced pair so a phrase
+            // like "전작(S23) 대비 ↑49% (수치 출처)" peels off only the last one.
+            const m = text.match(/^(.*?)\s*[\(（]([^)）]+)[\)）]\s*$/);
+            let headline = text;
+            let chips = [];
+            let subText = '';
+            if (m) {
+                headline = (m[1] || '').trim();
+                const inner = (m[2] || '').trim();
+                const tokens = inner.split(/[\/,·]/).map(t => t.trim()).filter(Boolean);
+                const muteRe = /(미언급|언급\s*없음|데이터\s*부족|정보\s*부족|평가\s*없음|다루지\s*않음)/;
+                const anyMuted = tokens.some(t => muteRe.test(t));
+                const anyLong  = tokens.some(t => t.length > 14);
+                if (tokens.length === 0 || anyMuted || anyLong) {
+                    subText = inner;
+                } else {
+                    chips = tokens;
+                }
+            }
+            // Headline must not be empty — if peeling left it blank, restore the raw text
+            // (minus the leading symbol) so the user still sees something meaningful.
+            if (!headline) headline = text || raw;
+
+            return { badge, headline, chips, subText };
+        }
+
+        // Wraps reviewer-quote formatting in try/catch. On failure (or if the
+        // helper throws), falls back to the original italic-blockquote rendering
+        // so the raw quote text is never lost.
+        function _cmpReviewerSideHtml(quote) {
+            try {
+                const parsed = _cmpFormatReviewerQuote(quote);
+                const badgeHtml = parsed.badge
+                    ? '<span class="cmp-rq-badge cmp-rq-badge-' + parsed.badge.variant + '">' +
+                        _cmEsc(parsed.badge.label) +
+                      '</span>'
+                    : '';
+                const headlineHtml = parsed.headline
+                    ? '<div class="cmp-rq-headline">' + _cmEsc(parsed.headline) + '</div>'
+                    : '';
+                const chipsHtml = parsed.chips.length
+                    ? '<div class="cmp-rq-chips">' +
+                        parsed.chips.map(c => '<span class="cmp-rq-chip">' + _cmEsc(c) + '</span>').join('') +
+                      '</div>'
+                    : '';
+                const subHtml = parsed.subText
+                    ? '<div class="cmp-rq-sub">' + _cmEsc(parsed.subText) + '</div>'
+                    : '';
+                return '<div class="cmp-evi-box cmp-rq">' +
+                        '<div class="cmp-evi-label">📝 리뷰어 자막</div>' +
+                        '<div class="cmp-rq-body">' +
+                            badgeHtml + headlineHtml + chipsHtml + subHtml +
+                        '</div>' +
+                    '</div>';
+            } catch (e) {
+                console.warn('[cmp-rq] reviewer quote format failed:', e);
+                return '<div class="cmp-evi-box">' +
+                        '<div class="cmp-evi-label">📝 리뷰어 자막</div>' +
+                        '<div class="cmp-evi-body reviewer-quote">' + _cmEsc(quote || '') + '</div>' +
+                    '</div>';
+            }
+        }
+
         function _cmpRenderCard(p, kind) {
             const isDisagree = (kind === 'disagree');
             const badge = isDisagree ? '✕ 불일치' : '✓ 일치';
@@ -2614,10 +2741,7 @@
             const consumerComments = (p.consumer_comments || [])
                 .map(c => _cmRenderQuote(c, quoteKind))
                 .join('');
-            const reviewerSide = '<div class="cmp-evi-box">' +
-                    '<div class="cmp-evi-label">📝 리뷰어 자막</div>' +
-                    '<div class="cmp-evi-body reviewer-quote">' + _cmEsc(quote) + '</div>' +
-                '</div>';
+            const reviewerSide = _cmpReviewerSideHtml(quote);
             const consumerSide = '<div class="cmp-evi-box">' +
                     '<div class="cmp-evi-label">💬 소비자 댓글</div>' +
                     (consumerComments
