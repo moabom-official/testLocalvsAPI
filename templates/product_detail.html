@@ -336,9 +336,19 @@
         /* ── Visual enhancements for integrated insight ─── */
         /* Section ① — score gauge */
         .pir-s1-wrap { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; margin: 4px 0; }
-        .pir-gauge-box { flex-shrink: 0; width: 150px; text-align: center; }
+        .pir-gauge-box {
+            flex-shrink: 0; width: 150px; text-align: center;
+            display: flex; flex-direction: column; align-items: center; gap: 6px;
+        }
         .pir-gauge-box canvas { display: block; margin: 0 auto; }
-        .pir-gauge-score { font-size: 12px; font-weight: 700; color: var(--text); margin-top: 6px; }
+        .pir-gauge-headline {
+            font-size: 12px; color: var(--muted); font-weight: 600;
+            letter-spacing: 0.01em;
+        }
+        .pir-gauge-sub {
+            font-size: 12px; color: var(--muted); font-weight: 500;
+            line-height: 1.4;
+        }
         .pir-consensus-badge {
             display: inline-block; margin-top: 6px;
             padding: 3px 10px; border-radius: 999px;
@@ -375,26 +385,6 @@
         }
         .pir-s1-card-extra .pir-s1-card-body {
             color: var(--muted); font-style: italic;
-        }
-        /* Section ① — score card big-number value (used by .pir-s1-card-score) */
-        .pir-s1-score-value {
-            display: flex; align-items: baseline; gap: 4px;
-            margin: 4px 0 2px;
-        }
-        .pir-s1-score-num {
-            font-size: 32px; font-weight: 800;
-            letter-spacing: -0.02em; line-height: 1;
-            font-variant-numeric: tabular-nums;
-        }
-        .pir-s1-score-denom {
-            font-size: 14px; color: var(--muted); font-weight: 600;
-        }
-        /* Generic subtitle for the three section-① cards (score / consensus
-           use their own desc class; score uses this one for the bottom line). */
-        .pir-s1-card-sub {
-            font-size: 12px; line-height: 1.5;
-            color: var(--muted);
-            word-break: keep-all;
         }
         /* Section ① — reviewer consensus 3-step meter */
         .pir-s1-consensus-meter {
@@ -1537,13 +1527,15 @@
 
         // ── Section ①: score gauge + consensus badge ────────────────────
         // Parse Section ① siblings into a small set of labelled cards.
-        // `consensus` is the already-extracted '높음'|'중간'|'낮음'|null and
-        // `score` is the already-parsed numeric (0~10) from the caller — both
-        // are passed through so the consensus card can drive its 3-step meter
-        // and the score card can color its big number to match the donut.
-        // Returns an array of DOM elements — empty if nothing parseable was
-        // found, in which case the caller falls back to plain siblings.
-        function _pirS1ParseToCards(siblings, consensus, score) {
+        //   - `consensus` is the already-extracted '높음'|'중간'|'낮음'|null
+        //   - `videoCount` (or null) is the analysis-video count used by the
+        //     consensus card to render a "리뷰어 N명의 평가가 ..." subtitle
+        //
+        // The score line is parsed out and *intentionally not rendered as a
+        // card* — the donut already shows the number. Returns an array of DOM
+        // elements (verdict + consensus + optional extra). Empty array → caller
+        // falls back to plain siblings.
+        function _pirS1ParseToCards(siblings, consensus, videoCount) {
             const SCORE_RE = /종합\s*평가/;
             const CONSENSUS_RE = /(?:리뷰어\s*)?합의도/;
 
@@ -1584,11 +1576,10 @@
             if (verdictText) {
                 cards.push(_pirS1MakeCard('verdict', '✎ 한줄 구매 판정', verdictText));
             }
-            if (scoreLine) {
-                cards.push(_pirS1MakeScoreCard(scoreLine, score));
-            }
+            // scoreLine은 의도적으로 카드로 만들지 않음 — 도넛이 점수를 이미
+            // 표시하므로 오른쪽에서 큰 숫자로 다시 보여주면 시각적 중복.
             if (consensusLine) {
-                cards.push(_pirS1MakeConsensusCard(consensus, consensusLine));
+                cards.push(_pirS1MakeConsensusCard(consensus, consensusLine, videoCount));
             }
             if (residual.length > 0) {
                 cards.push(_pirS1MakeCard('extra', '추가 메모', residual.join(' · ')));
@@ -1610,60 +1601,17 @@
             return card;
         }
 
-        // Score card: render the "종합 평가: N / 10 (분석 영상 M개 ...) — ..."
-        // text as a big number + small "/ 10" + one-line subtitle. The label
-        // already appears at the top, so the redundant "종합 평가:" prefix in
-        // the body text is dropped. Big-number color follows the same
-        // threshold as the donut (8↑ green / 6↑ amber / else red).
-        function _pirS1MakeScoreCard(scoreLine, score) {
-            const videoMatch  = scoreLine.match(/분석\s*영상\s*(\d+)\s*개/);
-            const tailMatch   = scoreLine.match(/[—–\-]\s*([^—–\-]+)\s*$/);
-            const color = score >= 8 ? '#20c997' : score >= 6 ? '#f5a623' : '#e35d6a';
-            const tail  = tailMatch ? tailMatch[1].trim() : '';
-
-            const card = document.createElement('div');
-            card.className = 'pir-s1-card pir-s1-card-score';
-
-            const label = document.createElement('div');
-            label.className = 'pir-s1-card-label';
-            label.textContent = '☆ 종합 평가';
-            card.appendChild(label);
-
-            const value = document.createElement('div');
-            value.className = 'pir-s1-score-value';
-            const numEl = document.createElement('span');
-            numEl.className = 'pir-s1-score-num';
-            numEl.style.color = color;
-            numEl.textContent = score.toFixed(1);
-            const denomEl = document.createElement('span');
-            denomEl.className = 'pir-s1-score-denom';
-            denomEl.textContent = '/ 10';
-            value.appendChild(numEl);
-            value.appendChild(denomEl);
-            card.appendChild(value);
-
-            // Subtitle: 표준 문구 + LLM 의 부가 설명(있다면)
-            const subParts = [];
-            if (videoMatch) subParts.push('분석 영상 ' + videoMatch[1] + '개를 종합한 평균 점수');
-            else            subParts.push('분석 영상 종합 점수');
-            // 부가 설명이 단순 "평균 점수" 반복이 아닐 때만 함께 노출
-            if (tail && !/평균\s*점수$/.test(tail) && tail !== subParts[0]) subParts.push(tail);
-
-            const sub = document.createElement('div');
-            sub.className = 'pir-s1-card-sub';
-            sub.textContent = subParts.join(' — ');
-            card.appendChild(sub);
-
-            return card;
-        }
-
         // Reviewer-consensus card with 3-step indicator (높음 3 / 중간 2 / 낮음 1)
-        // plus a short interpretation line. When level is null/unknown, falls
-        // back to plain body text so the original line is never lost.
-        function _pirS1MakeConsensusCard(level, fullText) {
-            const meta = level === '높음' ? { variant: 'high', filled: 3, desc: '리뷰어들의 평가가 대체로 일치 — 신뢰도 높은 결론' }
-                       : level === '중간' ? { variant: 'mid',  filled: 2, desc: '리뷰어 간 이견이 일부 있음 — 추가 정보 확인 권장' }
-                       : level === '낮음' ? { variant: 'low',  filled: 1, desc: '리뷰어 간 평가가 갈리는 영역 — 본인 우선순위에 맞춰 판단 필요' }
+        // plus a short interpretation line that references "위 점수" so the
+        // donut and this card read as one story. videoCount is folded into the
+        // copy when present ("리뷰어 N명…"); falls back to "리뷰어들…" otherwise.
+        // When level is null/unknown, fully falls back to plain body text so
+        // the original line is never lost.
+        function _pirS1MakeConsensusCard(level, fullText, videoCount) {
+            const who = (videoCount && videoCount > 0) ? ('리뷰어 ' + videoCount + '명') : '리뷰어들';
+            const meta = level === '높음' ? { variant: 'high', filled: 3, desc: who + '의 평가가 대체로 일치 — 위 점수의 신뢰도 높음' }
+                       : level === '중간' ? { variant: 'mid',  filled: 2, desc: who + ' 사이 이견이 일부 — 위 점수는 참고 수준으로 보기' }
+                       : level === '낮음' ? { variant: 'low',  filled: 1, desc: who + ' 사이 평가가 갈림 — 위 점수만으로 판단 주의' }
                        : null;
 
             const card = document.createElement('div');
@@ -1719,18 +1667,33 @@
             const consensusMatch = fullText.match(/리뷰어\s*합의도[^높중낮]*(높음|중간|낮음)/);
             const consensus = consensusMatch ? consensusMatch[1] : null;
 
-            // Build gauge box
+            // 분석 영상 수 — LLM 의 score 라인 (예: "종합 평가: 8.3 / 10 (분석
+            // 영상 5개 기반)") 에서 추출. 없으면 null — 도넛 하단/합의도 desc
+            // 양쪽 모두에서 graceful 하게 생략 처리.
+            const videoCountMatch = fullText.match(/분석\s*영상\s*(\d+)\s*개/);
+            const videoCount = videoCountMatch ? parseInt(videoCountMatch[1], 10) : null;
+
+            // Build gauge box — '제품 종합 점수' 라벨 위 / 도넛 / '분석 영상
+            // N개 종합' 보조 / 합의도 배지. 점수 숫자는 도넛 중앙에만 두고
+            // 별도 점수 텍스트 줄은 제거됨 (도넛 중앙 텍스트와 중복).
             const gaugeBox = document.createElement('div');
             gaugeBox.className = 'pir-gauge-box';
+
+            const headline = document.createElement('div');
+            headline.className = 'pir-gauge-headline';
+            headline.textContent = '제품 종합 점수';
+            gaugeBox.appendChild(headline);
 
             const canvas = document.createElement('canvas');
             canvas.width = 130; canvas.height = 130;
             gaugeBox.appendChild(canvas);
 
-            const scoreLabel = document.createElement('div');
-            scoreLabel.className = 'pir-gauge-score';
-            scoreLabel.textContent = score.toFixed(1) + ' / 10';
-            gaugeBox.appendChild(scoreLabel);
+            if (videoCount && videoCount > 0) {
+                const sub = document.createElement('div');
+                sub.className = 'pir-gauge-sub';
+                sub.textContent = '분석 영상 ' + videoCount + '개 종합';
+                gaugeBox.appendChild(sub);
+            }
 
             if (consensus) {
                 const badge = document.createElement('div');
@@ -1740,23 +1703,18 @@
                 gaugeBox.appendChild(badge);
             }
 
-            // (product image placeholder removed — pipeline never landed and the
-            //  dashed-box icon added visual noise without conveying data.)
-
             // Wrap heading's siblings in flex layout
             const wrapper = document.createElement('div');
             wrapper.className = 'pir-s1-wrap';
             const contentDiv = document.createElement('div');
             contentDiv.className = 'pir-s1-content';
 
-            // ── Right column: vertical card stack with try/catch fallback ──
-            // We parse the same siblings into semantic units (verdict / score /
-            // consensus / residual) and render labelled cards. On any parse
-            // error, fall back to the original behavior — moving siblings into
-            // contentDiv as-is — so the raw markdown remains visible.
+            // ── Right column: verdict + consensus 2 cards (score card removed
+            // because the donut already conveys score; redundancy added clutter).
+            // try/catch fallback preserves original sibling rendering on parse error.
             let cardStackBuilt = false;
             try {
-                const cards = _pirS1ParseToCards(siblings, consensus, score);
+                const cards = _pirS1ParseToCards(siblings, consensus, videoCount);
                 if (cards.length > 0) {
                     cards.forEach(c => contentDiv.appendChild(c));
                     // Hide the source siblings so the new cards aren't duplicated.
@@ -1797,11 +1755,18 @@
                     afterDraw(ch) {
                         const { ctx, chartArea: { left, top, width, height } } = ch;
                         ctx.save();
-                        ctx.font = 'bold 22px Pretendard, sans-serif';
-                        ctx.fillStyle = color;
+                        const cx = left + width / 2;
+                        const cy = top + height / 2;
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'middle';
-                        ctx.fillText(score.toFixed(1), left + width / 2, top + height / 2);
+                        // Big score number — sits slightly above center
+                        ctx.font = 'bold 26px Pretendard, sans-serif';
+                        ctx.fillStyle = color;
+                        ctx.fillText(score.toFixed(1), cx, cy - 7);
+                        // Small "/ 10" denominator — muted, sits below
+                        ctx.font = '500 11px Pretendard, sans-serif';
+                        ctx.fillStyle = '#6b6880';
+                        ctx.fillText('/ 10', cx, cy + 15);
                         ctx.restore();
                     }
                 }]
