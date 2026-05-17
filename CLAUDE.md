@@ -41,7 +41,10 @@
 - **7 섹션 종합 보고서** (`product_integrated_reports`, INSERT 누적 — UPSERT 아님): ①한 줄 구매 판정 + 종합 점수 + 합의도 ②핵심 요약(카드 3장) ③6차원 평가표(배터리·가격·카메라·성능·디스플레이·디자인) ④합의 기반 장단점(2명 이상 + 빈도 N/N, 다이버징 막대) ⑤소비자 여론(댓글 기반 — 가중 비율 + aspect 상위 + 대표 댓글) ⑥전작 대비 변화표 ⑦추천/비추(2열 칩 매처, 영상 N 근거). v1 사용자 피드백 반영해 v0의 Divergence·리뷰어 vs 실사용자 갭·경쟁/대체 비교 3 섹션 제거 후, ⑤ 소비자 여론은 `_pir_comment_aggregator` 가 `comment_filtering_agent` 결과(comments/comment_sentiments/aspect_extractions)를 READ ONLY 로 제품 단위 집계해 LLM 입력으로 주입한다.
 - **환각 방지 4규칙** (보고서 ④ 생성 시 자동 검증): ①근거 명시 ②합의도 정량화 ③등장 제품만 비교 ④데이터 부족 명시. 검증 실패 시 Heuristic Fallback("데이터 부족" 명시 모드)으로 자동 전환.
 - **토큰 예산 안전망**: 영상별 보고서 1500자 cap + 전체 18K 토큰 자동 비례 축소.
-- **Self-Healing**: 자막 또는 영상별 보고서가 누락된 경우 자동으로 재수집·재생성 (한상민 담당).
+- **Self-Healing** (한상민 담당, 보고서 ④ 통합 인사이트 엔드포인트):
+  - 자막: 선정 영상 중 `video_transcripts` / `video_reports.transcript_report` 가 없는 영상은 `collect_transcript_reports_for_product` 가 fetch+build 후 UPSERT.
+  - 댓글: `agent_decisions` 행이 없는 영상은 `ensure_comment_analysis_for_videos` 가 `sync.py` 의 `process_comments_with_agent` (7-step 댓글 agent) 를 그대로 호출해 collect → rule filter → LLM classify → ABSA 까지 적재. 댓글 파이프라인은 한 줄도 수정하지 않고 entry point 만 사용.
+  - 두 self-healing 은 `asyncio.gather` 로 병렬 실행 (서로 다른 YouTube API endpoint + 다른 LLM + 다른 테이블). 일부 영상 실패는 격리되어 다른 영상 처리에 영향 없음.
 - **캐시 정책 (FR-020)**: 동일 제품 재요청 시 DB 캐시 즉시 반환 (2초 이내). 영상 자막은 `video_transcripts`에 영구 캐시.
 
 ## 저장소 구조
