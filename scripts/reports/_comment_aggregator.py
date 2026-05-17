@@ -39,13 +39,23 @@ TOP_K_ASPECTS_PER_SENTIMENT = 8
 def compute_weighted_ratio(sentiment_rows: List[Dict[str, Any]]) -> Dict[str, float]:
     """analysis_weight 가중 비율 → {positive_pct, neutral_pct, negative_pct}.
 
-    sentiment_rows: [{"sentiment_label": "positive"|..., "analysis_weight": float|None}, ...]
+    sentiment_rows: [{"sentiment_label": str|None, "analysis_weight": float|None}, ...]
     NULL weight 는 1.0 으로 간주 (comment_report.py 의 기존 fallback 과 동일).
+
+    DB 의 comment_sentiments.sentiment_label 은 'POSITIVE' / 'NEGATIVE' / 'NEUTRAL'
+    대문자로 저장돼 있다. 과거에는 totals 딕셔너리 키가 소문자뿐이라 'if label
+    not in totals: continue' 에서 대문자 라벨이 전량 폐기되고, 우연히 소문자로
+    들어온 행 (또는 거의 없으면 NEUTRAL 만 살아남는 식) 으로 비율이 왜곡됐다.
+    이제 라벨을 .lower() 로 정규화한 뒤 매칭한다. None / 빈 값 / 알 수 없는
+    라벨은 안전하게 skip.
     """
     totals = {"positive": 0.0, "neutral": 0.0, "negative": 0.0}
     total_w = 0.0
     for r in sentiment_rows:
-        label = r.get("sentiment_label")
+        raw_label = r.get("sentiment_label")
+        if not raw_label:
+            continue
+        label = str(raw_label).strip().lower()
         if label not in totals:
             continue
         w = r.get("analysis_weight")
@@ -94,7 +104,7 @@ def aggregate_comment_report_inputs(
     """
     sentiment_rows = query_all(
         """
-        SELECT cs.sentiment_label, cs.analysis_weight
+        SELECT LOWER(cs.sentiment_label) AS sentiment_label, cs.analysis_weight
         FROM comments c
         INNER JOIN agent_decisions   ad ON c.comment_id = ad.comment_id
         INNER JOIN comment_sentiments cs ON c.comment_id = cs.comment_id

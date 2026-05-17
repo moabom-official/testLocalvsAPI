@@ -53,10 +53,14 @@ def aggregate_pir_consumer_inputs(video_ids: List[str]) -> Optional[Dict[str, An
     placeholders = ",".join(["%s"] * len(video_ids))
     params = tuple(video_ids)
 
-    # 1) 분석 대상 댓글의 sentiment 행 — 가중 비율과 total 계산용
+    # 1) 분석 대상 댓글의 sentiment 행 — 가중 비율과 total 계산용.
+    # DB 의 sentiment_label 은 'POSITIVE' / 'NEGATIVE' / 'NEUTRAL' 대문자다.
+    # compute_weighted_ratio 가 정규화를 처리하지만, SELECT 단에서도 LOWER 로
+    # 미리 정규화해 두 곳 모두 안전하게 한다 (대소문자 혼재 라벨이 들어와도
+    # 결과 동일).
     sentiment_rows = query_all(
         f"""
-        SELECT cs.sentiment_label, cs.analysis_weight
+        SELECT LOWER(cs.sentiment_label) AS sentiment_label, cs.analysis_weight
         FROM comments c
         INNER JOIN agent_decisions    ad ON c.comment_id = ad.comment_id
         INNER JOIN comment_sentiments cs ON c.comment_id = cs.comment_id
