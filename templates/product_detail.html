@@ -359,6 +359,40 @@
             font-size: 20px; color: var(--muted);
         }
 
+        /* Section ② — 3-card summary */
+        .pir-s2-row {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+            margin: 4px 0 14px;
+        }
+        .pir-s2-card {
+            background: var(--surface-soft);
+            border: 1px solid var(--border-soft);
+            border-left: 3px solid var(--primary);
+            border-radius: 10px;
+            padding: 10px 14px;
+            min-width: 0;
+        }
+        .pir-s2-title {
+            display: flex; align-items: center; gap: 6px;
+            font-size: 13px; font-weight: 700; color: var(--text);
+            margin-bottom: 6px;
+        }
+        .pir-s2-dot {
+            width: 9px; height: 9px; border-radius: 2px;
+            background: var(--primary); flex-shrink: 0;
+        }
+        .pir-s2-body {
+            font-size: 12px; line-height: 1.55; color: var(--muted);
+        }
+        .pir-s2-pos  { border-left-color: #20c997; }
+        .pir-s2-pos  .pir-s2-dot { background: #20c997; }
+        .pir-s2-warn { border-left-color: #f5a623; }
+        .pir-s2-warn .pir-s2-dot { background: #f5a623; }
+        .pir-s2-neg  { border-left-color: #e35d6a; }
+        .pir-s2-neg  .pir-s2-dot { background: #e35d6a; }
+
         /* Section ③ — radar chart */
         .pir-s3-wrap { display: flex; gap: 16px; align-items: flex-start; }
         .pir-radar-box {
@@ -397,6 +431,7 @@
             .pir-radar-box { width: 100%; max-width: 280px; margin: 0 auto; }
             .pir-s1-wrap { flex-direction: column; }
             .pir-gauge-box { width: 100%; }
+            .pir-s2-row { grid-template-columns: 1fr; }
         }
 
         /* ── Integrated insight progress overlay ─────────── */
@@ -1164,6 +1199,7 @@
 
         function enhanceIntegratedReport(bodyEl) {
             _pirEnhanceSection1Gauge(bodyEl);
+            try { _pirEnhanceSection2Cards(bodyEl); } catch (e) { console.warn('[PIR] s2 cards failed:', e); }
             _pirEnhanceSection3Radar(bodyEl);
             _pirEnhanceSection4Icons(bodyEl);
             _pirEnhanceSection7Highlights(bodyEl);
@@ -1274,6 +1310,54 @@
                 }]
             });
             _pirCharts.push(chart);
+        }
+
+        // ── Section ②: 3-card summary (parse "[title] body" bullets) ────
+        function _pirEnhanceSection2Cards(bodyEl) {
+            const heading = _pirFindHeading(bodyEl, '핵심 요약');
+            if (!heading) return;
+
+            const siblings = _pirSectionSiblings(heading);
+            const cards = [];
+            // Pattern: "[title] body" — title in brackets, then body. Brackets may be []
+            // or full-width []. Body may be empty (skip).
+            const re = /^\s*[\[［]\s*([^\]］]{1,30})\s*[\]］]\s*(.+?)\s*$/;
+            for (const el of siblings) {
+                for (const li of el.querySelectorAll('li')) {
+                    const text = li.textContent.replace(/\s+/g, ' ').trim();
+                    const m = text.match(re);
+                    if (!m) continue;
+                    const title = m[1].trim();
+                    const body = m[2].trim();
+                    if (!title || !body) continue;
+                    cards.push({ title, body });
+                    if (cards.length >= 3) break;
+                }
+                if (cards.length >= 3) break;
+            }
+            if (cards.length === 0) return; // parse failed → leave original markdown
+
+            // Pick accent color per card index (stable, no data dependency)
+            const ACCENTS = ['pos', 'pos', 'warn'];
+
+            const row = document.createElement('div');
+            row.className = 'pir-s2-row';
+            cards.forEach((c, idx) => {
+                const card = document.createElement('div');
+                card.className = 'pir-s2-card pir-s2-' + (ACCENTS[idx] || 'pos');
+                card.innerHTML =
+                    '<div class="pir-s2-title">' +
+                        '<span class="pir-s2-dot"></span>' +
+                        escapeHtml(c.title) +
+                    '</div>' +
+                    '<div class="pir-s2-body">' + escapeHtml(c.body) + '</div>';
+                row.appendChild(card);
+            });
+
+            // Replace the original list elements with the card row
+            const first = siblings[0];
+            first.parentNode.insertBefore(row, first);
+            siblings.forEach(el => el.remove());
         }
 
         // ── Section ③: radar chart alongside 6차원 table ───────────────
