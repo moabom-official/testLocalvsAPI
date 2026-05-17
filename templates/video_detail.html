@@ -433,6 +433,95 @@
         }
         .tr-heatmap-tooltip .t-empty { color: #b8b3cc; font-style: italic; }
 
+        /* ── #2.5 Pros/Cons strength-ranked card grid ── */
+        .tr-pc-wrap {
+            margin: 8px 0 16px;
+        }
+        .tr-pc-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .tr-pc-col {
+            display: flex; flex-direction: column; gap: 8px;
+            min-width: 0;
+        }
+        .tr-pc-col-header {
+            display: flex; align-items: center; justify-content: space-between;
+            font-size: 12px; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.04em;
+            padding: 0 2px 4px;
+        }
+        .tr-pc-col-header-pos { color: #0d6e4f; }
+        .tr-pc-col-header-neg { color: #b3303c; }
+        .tr-pc-col-count {
+            font-size: 11px; font-weight: 700; color: var(--muted);
+            background: var(--surface-soft, #faf7ff);
+            padding: 2px 8px; border-radius: 999px;
+        }
+        .tr-pc-card {
+            display: flex; align-items: flex-start; gap: 10px;
+            background: var(--surface);
+            border: 1px solid var(--border-soft);
+            border-radius: 10px;
+            padding: 10px 12px;
+            min-width: 0;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        .tr-pc-card:hover {
+            box-shadow: var(--shadow);
+        }
+        .tr-pc-card-strong-pos { border-left: 3px solid #19a87c; }
+        .tr-pc-card-pos        { border-left: 3px solid #c5f0de; }
+        .tr-pc-card-strong-neg { border-left: 3px solid #b3303c; }
+        .tr-pc-card-neg        { border-left: 3px solid #f7c2c8; }
+        .tr-pc-badge {
+            display: inline-flex; align-items: center;
+            font-size: 10px; font-weight: 700;
+            padding: 3px 8px; border-radius: 999px;
+            white-space: nowrap; flex-shrink: 0;
+            letter-spacing: 0.02em;
+        }
+        .tr-pc-badge-strong-pos {
+            background: #19a87c; color: #fff;
+        }
+        .tr-pc-badge-pos {
+            background: var(--positive-soft); color: #0d6e4f;
+            border: 1px solid #c5f0de;
+        }
+        .tr-pc-badge-strong-neg {
+            background: #b3303c; color: #fff;
+        }
+        .tr-pc-badge-neg {
+            background: var(--negative-soft); color: #b3303c;
+            border: 1px solid #f7c2c8;
+        }
+        .tr-pc-icon {
+            font-size: 16px; line-height: 1.2; flex-shrink: 0;
+        }
+        .tr-pc-text {
+            flex: 1; min-width: 0;
+            display: flex; flex-direction: column; gap: 3px;
+        }
+        .tr-pc-main {
+            font-size: 13px; line-height: 1.4;
+            color: var(--text); font-weight: 600;
+            word-break: keep-all;
+        }
+        .tr-pc-sub {
+            font-size: 11px; line-height: 1.45;
+            color: var(--muted); font-weight: 400;
+            word-break: keep-all;
+        }
+        .tr-pc-empty {
+            font-size: 12px; color: var(--muted);
+            font-style: italic; padding: 8px 4px;
+            text-align: center;
+        }
+        @media (max-width: 660px) {
+            .tr-pc-grid { grid-template-columns: 1fr; }
+        }
+
         /* ── #4 Before/After change cards ─────────── */
         .tr-changes {
             margin: 6px 0 14px;
@@ -1672,6 +1761,137 @@
         }
 
         /* ─── #4 Before/after change cards ─── */
+        /* ─── #2.5 Pros/Cons strength-ranked card grid ─── */
+        // Replaces the original ◎○△✕ text list under 장점 / 단점 headings with a
+        // 2-column card grid sorted by strength (◎/✕ first). The balance bar and
+        // category heatmap inserted by _trBuildBalanceAndHeatmap remain above
+        // untouched. All data comes from the existing _tr* utilities — no util
+        // is modified.
+        function _trBuildProsConsCards(bodyEl) {
+            const heading = _trFindHeading(bodyEl, '장점') ||
+                            _trFindHeading(bodyEl, '단점');
+            if (!heading) return;
+
+            const lis = _trCollectAllLis(bodyEl);
+            if (lis.length === 0) return;
+
+            // Sort within each side by symbol strength
+            const order = { strongPos: 0, pos: 1, strongNeg: 0, neg: 1 };
+            const posItems = lis
+                .filter(x => x.sentiment === 'strongPos' || x.sentiment === 'pos')
+                .sort((a, b) => order[a.sentiment] - order[b.sentiment]);
+            const negItems = lis
+                .filter(x => x.sentiment === 'strongNeg' || x.sentiment === 'neg')
+                .sort((a, b) => order[a.sentiment] - order[b.sentiment]);
+
+            if (posItems.length === 0 && negItems.length === 0) return;
+
+            // Peel off "(부가 설명)" trailing parenthetical as secondary text.
+            // Leading ◎○△✕ / dash markers are stripped first.
+            function splitText(text) {
+                let t = (text || '').replace(/^[◎○△✕✗×]\s*/, '').replace(/^[\-\*]\s*/, '').trim();
+                const m = t.match(/^(.+?)\s*[\(（]([^)）]{2,})[\)）]\s*$/);
+                if (m) return { main: m[1].trim(), sub: m[2].trim() };
+                return { main: t, sub: '' };
+            }
+
+            function badgeFor(sentiment) {
+                if (sentiment === 'strongPos') return { label: '핵심',     variant: 'strong-pos' };
+                if (sentiment === 'pos')        return { label: '장점',     variant: 'pos' };
+                if (sentiment === 'strongNeg') return { label: '주요 단점', variant: 'strong-neg' };
+                if (sentiment === 'neg')        return { label: '아쉬움',   variant: 'neg' };
+                return { label: '', variant: '' };
+            }
+
+            function buildCard(item) {
+                const { main, sub } = splitText(item.text);
+                const b = badgeFor(item.sentiment);
+                const cats = _trClassifyByCategory(item.text);
+                const icon = (cats[0] && cats[0].icon) || '';
+                const card = document.createElement('div');
+                card.className = 'tr-pc-card tr-pc-card-' + b.variant;
+                card.innerHTML =
+                    '<span class="tr-pc-badge tr-pc-badge-' + b.variant + '">' +
+                        _trEscape(b.label) +
+                    '</span>' +
+                    (icon ? '<span class="tr-pc-icon" aria-hidden="true">' + icon + '</span>' : '') +
+                    '<div class="tr-pc-text">' +
+                        '<div class="tr-pc-main">' + _trEscape(main) + '</div>' +
+                        (sub ? '<div class="tr-pc-sub">' + _trEscape(sub) + '</div>' : '') +
+                    '</div>';
+                return card;
+            }
+
+            function buildColumn(kind, items, title) {
+                const col = document.createElement('div');
+                col.className = 'tr-pc-col tr-pc-col-' + kind;
+                const header = document.createElement('div');
+                header.className = 'tr-pc-col-header tr-pc-col-header-' + kind;
+                header.innerHTML =
+                    '<span class="tr-pc-col-title">' + _trEscape(title) + '</span>' +
+                    '<span class="tr-pc-col-count">' + items.length + '</span>';
+                col.appendChild(header);
+                if (items.length === 0) {
+                    const empty = document.createElement('div');
+                    empty.className = 'tr-pc-empty';
+                    empty.textContent = '항목 없음';
+                    col.appendChild(empty);
+                } else {
+                    items.forEach(it => col.appendChild(buildCard(it)));
+                }
+                return col;
+            }
+
+            const wrap = document.createElement('div');
+            wrap.className = 'tr-pc-wrap';
+            const grid = document.createElement('div');
+            grid.className = 'tr-pc-grid';
+            grid.appendChild(buildColumn('pos', posItems, '장점'));
+            grid.appendChild(buildColumn('neg', negItems, '단점'));
+            wrap.appendChild(grid);
+
+            // Insert after the heatmap (which sits after the balance bar). If those
+            // are missing for any reason, fall back to inserting right after the heading.
+            const heatmap = bodyEl.querySelector('.tr-heatmap');
+            const balance = bodyEl.querySelector('.tr-balance');
+            const anchor = heatmap || balance || heading;
+            anchor.parentNode.insertBefore(wrap, anchor.nextSibling);
+
+            // Hide the original ◎○△✕ items only after the cards are in the DOM.
+            // Path 1 (real <li>): hide each li; hide parent <ul> if every li hidden.
+            // Path 2 (<p> with embedded ◎○△✕ lines): hide the whole <p> only when
+            // every non-empty line in it is a symbol-prefixed item (otherwise the
+            // <p> may carry other prose we should keep).
+            const touchedUls = new Set();
+            const touchedPs = new Map(); // p -> total lines
+            lis.forEach(({ el }) => {
+                if (!el) return;
+                if (el.tagName === 'LI') {
+                    el.classList.add('tr-hidden');
+                    if (el.parentElement) touchedUls.add(el.parentElement);
+                } else if (el.tagName === 'P') {
+                    touchedPs.set(el, (touchedPs.get(el) || 0) + 1);
+                }
+            });
+            touchedUls.forEach(ul => {
+                const remaining = Array.from(ul.querySelectorAll(':scope > li'))
+                    .filter(li => !li.classList.contains('tr-hidden'));
+                if (remaining.length === 0) ul.classList.add('tr-hidden');
+            });
+            touchedPs.forEach((_, p) => {
+                const html = p.innerHTML || '';
+                const lines = html.split(/<br\s*\/?>/i);
+                const allSymbolic = lines.every(line => {
+                    const tmp = document.createElement('div');
+                    tmp.innerHTML = line;
+                    const text = (tmp.textContent || '').replace(/^[\-\*]\s*/, '').trim();
+                    if (!text) return true; // blank line OK
+                    return _trClassifyLi(text) !== null;
+                });
+                if (allSymbolic) p.classList.add('tr-hidden');
+            });
+        }
+
         function _trBuildChangeCards(bodyEl) {
             const heading = _trFindHeading(bodyEl, '전작 대비') ||
                             _trFindHeading(bodyEl, '달라진');
@@ -1862,6 +2082,9 @@
             try {
                 _trBuildBalanceAndHeatmap(bodyEl);
             } catch (e) { console.warn('[transcript-viz] balance/heatmap failed', e); }
+            try {
+                _trBuildProsConsCards(bodyEl);
+            } catch (e) { console.warn('[transcript-viz] pros/cons cards failed', e); }
             try {
                 _trBuildChangeCards(bodyEl);
             } catch (e) { console.warn('[transcript-viz] changes failed', e); }
