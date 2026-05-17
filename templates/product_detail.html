@@ -376,10 +376,31 @@
         .pir-s1-card-extra .pir-s1-card-body {
             color: var(--muted); font-style: italic;
         }
+        /* Section ① — score card big-number value (used by .pir-s1-card-score) */
+        .pir-s1-score-value {
+            display: flex; align-items: baseline; gap: 4px;
+            margin: 4px 0 2px;
+        }
+        .pir-s1-score-num {
+            font-size: 32px; font-weight: 800;
+            letter-spacing: -0.02em; line-height: 1;
+            font-variant-numeric: tabular-nums;
+        }
+        .pir-s1-score-denom {
+            font-size: 14px; color: var(--muted); font-weight: 600;
+        }
+        /* Generic subtitle for the three section-① cards (score / consensus
+           use their own desc class; score uses this one for the bottom line). */
+        .pir-s1-card-sub {
+            font-size: 12px; line-height: 1.5;
+            color: var(--muted);
+            word-break: keep-all;
+        }
         /* Section ① — reviewer consensus 3-step meter */
         .pir-s1-consensus-meter {
             display: flex; align-items: center; gap: 6px;
             margin-top: 6px; min-width: 0;
+            max-width: 360px;
         }
         .pir-s1-consensus-step {
             flex: 1; min-width: 0;
@@ -1516,11 +1537,13 @@
 
         // ── Section ①: score gauge + consensus badge ────────────────────
         // Parse Section ① siblings into a small set of labelled cards.
-        // `consensus` is the already-extracted '높음'|'중간'|'낮음'|null from
-        // the caller's regex — used to drive the 3-step meter inside the
-        // reviewer-consensus card. Returns an array of DOM elements — empty
-        // if nothing parseable was found, in which case the caller falls back.
-        function _pirS1ParseToCards(siblings, consensus) {
+        // `consensus` is the already-extracted '높음'|'중간'|'낮음'|null and
+        // `score` is the already-parsed numeric (0~10) from the caller — both
+        // are passed through so the consensus card can drive its 3-step meter
+        // and the score card can color its big number to match the donut.
+        // Returns an array of DOM elements — empty if nothing parseable was
+        // found, in which case the caller falls back to plain siblings.
+        function _pirS1ParseToCards(siblings, consensus, score) {
             const SCORE_RE = /종합\s*평가/;
             const CONSENSUS_RE = /(?:리뷰어\s*)?합의도/;
 
@@ -1562,7 +1585,7 @@
                 cards.push(_pirS1MakeCard('verdict', '✎ 한줄 구매 판정', verdictText));
             }
             if (scoreLine) {
-                cards.push(_pirS1MakeCard('score', '☆ 종합 평가', scoreLine));
+                cards.push(_pirS1MakeScoreCard(scoreLine, score));
             }
             if (consensusLine) {
                 cards.push(_pirS1MakeConsensusCard(consensus, consensusLine));
@@ -1584,6 +1607,53 @@
             body.textContent = bodyText;
             card.appendChild(label);
             card.appendChild(body);
+            return card;
+        }
+
+        // Score card: render the "종합 평가: N / 10 (분석 영상 M개 ...) — ..."
+        // text as a big number + small "/ 10" + one-line subtitle. The label
+        // already appears at the top, so the redundant "종합 평가:" prefix in
+        // the body text is dropped. Big-number color follows the same
+        // threshold as the donut (8↑ green / 6↑ amber / else red).
+        function _pirS1MakeScoreCard(scoreLine, score) {
+            const videoMatch  = scoreLine.match(/분석\s*영상\s*(\d+)\s*개/);
+            const tailMatch   = scoreLine.match(/[—–\-]\s*([^—–\-]+)\s*$/);
+            const color = score >= 8 ? '#20c997' : score >= 6 ? '#f5a623' : '#e35d6a';
+            const tail  = tailMatch ? tailMatch[1].trim() : '';
+
+            const card = document.createElement('div');
+            card.className = 'pir-s1-card pir-s1-card-score';
+
+            const label = document.createElement('div');
+            label.className = 'pir-s1-card-label';
+            label.textContent = '☆ 종합 평가';
+            card.appendChild(label);
+
+            const value = document.createElement('div');
+            value.className = 'pir-s1-score-value';
+            const numEl = document.createElement('span');
+            numEl.className = 'pir-s1-score-num';
+            numEl.style.color = color;
+            numEl.textContent = score.toFixed(1);
+            const denomEl = document.createElement('span');
+            denomEl.className = 'pir-s1-score-denom';
+            denomEl.textContent = '/ 10';
+            value.appendChild(numEl);
+            value.appendChild(denomEl);
+            card.appendChild(value);
+
+            // Subtitle: 표준 문구 + LLM 의 부가 설명(있다면)
+            const subParts = [];
+            if (videoMatch) subParts.push('분석 영상 ' + videoMatch[1] + '개를 종합한 평균 점수');
+            else            subParts.push('분석 영상 종합 점수');
+            // 부가 설명이 단순 "평균 점수" 반복이 아닐 때만 함께 노출
+            if (tail && !/평균\s*점수$/.test(tail) && tail !== subParts[0]) subParts.push(tail);
+
+            const sub = document.createElement('div');
+            sub.className = 'pir-s1-card-sub';
+            sub.textContent = subParts.join(' — ');
+            card.appendChild(sub);
+
             return card;
         }
 
@@ -1686,7 +1756,7 @@
             // contentDiv as-is — so the raw markdown remains visible.
             let cardStackBuilt = false;
             try {
-                const cards = _pirS1ParseToCards(siblings, consensus);
+                const cards = _pirS1ParseToCards(siblings, consensus, score);
                 if (cards.length > 0) {
                     cards.forEach(c => contentDiv.appendChild(c));
                     // Hide the source siblings so the new cards aren't duplicated.
