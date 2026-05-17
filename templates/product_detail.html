@@ -347,16 +347,34 @@
         .pir-consensus-high { background: rgba(32,201,151,0.15); color: #19a87c; }
         .pir-consensus-mid  { background: rgba(245,166,35,0.15);  color: #b07008; }
         .pir-consensus-low  { background: rgba(227,93,106,0.15);  color: #b44454; }
-        .pir-s1-content { flex: 1; min-width: 200px; }
-        /* product image placeholder (for future pipeline) */
-        .pir-product-images {
-            display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px;
+        .pir-s1-content { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 10px; }
+
+        /* Section ① content cards (verdict / score / consensus / extra) */
+        .pir-s1-card {
+            background: var(--surface);
+            border: 1px solid var(--border-soft);
+            border-radius: 10px;
+            padding: 10px 14px;
+            display: flex; flex-direction: column; gap: 4px;
+            min-width: 0;
         }
-        .pir-product-img-placeholder {
-            width: 72px; height: 72px; border-radius: 8px;
-            background: var(--primary-soft); border: 1px dashed var(--border);
-            display: grid; place-items: center;
-            font-size: 20px; color: var(--muted);
+        .pir-s1-card-label {
+            font-size: 11px; color: var(--muted); font-weight: 600;
+            letter-spacing: 0.02em;
+        }
+        .pir-s1-card-body {
+            font-size: 13px; line-height: 1.55; color: var(--text);
+            font-weight: 500; word-break: keep-all;
+        }
+        /* Verdict gets the strongest emphasis — accent border + larger body */
+        .pir-s1-card-verdict {
+            border-left: 3px solid var(--primary);
+        }
+        .pir-s1-card-verdict .pir-s1-card-body {
+            font-size: 14px; font-weight: 600;
+        }
+        .pir-s1-card-extra .pir-s1-card-body {
+            color: var(--muted); font-style: italic;
         }
 
         /* Section ② — 3-card summary */
@@ -1465,6 +1483,76 @@
         }
 
         // ── Section ①: score gauge + consensus badge ────────────────────
+        // Parse Section ① siblings into a small set of labelled cards.
+        // Returns an array of DOM elements (.pir-s1-card …) — empty if nothing
+        // parseable was found, in which case the caller falls back to plain.
+        function _pirS1ParseToCards(siblings) {
+            const SCORE_RE = /종합\s*평가/;
+            const CONSENSUS_RE = /(?:리뷰어\s*)?합의도/;
+
+            // Flatten siblings to candidate "lines": one per <li> inside <ul>/<ol>,
+            // or the element's own textContent otherwise. blockquote is flagged
+            // so we can prioritize it as the verdict.
+            const lines = [];
+            siblings.forEach(el => {
+                if (!el || el.nodeType !== 1) return;
+                if (el.tagName === 'UL' || el.tagName === 'OL') {
+                    el.querySelectorAll('li').forEach(li => {
+                        const text = (li.textContent || '').replace(/\s+/g, ' ').trim();
+                        if (text) lines.push({ text, isBlockquote: false });
+                    });
+                } else if (el.tagName === 'BLOCKQUOTE') {
+                    const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
+                    if (text) lines.push({ text, isBlockquote: true });
+                } else {
+                    const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
+                    if (text) lines.push({ text, isBlockquote: false });
+                }
+            });
+
+            let verdictText = '';
+            let scoreLine = '';
+            let consensusLine = '';
+            const residual = [];
+
+            for (const item of lines) {
+                const t = item.text;
+                if (!scoreLine && SCORE_RE.test(t)) { scoreLine = t; continue; }
+                if (!consensusLine && CONSENSUS_RE.test(t)) { consensusLine = t; continue; }
+                if (!verdictText && (item.isBlockquote || true)) { verdictText = t; continue; }
+                residual.push(t);
+            }
+
+            const cards = [];
+            if (verdictText) {
+                cards.push(_pirS1MakeCard('verdict', '✎ 한줄 구매 판정', verdictText));
+            }
+            if (scoreLine) {
+                cards.push(_pirS1MakeCard('score', '☆ 종합 평가', scoreLine));
+            }
+            if (consensusLine) {
+                cards.push(_pirS1MakeCard('consensus', '👥 리뷰어 합의도', consensusLine));
+            }
+            if (residual.length > 0) {
+                cards.push(_pirS1MakeCard('extra', '추가 메모', residual.join(' · ')));
+            }
+            return cards;
+        }
+
+        function _pirS1MakeCard(kind, labelText, bodyText) {
+            const card = document.createElement('div');
+            card.className = 'pir-s1-card pir-s1-card-' + kind;
+            const label = document.createElement('div');
+            label.className = 'pir-s1-card-label';
+            label.textContent = labelText;
+            const body = document.createElement('div');
+            body.className = 'pir-s1-card-body';
+            body.textContent = bodyText;
+            card.appendChild(label);
+            card.appendChild(body);
+            return card;
+        }
+
         function _pirEnhanceSection1Gauge(bodyEl) {
             const heading = _pirFindHeading(bodyEl, '한줄 구매 판정');
             if (!heading) return;
@@ -1501,18 +1589,37 @@
                 gaugeBox.appendChild(badge);
             }
 
-            // Product image placeholder (future pipeline hook)
-            const imgPlaceholder = document.createElement('div');
-            imgPlaceholder.className = 'pir-product-images';
-            imgPlaceholder.innerHTML = '<div class="pir-product-img-placeholder" title="제품 이미지 (준비 중)">🖼</div>';
-            gaugeBox.appendChild(imgPlaceholder);
+            // (product image placeholder removed — pipeline never landed and the
+            //  dashed-box icon added visual noise without conveying data.)
 
             // Wrap heading's siblings in flex layout
             const wrapper = document.createElement('div');
             wrapper.className = 'pir-s1-wrap';
             const contentDiv = document.createElement('div');
             contentDiv.className = 'pir-s1-content';
-            siblings.forEach(el => contentDiv.appendChild(el));
+
+            // ── Right column: vertical card stack with try/catch fallback ──
+            // We parse the same siblings into semantic units (verdict / score /
+            // consensus / residual) and render labelled cards. On any parse
+            // error, fall back to the original behavior — moving siblings into
+            // contentDiv as-is — so the raw markdown remains visible.
+            let cardStackBuilt = false;
+            try {
+                const cards = _pirS1ParseToCards(siblings);
+                if (cards.length > 0) {
+                    cards.forEach(c => contentDiv.appendChild(c));
+                    // Hide the source siblings so the new cards aren't duplicated.
+                    // Inline style only — no global hide utility exists in this file.
+                    siblings.forEach(el => { el.style.display = 'none'; });
+                    cardStackBuilt = true;
+                }
+            } catch (e) {
+                console.warn('[PIR] s1 card stack build failed, falling back to plain siblings:', e);
+            }
+            if (!cardStackBuilt) {
+                siblings.forEach(el => contentDiv.appendChild(el));
+            }
+
             wrapper.appendChild(gaugeBox);
             wrapper.appendChild(contentDiv);
             heading.after(wrapper);
