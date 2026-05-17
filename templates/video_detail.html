@@ -697,6 +697,127 @@
             .tr-vv-grid { grid-template-columns: 1fr; }
         }
 
+        /* ── Comments screen: donut + key-comment cards + collapsible list ── */
+        .cmd-section-sub {
+            font-size: 13px; font-weight: 500; color: var(--muted);
+            margin-left: 6px;
+        }
+        .cmd-loading {
+            font-size: 13px; color: var(--muted); padding: 12px 4px;
+        }
+        .cmd-dist-grid {
+            display: grid;
+            grid-template-columns: minmax(180px, 220px) 1fr;
+            gap: 22px;
+            align-items: start;
+            margin-top: 12px;
+            padding: 14px 16px;
+            background: var(--surface);
+            border: 1px solid var(--border-soft);
+            border-radius: 12px;
+        }
+        .cmd-donut-wrap {
+            display: flex; flex-direction: column; align-items: center; gap: 10px;
+        }
+        .cmd-donut-wrap svg {
+            display: block; max-width: 180px; height: auto;
+        }
+        .cmd-donut-legend {
+            display: flex; flex-wrap: wrap; gap: 4px;
+            align-items: center; justify-content: center;
+            width: 100%;
+        }
+        .cmd-legend-item {
+            display: inline-flex; align-items: center; gap: 5px;
+            background: transparent; border: none; padding: 4px 8px;
+            border-radius: 6px; cursor: pointer;
+            font-family: inherit; font-size: 12px; font-weight: 600;
+            color: var(--text);
+            transition: background 0.15s;
+        }
+        .cmd-legend-item:hover {
+            background: var(--primary-soft);
+        }
+        .cmd-legend-dot {
+            width: 10px; height: 10px; border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .cmd-legend-count {
+            color: var(--muted); font-weight: 500;
+            font-variant-numeric: tabular-nums;
+        }
+        .cmd-key-comments {
+            display: flex; flex-direction: column; gap: 10px;
+            min-width: 0;
+        }
+        .cmd-key-title {
+            font-size: 12px; color: var(--muted); font-weight: 600;
+            letter-spacing: 0.02em;
+            margin-bottom: 2px;
+        }
+        .cmd-key-card {
+            background: var(--surface);
+            border: 1px solid var(--border-soft);
+            border-left: 3px solid var(--border);
+            border-radius: 10px;
+            padding: 12px 14px;
+            display: flex; flex-direction: column; gap: 5px;
+            min-width: 0;
+            transition: box-shadow 0.15s;
+        }
+        .cmd-key-card:hover { box-shadow: var(--shadow); }
+        .cmd-key-positive { border-left-color: #19a87c; }
+        .cmd-key-negative { border-left-color: #b3303c; }
+        .cmd-key-neutral  { border-left-color: #b8b3c4; }
+        .cmd-key-text {
+            font-size: 13px; line-height: 1.55; color: var(--text);
+            font-weight: 500; word-break: keep-all;
+        }
+        .cmd-key-meta {
+            font-size: 11px; font-weight: 600;
+        }
+        .cmd-key-positive .cmd-key-meta { color: #0d6e4f; }
+        .cmd-key-negative .cmd-key-meta { color: #b3303c; }
+        .cmd-key-neutral  .cmd-key-meta { color: var(--muted); }
+        .cmd-empty {
+            font-size: 13px; color: var(--muted); font-style: italic;
+            padding: 14px; text-align: center;
+            border: 1px dashed var(--border-soft); border-radius: 10px;
+        }
+
+        /* Full analyzed-comments list — collapsed by default, expands inline */
+        .cmd-full-toggle { margin-top: 4px; }
+        .cmd-full-toggle > summary {
+            list-style: none; cursor: pointer; user-select: none;
+            padding: 12px 16px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: space-between;
+            font-size: 13px; font-weight: 600; color: var(--text);
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .cmd-full-toggle > summary::-webkit-details-marker { display: none; }
+        .cmd-full-toggle > summary:hover {
+            background: var(--primary-soft); border-color: var(--primary-soft);
+        }
+        .cmd-full-toggle-text strong { color: var(--primary-strong); font-weight: 700; }
+        .cmd-full-toggle-filter {
+            margin-left: 6px; font-size: 11px;
+            color: var(--primary-strong); background: var(--primary-soft);
+            padding: 2px 8px; border-radius: 999px; font-weight: 600;
+        }
+        .cmd-full-toggle-icon {
+            color: var(--muted); transition: transform 0.2s;
+            font-size: 14px; line-height: 1;
+        }
+        .cmd-full-toggle[open] > summary .cmd-full-toggle-icon { transform: rotate(180deg); }
+        .cmd-full-body { padding-top: 14px; }
+
+        @media (max-width: 660px) {
+            .cmd-dist-grid { grid-template-columns: 1fr; gap: 16px; }
+        }
+
         /* ── #5 Audience matcher ─────────────────── */
         .tr-matcher {
             margin: 6px 0 16px;
@@ -1444,60 +1565,81 @@
             <div class="stat-box"><div class="label">제품 관련 댓글</div><div class="value">{{ product_related_count }}</div></div>
         </div>
 
-        <!-- Sentiment summary -->
+        <!-- Sentiment summary — donut + key-comment cards -->
         <section class="section">
-            <h2>댓글 감성 분포</h2>
-            <div class="sentiment-summary">
-                <div class="sentiment-box positive {% if current_sentiment == 'positive' %}active{% endif %}" onclick="filterBySentiment('positive')" id="box-positive">
-                    <div class="label">😊 긍정</div>
-                    <div class="value">{{ sentiment_positive }}</div>
+            <h2>댓글 감성 분포 <span class="cmd-section-sub">— 분석 댓글 {{ analyzed_comment_count }}건</span></h2>
+            {% if (sentiment_positive + sentiment_neutral + sentiment_negative) > 0 %}
+                <script type="application/json" id="cmdData">{
+                    "pos": {{ sentiment_positive }},
+                    "neu": {{ sentiment_neutral }},
+                    "neg": {{ sentiment_negative }},
+                    "total_analyzed": {{ analyzed_comment_count }},
+                    "current_sentiment": {{ (current_sentiment or '')|tojson }},
+                    "sample": [
+                        {% for c in comments %}{
+                            "text": {{ (c.text_raw or '')|tojson }},
+                            "label": {{ (c.sentiment_label or '')|tojson }},
+                            "score": {{ (c.sentiment_score|float) if c.sentiment_score is not none else 0 }}
+                        }{% if not loop.last %},{% endif %}{% endfor %}
+                    ]
+                }</script>
+                <div id="cmdDist" class="cmd-dist-grid">
+                    <div class="cmd-loading">렌더링 중…</div>
                 </div>
-                <div class="sentiment-box neutral {% if current_sentiment == 'neutral' %}active{% endif %}" onclick="filterBySentiment('neutral')" id="box-neutral">
-                    <div class="label">😐 중립</div>
-                    <div class="value">{{ sentiment_neutral }}</div>
-                </div>
-                <div class="sentiment-box negative {% if current_sentiment == 'negative' %}active{% endif %}" onclick="filterBySentiment('negative')" id="box-negative">
-                    <div class="label">😠 부정</div>
-                    <div class="value">{{ sentiment_negative }}</div>
-                </div>
-            </div>
+            {% else %}
+                <div class="empty-report">감성 분석된 댓글이 없습니다.</div>
+            {% endif %}
         </section>
 
-        <!-- Comments -->
+        <!-- Comments — full list collapsed inside <details> -->
         <section class="section">
-            <h2>최종 분석 댓글 <span class="count">{{ analyzed_comment_count }}건</span></h2>
             {% if comments %}
-                {% for comment in comments %}
-                    <div class="comment-item {% if comment.sentiment_label %}{{ comment.sentiment_label }}{% else %}neutral{% endif %}">
-                        <div class="comment-text">{{ comment.text_raw }}</div>
-                        <div class="comment-meta">
-                            {% if comment.sentiment_label %}
-                                감성: <strong class="{{ comment.sentiment_label }}">{{ comment.sentiment_label|upper }}</strong> ({{ comment.sentiment_score }})
-                            {% else %}
-                                감성: <strong>UNANALYZED</strong>
+                <details class="cmd-full-toggle" {% if current_sentiment %}open{% endif %}>
+                    <summary>
+                        <span class="cmd-full-toggle-text">
+                            전체 분석 댓글 <strong>{{ analyzed_comment_count }}건</strong>
+                            {% if current_sentiment %}
+                                <span class="cmd-full-toggle-filter">· 필터: {{ current_sentiment|upper }}</span>
                             {% endif %}
-                        </div>
-                    </div>
-                {% endfor %}
+                            펼치기
+                        </span>
+                        <span class="cmd-full-toggle-icon" aria-hidden="true">▾</span>
+                    </summary>
+                    <div class="cmd-full-body">
+                        {% for comment in comments %}
+                            <div class="comment-item {% if comment.sentiment_label %}{{ comment.sentiment_label }}{% else %}neutral{% endif %}">
+                                <div class="comment-text">{{ comment.text_raw }}</div>
+                                <div class="comment-meta">
+                                    {% if comment.sentiment_label %}
+                                        감성: <strong class="{{ comment.sentiment_label }}">{{ comment.sentiment_label|upper }}</strong> ({{ comment.sentiment_score }})
+                                    {% else %}
+                                        감성: <strong>UNANALYZED</strong>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        {% endfor %}
 
-                {% if total_pages > 1 %}
-                    <div class="pagination">
-                        {% if current_page > 1 %}
-                            <a href="?page={{ current_page - 1 }}{% if current_sentiment %}&sentiment={{ current_sentiment }}{% endif %}">‹ 이전</a>
-                        {% else %}
-                            <span class="disabled">‹ 이전</span>
+                        {% if total_pages > 1 %}
+                            <div class="pagination">
+                                {% if current_page > 1 %}
+                                    <a href="?page={{ current_page - 1 }}{% if current_sentiment %}&sentiment={{ current_sentiment }}{% endif %}">‹ 이전</a>
+                                {% else %}
+                                    <span class="disabled">‹ 이전</span>
+                                {% endif %}
+
+                                <span class="current">{{ current_page }} / {{ total_pages }}</span>
+
+                                {% if current_page < total_pages %}
+                                    <a href="?page={{ current_page + 1 }}{% if current_sentiment %}&sentiment={{ current_sentiment }}{% endif %}">다음 ›</a>
+                                {% else %}
+                                    <span class="disabled">다음 ›</span>
+                                {% endif %}
+                            </div>
                         {% endif %}
-
-                        <span class="current">{{ current_page }} / {{ total_pages }}</span>
-
-                        {% if current_page < total_pages %}
-                            <a href="?page={{ current_page + 1 }}{% if current_sentiment %}&sentiment={{ current_sentiment }}{% endif %}">다음 ›</a>
-                        {% else %}
-                            <span class="disabled">다음 ›</span>
-                        {% endif %}
                     </div>
-                {% endif %}
+                </details>
             {% else %}
+                <h2>최종 분석 댓글</h2>
                 <div class="empty-report">분석된 댓글이 없습니다.</div>
             {% endif %}
         </section>
@@ -1571,6 +1713,127 @@
             urlParams.set('page', '1');
             window.location.search = urlParams.toString();
         }
+
+        /* ── Comments-screen: SVG donut + key-comment cards ───────────
+           The original 3-box sentiment summary is replaced by a donut +
+           a short "핵심 댓글" card list. Data comes from #cmdData (server
+           rendered Jinja JSON), no extra deps, no Chart.js. The filter
+           function (filterBySentiment) is reused via legend buttons so
+           the existing ?sentiment= filter path remains intact. */
+        function _cmdEscape(s) {
+            const d = document.createElement('div');
+            d.textContent = String(s == null ? '' : s);
+            return d.innerHTML;
+        }
+        function _cmdReadData() {
+            const el = document.getElementById('cmdData');
+            if (!el) return null;
+            try { return JSON.parse(el.textContent); } catch (e) { return null; }
+        }
+        function _cmdBuildDonut(pos, neu, neg, total) {
+            const cx = 90, cy = 90, r = 60, sw = 26;
+            const C = 2 * Math.PI * r;
+            const segs = [
+                { kind: 'positive', count: pos, color: '#20c997', label: '긍정' },
+                { kind: 'neutral',  count: neu, color: '#b8b3c4', label: '중립' },
+                { kind: 'negative', count: neg, color: '#e35d6a', label: '부정' }
+            ];
+            let offset = 0;
+            const arcs = segs.map(s => {
+                if (s.count <= 0) return '';
+                const len = (s.count / total) * C;
+                const arc = '<circle cx="' + cx + '" cy="' + cy + '" r="' + r +
+                    '" fill="none" stroke="' + s.color + '" stroke-width="' + sw +
+                    '" stroke-dasharray="' + len.toFixed(3) + ' ' + C.toFixed(3) +
+                    '" stroke-dashoffset="' + (-offset).toFixed(3) +
+                    '" transform="rotate(-90 ' + cx + ' ' + cy + ')"></circle>';
+                offset += len;
+                return arc;
+            }).join('');
+            const svg = '<svg width="180" height="180" viewBox="0 0 180 180" role="img" aria-label="감성 분포 도넛">' +
+                arcs +
+                '<text x="90" y="92" text-anchor="middle" font-size="28" font-weight="800" fill="#1f1c2e">' + total + '</text>' +
+                '<text x="90" y="114" text-anchor="middle" font-size="12" fill="#6b6880">건</text>' +
+                '</svg>';
+            const legend = '<div class="cmd-donut-legend">' + segs.map(s =>
+                '<button type="button" class="cmd-legend-item" onclick="filterBySentiment(\'' + s.kind + '\')" title="' + s.label + ' 댓글만 필터">' +
+                    '<span class="cmd-legend-dot" style="background:' + s.color + '"></span>' +
+                    '<span class="cmd-legend-label">' + s.label + '</span>' +
+                    '<span class="cmd-legend-count">' + s.count + '</span>' +
+                '</button>'
+            ).join('') + '</div>';
+            return svg + legend;
+        }
+        function _cmdPickKeyComments(sample) {
+            // Backend SELECT does not include like_count, so we approximate
+            // "impact" with the absolute sentiment_score. Goal: a short list
+            // that mixes positive + negative voices.
+            const scored = (sample || [])
+                .filter(c => c && c.text && c.label)
+                .map(c => ({
+                    text: String(c.text),
+                    label: String(c.label).toLowerCase(),
+                    score: Number(c.score) || 0,
+                    abs: Math.abs(Number(c.score) || 0)
+                }))
+                .sort((a, b) => b.abs - a.abs);
+            const picked = [];
+            const seen = new Set();
+            function add(c) {
+                if (!c || seen.has(c.text)) return;
+                seen.add(c.text);
+                picked.push(c);
+            }
+            add(scored.find(c => c.label === 'positive'));
+            add(scored.find(c => c.label === 'negative'));
+            for (const c of scored) {
+                if (picked.length >= 3) break;
+                add(c);
+            }
+            return picked.slice(0, 3);
+        }
+        function _cmdBuildKeyCards(sample) {
+            const picked = _cmdPickKeyComments(sample);
+            const labelKr = { positive: '긍정', negative: '부정', neutral: '중립' };
+            const TRUNC = 60;
+            function trunc(s) { return s.length > TRUNC ? s.slice(0, TRUNC) + '…' : s; }
+            const head = '<div class="cmd-key-title">핵심 댓글</div>';
+            if (picked.length === 0) {
+                return head + '<div class="cmd-empty">현재 페이지에 표시할 핵심 댓글이 없습니다.</div>';
+            }
+            const cards = picked.map(c => {
+                const score = c.score.toFixed(2);
+                const tag = labelKr[c.label] || '중립';
+                return '<div class="cmd-key-card cmd-key-' + c.label + '">' +
+                        '<div class="cmd-key-text">' + _cmdEscape(trunc(c.text)) + '</div>' +
+                        '<div class="cmd-key-meta">' + tag + ' ' + score + ' · 강도순</div>' +
+                    '</div>';
+            }).join('');
+            return head + cards;
+        }
+        function cmdRender() {
+            const root = document.getElementById('cmdDist');
+            if (!root) return;
+            try {
+                const data = _cmdReadData();
+                if (!data) return;
+                const pos = Number(data.pos) || 0;
+                const neu = Number(data.neu) || 0;
+                const neg = Number(data.neg) || 0;
+                const total = pos + neu + neg;
+                if (total <= 0) {
+                    root.outerHTML = '<div class="empty-report">감성 분석된 댓글이 없습니다.</div>';
+                    return;
+                }
+                root.innerHTML =
+                    '<div class="cmd-donut-wrap">' + _cmdBuildDonut(pos, neu, neg, total) + '</div>' +
+                    '<div class="cmd-key-comments">' + _cmdBuildKeyCards(data.sample || []) + '</div>';
+            } catch (e) {
+                console.warn('[cmd] sentiment donut render failed', e);
+                // leave the .cmd-loading placeholder in place — non-fatal
+            }
+        }
+        document.addEventListener('DOMContentLoaded', cmdRender);
 
         /* ───────────────────────────────────────────────────────────
            Transcript report visual enhancement
