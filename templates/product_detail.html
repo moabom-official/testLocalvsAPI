@@ -459,6 +459,46 @@
             text-align: right; font-variant-numeric: tabular-nums;
         }
 
+        /* Section ④ — individual reviewer opinions (1-mention items) as card grid */
+        .pir-s4-individual-wrap {
+            margin: 4px 0 14px;
+        }
+        .pir-s4-individual-title {
+            font-size: 11px; font-weight: 600; color: var(--muted);
+            text-transform: uppercase; letter-spacing: 0.03em;
+            margin: 4px 2px 8px;
+        }
+        .pir-s4-individual-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 8px;
+        }
+        .pir-s4-individual-card {
+            background: var(--surface);
+            border: 1px solid var(--border-soft);
+            border-left: 3px solid var(--primary-soft);
+            border-radius: 8px;
+            padding: 8px 12px;
+            display: flex; flex-direction: column; gap: 4px;
+            min-width: 0;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        .pir-s4-individual-card:hover {
+            border-left-color: var(--primary);
+            box-shadow: var(--shadow);
+        }
+        .pir-s4-individual-text {
+            font-size: 12px; line-height: 1.4; color: var(--text);
+            font-weight: 500;
+        }
+        .pir-s4-individual-source {
+            font-size: 10px; color: var(--primary-strong);
+            font-weight: 600;
+            background: var(--primary-soft);
+            padding: 2px 8px; border-radius: 999px;
+            align-self: flex-start;
+        }
+
         /* Section ⑤ — consumer opinion (comment-based) */
         .pir-s5-wrap {
             display: flex; flex-direction: column; gap: 12px;
@@ -1739,6 +1779,86 @@
             const firstSibling = sectionEls[0];
             if (firstSibling) firstSibling.parentNode.insertBefore(container, firstSibling);
             else heading.after(container);
+
+            // ── Tidy section ④ body: the diverging bar already encodes ### 장점 /
+            // ### 단점 (label + frequency), so the original markdown list under those
+            // H3s is redundant. Remove them. ### 개별 리뷰어 의견 (1 명만 언급) is
+            // separate data — convert it into a compact card grid.
+            const individualItems = [];
+            let i = 0;
+            while (i < sectionEls.length) {
+                const el = sectionEls[i];
+                if (el.tagName === 'H3') {
+                    const t = el.textContent;
+                    if (t.includes('장점') || t.includes('단점')) {
+                        // Remove this H3 + every following non-H3 sibling (UL etc.) up
+                        // to the next H3 / end of section. Already covered by bars.
+                        el.remove();
+                        let j = i + 1;
+                        while (j < sectionEls.length && sectionEls[j].tagName !== 'H3') {
+                            sectionEls[j].remove();
+                            j += 1;
+                        }
+                        i = j;
+                        continue;
+                    }
+                    if (t.includes('개별') || t.includes('리뷰어')) {
+                        // Collect <li>s under this H3 then strip them out — we re-render
+                        // as a card grid.
+                        let j = i + 1;
+                        while (j < sectionEls.length && sectionEls[j].tagName !== 'H3') {
+                            for (const li of sectionEls[j].querySelectorAll('li')) {
+                                const raw = li.textContent.replace(/\s+/g, ' ').trim();
+                                if (!raw || raw === '데이터 부족') continue;
+                                // "본문 (영상 N)" 또는 "본문 (영상 N,M)" — source 절은 선택.
+                                const mm = raw.match(/^(.+?)\s*(?:[\(（]\s*(영상\s*[\d,\s]+)\s*[\)）])?\s*$/);
+                                if (!mm) continue;
+                                individualItems.push({
+                                    label: mm[1].trim(),
+                                    source: (mm[2] || '').trim(),
+                                });
+                            }
+                            j += 1;
+                        }
+                        // Remove the H3 and its following content (we'll re-insert as cards).
+                        el.remove();
+                        let k = i + 1;
+                        while (k < sectionEls.length && sectionEls[k].tagName !== 'H3') {
+                            sectionEls[k].remove();
+                            k += 1;
+                        }
+                        i = k;
+                        continue;
+                    }
+                }
+                i += 1;
+            }
+
+            if (individualItems.length > 0) {
+                const wrap = document.createElement('div');
+                wrap.className = 'pir-s4-individual-wrap';
+
+                const title = document.createElement('div');
+                title.className = 'pir-s4-individual-title';
+                title.textContent = '개별 리뷰어 의견 — 1명만 언급한 항목';
+                wrap.appendChild(title);
+
+                const grid = document.createElement('div');
+                grid.className = 'pir-s4-individual-grid';
+                for (const it of individualItems) {
+                    const card = document.createElement('div');
+                    card.className = 'pir-s4-individual-card';
+                    const srcHtml = it.source
+                        ? '<span class="pir-s4-individual-source">' + escapeHtml(it.source) + '</span>'
+                        : '';
+                    card.innerHTML =
+                        '<span class="pir-s4-individual-text">' + escapeHtml(it.label) + '</span>' +
+                        srcHtml;
+                    grid.appendChild(card);
+                }
+                wrap.appendChild(grid);
+                container.after(wrap);
+            }
         }
 
         // ── Section ④: keyword-based category icons ─────────────────────
