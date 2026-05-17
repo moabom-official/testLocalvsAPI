@@ -745,18 +745,27 @@
             display: flex; flex-direction: column; gap: 4px;
             min-width: 0;
         }
-        .pir-highlight-side-after {
-            background: var(--positive-soft);
-            border-color: #c5f0de;
+        /* '현재' 칸과 단일 카드 모두 동일한 연한 초록 톤. var(--positive-soft) 는
+           일부 환경(다크 모드 등) 에서 거의 보이지 않아 rgba 로 명시 — 라이트
+           모드에서는 옅은 초록, 다크 모드에서도 분명한 초록 띤 강조로 보임. */
+        .pir-highlight-side-after,
+        .pir-highlight-single {
+            background: rgba(32, 201, 151, 0.22);
+            border: 1px solid rgba(32, 201, 151, 0.55);
         }
         .pir-highlight-side-label {
             font-size: 10px; font-weight: 600; color: var(--muted);
             text-transform: uppercase; letter-spacing: 0.04em;
         }
-        .pir-highlight-side-after .pir-highlight-side-label { color: #0d6e4f; }
+        .pir-highlight-side-after .pir-highlight-side-label,
+        .pir-highlight-single .pir-highlight-side-label { color: #19a87c; }
         .pir-highlight-side-value {
             font-size: 12px; line-height: 1.45; color: var(--text);
-            font-weight: 500; word-break: keep-all;
+            font-weight: 500;
+            /* keep-all 만 쓰면 슬래시/괄호 섞인 영문·숫자가 카드 밖으로 흘러
+               나옴. overflow-wrap: anywhere 로 어디서든 줄바꿈 허용. */
+            word-break: keep-all;
+            overflow-wrap: anywhere;
         }
         .pir-highlight-arrow {
             align-self: center; justify-self: center;
@@ -765,22 +774,26 @@
         }
         /* Single (current-only) body — no-predecessor rows */
         .pir-highlight-single {
-            background: var(--positive-soft);
-            border: 1px solid #c5f0de;
             border-radius: 8px;
             padding: 8px 10px;
             display: flex; flex-direction: column; gap: 4px;
             min-width: 0;
         }
-        .pir-highlight-single .pir-highlight-side-label { color: #0d6e4f; }
-        /* Bottom change-assessment line */
+        /* 변화 평가 줄 — 가운데 정렬 + 초록 굵게. "어떤 부분이 좋아졌는지"
+           한눈에 들어오도록 강조. 카드 하단에 단독 행. */
         .pir-highlight-change-line {
-            font-size: 11px; line-height: 1.4;
-            color: var(--primary-strong); font-weight: 600;
-            display: inline-flex; align-items: center; gap: 4px;
+            font-size: 12px; line-height: 1.4;
+            color: #19a87c; font-weight: 700;
+            display: flex; align-items: center; justify-content: center;
+            gap: 4px;
+            text-align: center;
             word-break: keep-all;
+            overflow-wrap: anywhere;
         }
-        .pir-highlight-change-icon { font-size: 12px; line-height: 1; }
+        .pir-highlight-change-icon {
+            font-size: 14px; line-height: 1;
+            color: #19a87c;
+        }
 
         @media (max-width: 660px) {
             .pir-s3-wrap { flex-direction: column; }
