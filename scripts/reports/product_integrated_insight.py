@@ -362,29 +362,45 @@ async def ensure_comment_analysis_for_videos(
 
     # Pass 2: 미처리 영상에 댓글 agent 호출 (병렬)
     # sync.py 에서 import — 모듈 import 실패 시 (AGENT_AVAILABLE=False) self-healing 자체 skip.
+    # sync.py 모듈 자체의 import 가 깨졌으면 (드문 케이스) traceback 까지 출력.
     try:
         from scripts.api.sync import process_comments_with_agent, AGENT_AVAILABLE
+        # AGENT_IMPORT_ERROR 는 sync.py 의 새 진단 변수. 옛 버전과 호환 위해 getattr.
+        from scripts.api import sync as _sync_module
+        agent_import_error = getattr(_sync_module, 'AGENT_IMPORT_ERROR', None)
     except Exception as e:
-        print(f"[WARN] comment self-healing unavailable: import failed — {type(e).__name__}: {e}")
+        import traceback as _tb
+        msg = f"{type(e).__name__}: {e}"
+        print(f"[WARN] comment self-healing unavailable: sync.py import failed — {msg}")
+        print(_tb.format_exc())
         for vid in pending:
             base_stats["per_video"].append({
                 "video_id": vid, "status": "skipped_no_agent",
-                "duration_ms": 0.0, "error": "import_failed",
+                "duration_ms": 0.0, "error": "sync_import_failed",
             })
         base_stats["agent_available"] = False
+        base_stats["agent_import_error"] = msg
         base_stats["failed"] = len(pending)
         base_stats["total_ms"] = round((perf_counter() - route_t0) * 1000, 1)
         _LAST_COMMENT_HEAL_PERF = base_stats
         return base_stats
 
     if not AGENT_AVAILABLE:
-        print("[WARN] comment self-healing skipped — AGENT_AVAILABLE=False in sync.py")
+        # sync.py 가 startup 시 AGENT_IMPORT_ERROR 에 원인을 저장해 둠. 사용자
+        # 환경 진단 자체가 핵심이므로 자세히 노출.
+        print("[WARN] comment self-healing skipped — AGENT_AVAILABLE=False in sync.py.")
+        if agent_import_error:
+            print(f"[WARN]   AGENT_IMPORT_ERROR (sync.py startup): {agent_import_error}")
+            print(f"[WARN]   서버 startup 로그의 첫 [WARN] 블록에 traceback 이 출력돼 있습니다.")
+        else:
+            print(f"[WARN]   원인 변수 미노출 (sync.py 옛 버전). 서버 startup 로그 확인 권장.")
         for vid in pending:
             base_stats["per_video"].append({
                 "video_id": vid, "status": "skipped_no_agent",
                 "duration_ms": 0.0, "error": "agent_unavailable",
             })
         base_stats["agent_available"] = False
+        base_stats["agent_import_error"] = agent_import_error
         base_stats["failed"] = len(pending)
         base_stats["total_ms"] = round((perf_counter() - route_t0) * 1000, 1)
         _LAST_COMMENT_HEAL_PERF = base_stats
@@ -518,15 +534,26 @@ def _heuristic_fallback_report(
     product_name: str,
     per_video_reports: List[Dict],
     consumer_aggregate: Optional[Dict] = None,
+    selected_video_count: Optional[int] = None,
 ) -> str:
     """LLM 미사용 모드. 7개 섹션 헤더만 깔끔히 출력하고 본문은 '데이터 부족'으로 채운다.
     환각을 만들지 않는 것이 최우선. ⑤ 소비자 여론 섹션만은 댓글 집계가 존재하면
     수치/aspect/대표 댓글을 LLM 없이 그대로 렌더해 정보를 보존한다.
+
+    selected_video_count: 사용자가 선정한 영상 총 수 (자막 부재 제외 전).
+        per_video_reports 보다 크면 메타박스에 "선정 N개 중 M개 분석 (X개 자막
+        부재)" 표기. None/같은 값이면 단순히 "분석 영상: M개".
     """
     n = len(per_video_reports)
     today_str = date.today().isoformat()
 
     section5_lines = _fallback_render_consumer_section(consumer_aggregate)
+
+    if selected_video_count is not None and selected_video_count > n:
+        excluded = selected_video_count - n
+        analyzed_line = f"   분석 영상: {n}개 (선정 {selected_video_count}개 중 {excluded}개 자막 부재로 제외)"
+    else:
+        analyzed_line = f"   분석 영상: {n}개"
 
     sections = [
         f"# {product_name} 종합 인사이트 보고서 (LLM 미사용 모드)",
@@ -562,7 +589,7 @@ def _heuristic_fallback_report(
         "",
         "---",
         "📊 분석 기반",
-        f"   분석 영상: {n}개",
+        analyzed_line,
         f"   보고서 생성일: {today_str}",
         "",
         "## 입력 영상별 보고서 (참고)",
@@ -581,6 +608,7 @@ def build_product_integrated_insight_report(
     product_name: str,
     per_video_reports: List[Dict],
     video_ids: Optional[List[str]] = None,
+    selected_video_count: Optional[int] = None,
 ) -> Tuple[str, str]:
     """
     7섹션 통합 인사이트 보고서를 생성한다.
@@ -589,6 +617,11 @@ def build_product_integrated_insight_report(
     video_ids: ⑤ 소비자 여론 섹션을 위한 제품 단위 댓글 집계 대상. None / 빈 리스트면
                집계를 건너뛰고 ⑤ 섹션은 "데이터 부족" 으로 처리된다. 호환을 위해
                기본값은 None — 호출부가 per_video_reports.video_id 로 자동 도출.
+    selected_video_count: 사용자가 선정한 영상 총 수 (자막 부재 제외 전).
+        None / per_video_reports 길이와 동일하면 추가 표기 안 함 (호환 기본값).
+        per_video_reports 보다 크면 메타박스에 "선정 N개 중 M개 분석 (X개 자막
+        부재)" 표기. 분모 (장점/단점 N/M 의 M) 자체는 항상 실제 분석 영상 수
+        (= len(per_video_reports)) 기준이다.
 
     반환: (report_text, model_used)
     """
@@ -622,20 +655,21 @@ def build_product_integrated_insight_report(
             )
 
     prompt = build_product_integrated_insight_prompt(
-        product_name, truncated, today_str=today_str, consumer_aggregate=consumer_aggregate
+        product_name, truncated, today_str=today_str, consumer_aggregate=consumer_aggregate,
+        selected_video_count=selected_video_count,
     )
 
     if not RUNYOURAI_API_KEY:
         print("[WARN] RUNYOURAI_API_KEY not configured — using heuristic fallback")
         _LAST_LLM_PERF["fallback"] = True
-        return (_heuristic_fallback_report(product_name, truncated, consumer_aggregate), HEURISTIC_MODEL_LABEL)
+        return (_heuristic_fallback_report(product_name, truncated, consumer_aggregate, selected_video_count=selected_video_count), HEURISTIC_MODEL_LABEL)
 
     try:
         client = get_report_llm_client()
     except ValueError as e:
         print(f"[WARN] RunYourAI client unavailable: {e} — using heuristic fallback")
         _LAST_LLM_PERF["fallback"] = True
-        return (_heuristic_fallback_report(product_name, truncated, consumer_aggregate), HEURISTIC_MODEL_LABEL)
+        return (_heuristic_fallback_report(product_name, truncated, consumer_aggregate, selected_video_count=selected_video_count), HEURISTIC_MODEL_LABEL)
 
     try:
         print(f"[DEBUG] product_integrated_insight: calling {REPORT_LLM_DEPLOYMENT} for {product_name} (n={len(truncated)})")
@@ -652,19 +686,19 @@ def build_product_integrated_insight_report(
         if not response.choices:
             print("[WARN] product_integrated_insight: empty response — using heuristic fallback")
             _LAST_LLM_PERF["fallback"] = True
-            return (_heuristic_fallback_report(product_name, truncated, consumer_aggregate), HEURISTIC_MODEL_LABEL)
+            return (_heuristic_fallback_report(product_name, truncated, consumer_aggregate, selected_video_count=selected_video_count), HEURISTIC_MODEL_LABEL)
         text = response.choices[0].message.content or ""
         text = fix_encoding(text.strip())
         if not text:
             print("[WARN] product_integrated_insight: empty text — using heuristic fallback")
             _LAST_LLM_PERF["fallback"] = True
-            return (_heuristic_fallback_report(product_name, truncated, consumer_aggregate), HEURISTIC_MODEL_LABEL)
+            return (_heuristic_fallback_report(product_name, truncated, consumer_aggregate, selected_video_count=selected_video_count), HEURISTIC_MODEL_LABEL)
         print(f"[DEBUG] product_integrated_insight: report length={len(text)}")
         return (text, REPORT_LLM_DEPLOYMENT)
     except Exception as e:
         print(f"[ERROR] product_integrated_insight LLM call failed: {type(e).__name__}: {e}")
         _LAST_LLM_PERF["fallback"] = True
-        return (_heuristic_fallback_report(product_name, truncated, consumer_aggregate), HEURISTIC_MODEL_LABEL)
+        return (_heuristic_fallback_report(product_name, truncated, consumer_aggregate, selected_video_count=selected_video_count), HEURISTIC_MODEL_LABEL)
 
 
 # ── 3) 저장 / 조회 ───────────────────────────────────────────────

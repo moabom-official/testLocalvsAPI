@@ -65,13 +65,19 @@ def build_product_integrated_insight_prompt(
     per_video_reports: list,
     today_str: str = "",
     consumer_aggregate: dict | None = None,
+    selected_video_count: int | None = None,
 ) -> str:
     """
     제품 단위 통합 인사이트 보고서 프롬프트 (7 섹션).
 
     per_video_reports: [{"video_id": str, "title": str, "transcript_report": str}, ...]
+        실제 분석에 사용된 영상 (자막 확보 + 보고서 생성 성공한 것만). 분모 N 의
+        기준이 된다.
     consumer_aggregate: scripts.reports._pir_comment_aggregator.aggregate_pir_consumer_inputs
                         결과 dict 또는 None (댓글 0건/미수집 제품).
+    selected_video_count: 사용자가 선정한 영상 총 수 (자막 부재로 제외되기 전).
+        None / per_video_reports 길이와 같으면 메타박스에 추가 표기 안 함.
+        per_video_reports 보다 크면 "선정 N개 중 M개 분석 (X개 자막 없음)" 표기.
 
     환각 방지를 위해 절대 규칙을 강하게 명시한다 — 입력 보고서/집계에 등장하지 않은
     사실/수치/사양/가격/비교 제품/출시일/리뷰어 이름을 만들어 내지 못하도록 한다.
@@ -87,6 +93,14 @@ def build_product_integrated_insight_prompt(
     joined = "\n\n".join(joined_blocks)
     n = len(per_video_reports)
     today_line = f"보고서 생성일: {today_str}" if today_str else "보고서 생성일: (오늘 날짜)"
+
+    # 선정 영상 수 vs 실제 분석 영상 수 — 자막 없는 영상 제외로 둘이 다르면
+    # 메타박스에 정직하게 표기. selected 가 None 이거나 동일하면 단순 분석 수만.
+    if selected_video_count is not None and selected_video_count > n:
+        excluded = selected_video_count - n
+        analyzed_line = f"분석 영상: {n}개 (선정 {selected_video_count}개 중 {excluded}개 자막 부재로 제외)"
+    else:
+        analyzed_line = f"분석 영상: {n}개"
 
     # 댓글 집계 블록을 구성. 없으면 "데이터 부족" 강제.
     if consumer_aggregate and consumer_aggregate.get("total_analyzed_comments", 0) > 0:
@@ -237,7 +251,7 @@ def build_product_integrated_insight_prompt(
 
 ---
 📊 분석 기반
-   분석 영상: {n}개
+   {analyzed_line}
    리뷰어 성향: (영상별 보고서에 명시된 경우에만)
    {today_line}
 """
