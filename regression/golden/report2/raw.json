@@ -1,0 +1,39 @@
+{
+  "sentiment_summary": {
+    "positive_pct": 55.0,
+    "neutral_pct": 20.0,
+    "negative_pct": 25.0,
+    "one_line_mood": "대체로 호평이나 일부 불만이 있습니다."
+  },
+  "positive_points": [
+    {
+      "aspect_name": "디스플레이",
+      "summary_line": "선명하고 밝은 화면",
+      "comment_count": 30,
+      "representative_comment_ids": [
+        "cmt_4001",
+        "cmt_4002"
+      ]
+    }
+  ],
+  "negative_points": [
+    {
+      "aspect_name": "발열",
+      "summary_line": "고부하 시 발열",
+      "comment_count": 11,
+      "representative_comment_ids": [
+        "cmt_5001"
+      ]
+    }
+  ],
+  "top_issues": [
+    {
+      "keyword": "발열",
+      "count": 11
+    },
+    {
+      "keyword": "디스플레이",
+      "count": 30
+    }
+  ]
+}

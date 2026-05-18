@@ -1,0 +1,42 @@
+{
+  "agreement_points": [
+    {
+      "topic": "배터리",
+      "match_tier": "strict",
+      "evidence_strength": "medium",
+      "reviewer_quote": "실사용 하루 반은 거뜬합니다.",
+      "consumer_comment_ids": [
+        "cmt_3001"
+      ],
+      "consumer_comments": [
+        {
+          "comment_id": "cmt_3001",
+          "text_raw": "하루 종일 써도 버티네요",
+          "like_count": 20,
+          "author_name": "user_b"
+        }
+      ]
+    }
+  ],
+  "disagreement_points": [],
+  "reviewer_only": [
+    "AI 기능"
+  ],
+  "consumer_only": [],
+  "spec_changes": [],
+  "consumer_questions": [],
+  "fallback_notes": {
+    "disagreement_empty_message": "리뷰어와 소비자 의견이 대체로 일치합니다.",
+    "data_scope": "분석 대상 댓글 20건 기준"
+  },
+  "_meta": {
+    "video_id": "yt_demo_video_03",
+    "product_name": "데모 제품",
+    "agreement_count": 1,
+    "disagreement_count": 0,
+    "spec_change_count": 0,
+    "consumer_question_count": 0,
+    "model_used": "openai/gpt-4.1-2025-04-14",
+    "schema_version": "v2.integrated_report.2"
+  }
+}
