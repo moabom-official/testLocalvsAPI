@@ -2,8 +2,10 @@
 
 ⚠️ 보고서 ② 는 이미 검증 자산이 존재한다. 상수·검증 로직을 새로 손으로 짜지 않고
 scripts.reports._comment_aggregator 의 validate_report2_json 과 REQUIRED_REPORT2_*
-를 import 해 재사용한다. 본 모듈은 그 위에 "어느 키가 어디서 빠졌는지" 위치를
-채워 ContractResult 로 확장 반환할 뿐이다.
+를 재사용한다(단일 진실 공급원, 복붙 없음). 단 _comment_aggregator 가 import
+시점에 DB 드라이버를 끌어오므로, 오프라인 안전을 위해 regression._aggregator_adapter
+경유로 import 한다. 본 모듈은 그 위에 "어느 키가 어디서 빠졌는지" 위치를 채워
+ContractResult 로 확장 반환할 뿐이다.
 
 검증 대상은 raw LLM 응답이 아니라 DB 저장 "최종 dict" (후처리로 _meta 와 댓글
 원문이 첨부된 형태) 다. 1차(raw 필수 스키마)는 error, 2차(후처리 첨부 형태)는
@@ -11,7 +13,7 @@ warning 으로 처리한다(raw 형태일 수도 있으므로 hard fail 아님).
 """
 from __future__ import annotations
 
-from scripts.reports._comment_aggregator import (
+from regression._aggregator_adapter import (
     REQUIRED_REPORT2_POINT_KEYS,
     REQUIRED_REPORT2_SENT_KEYS,
     REQUIRED_REPORT2_TOP_KEYS,

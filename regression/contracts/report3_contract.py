@@ -2,14 +2,15 @@
 
 ⚠️ 보고서 ③ 도 이미 검증 자산이 존재한다. 상수·검증 로직을 새로 손으로 짜지 않고
 scripts.reports._comment_aggregator 의 validate_report3_json 과 REQUIRED_REPORT3_*
-상수를 import 해 재사용한다. 본 모듈은 위반 위치를 채워 확장 반환할 뿐이다.
+상수를 재사용한다(단일 진실 공급원, 복붙 없음). 오프라인 안전을 위해 import 는
+regression._aggregator_adapter 경유. 본 모듈은 위반 위치를 채워 확장 반환할 뿐이다.
 
 검증 대상은 DB 저장 "최종 dict" (후처리로 _meta·consumer_comments·question_comment
 가 첨부된 형태). 1차(raw 필수 스키마)는 error, 2차(후처리 첨부 형태)는 warning.
 """
 from __future__ import annotations
 
-from scripts.reports._comment_aggregator import (
+from regression._aggregator_adapter import (
     REQUIRED_REPORT3_AGREE_KEYS,
     REQUIRED_REPORT3_DISAGREE_KEYS,
     REQUIRED_REPORT3_FALLBACK_KEYS,
