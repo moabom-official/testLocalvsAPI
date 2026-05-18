@@ -128,6 +128,31 @@ def build_integrated_analysis_report(
             )
             continue
 
+        # 다중 환각 검증. 근거 = 자막 보고서 + 댓글 보고서 + aspect 요약.
+        verification_perf = None
+        try:
+            from scripts.reports._verification import verify_json_report
+
+            _grounding = json.dumps(
+                {
+                    "transcript_report": transcript_report,
+                    "comment_report": _strip_meta(comment_report),
+                    "aspect_summary": aspect_summary,
+                },
+                ensure_ascii=False,
+            )
+            _vr = verify_json_report(
+                "report3",
+                data,
+                grounding=_grounding,
+                format_validator=validate_report3_json,
+            )
+            if isinstance(_vr.output, dict) and validate_report3_json(_vr.output):
+                data = _vr.output
+            verification_perf = _vr.perf.to_dict()
+        except Exception as e:  # noqa: BLE001 — 검증 실패는 초안 채택으로 퇴화
+            print(f"[WARN][verification] report3 검증 건너뜀: {type(e).__name__}: {e}")
+
         # 환각 차단 (v2.2): consumer_comment_ids / reviewer_only / consumer_only /
         # spec_changes / consumer_questions 모두 화이트리스트
         data = _filter_ids_and_lists(data, aspect_summary)
@@ -156,6 +181,9 @@ def build_integrated_analysis_report(
             "model_used": REPORT_LLM_DEPLOYMENT,
             "schema_version": SCHEMA_VERSION,
         }
+        # 기존 _meta 키 불변. 검증 perf 는 새 키로만 추가 (Phase 0 계약 보존).
+        if verification_perf is not None:
+            data["_meta"]["verification"] = verification_perf
         return data
 
     print(f"[ERROR] integrated_report: failed after {MAX_LLM_ATTEMPTS} attempts (video_id={video_id})")
