@@ -1,0 +1,107 @@
+{
+  "sentiment_summary": {
+    "positive_pct": 61.2,
+    "neutral_pct": 18.5,
+    "negative_pct": 20.3,
+    "one_line_mood": "디스플레이와 카메라에 호평이 많고 발열·가격에 불만이 갈립니다."
+  },
+  "positive_points": [
+    {
+      "aspect_name": "디스플레이",
+      "summary_line": "야외에서도 잘 보이는 밝은 화면",
+      "comment_count": 42,
+      "representative_comment_ids": [
+        "cmt_1001",
+        "cmt_1002"
+      ],
+      "representative_comments": [
+        {
+          "comment_id": "cmt_1001",
+          "text_raw": "화면 밝기는 진짜 역대급이네요 야외에서도 잘 보임",
+          "like_count": 87,
+          "author_name": "tech_user_a"
+        },
+        {
+          "comment_id": "cmt_1002",
+          "text_raw": "주사율이 부드러워서 스크롤할 때 눈이 편합니다",
+          "like_count": 45,
+          "author_name": "daily_reviewer"
+        }
+      ]
+    },
+    {
+      "aspect_name": "카메라 줌",
+      "summary_line": "원거리 줌 화질이 기대 이상",
+      "comment_count": 33,
+      "representative_comment_ids": [
+        "cmt_1010"
+      ],
+      "representative_comments": [
+        {
+          "comment_id": "cmt_1010",
+          "text_raw": "10배 줌 찍어봤는데 디테일이 살아있네요",
+          "like_count": 38,
+          "author_name": "photo_lover"
+        }
+      ]
+    }
+  ],
+  "negative_points": [
+    {
+      "aspect_name": "발열",
+      "summary_line": "장시간 게임 시 발열 체감",
+      "comment_count": 28,
+      "representative_comment_ids": [
+        "cmt_2001"
+      ],
+      "representative_comments": [
+        {
+          "comment_id": "cmt_2001",
+          "text_raw": "게임 오래 하면 뜨거워지는 건 여전하네요",
+          "like_count": 54,
+          "author_name": "gamer_kim"
+        }
+      ]
+    },
+    {
+      "aspect_name": "가격",
+      "summary_line": "전작 대비 인상된 가격 부담",
+      "comment_count": 19,
+      "representative_comment_ids": [],
+      "representative_comments": []
+    }
+  ],
+  "top_issues": [
+    {
+      "keyword": "발열",
+      "count": 28
+    },
+    {
+      "keyword": "가격",
+      "count": 19
+    },
+    {
+      "keyword": "배터리",
+      "count": 15
+    },
+    {
+      "keyword": "카메라",
+      "count": 33
+    },
+    {
+      "keyword": "디스플레이",
+      "count": 42
+    },
+    {
+      "keyword": "무게",
+      "count": 9
+    }
+  ],
+  "_meta": {
+    "video_id": "yt_demo_video_01",
+    "product_name": "삼성 갤럭시 S24 울트라",
+    "total_analyzed_comments": 134,
+    "model_used": "openai/gpt-4.1-2025-04-14",
+    "schema_version": "v2.comment_report.1"
+  }
+}

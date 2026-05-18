@@ -1,0 +1,59 @@
+{
+  "report_kind": "report3",
+  "label": "raw",
+  "captured_at": "2026-05-18T16:51:39.474787+00:00",
+  "source_path": "/Users/hansangmin/Moabom_Prototype/.claude/worktrees/sharp-chandrasekhar-89ebfd/regression/golden/report3/raw.json",
+  "fingerprint": {
+    "report_kind": "report3",
+    "form": "json",
+    "valid_dict": true,
+    "key_paths": [
+      "agreement_points",
+      "agreement_points[].consumer_comment_ids",
+      "agreement_points[].evidence_strength",
+      "agreement_points[].match_tier",
+      "agreement_points[].reviewer_quote",
+      "agreement_points[].topic",
+      "consumer_only",
+      "consumer_questions",
+      "consumer_questions[].question_text_id",
+      "consumer_questions[].short_answer",
+      "consumer_questions[].similar_count",
+      "disagreement_points",
+      "fallback_notes",
+      "fallback_notes.data_scope",
+      "fallback_notes.disagreement_empty_message",
+      "reviewer_only",
+      "spec_changes",
+      "spec_changes[].after",
+      "spec_changes[].before",
+      "spec_changes[].delta",
+      "spec_changes[].spec_name",
+      "verdict",
+      "verdict.summary",
+      "verdict.trust_score"
+    ],
+    "list_elem_keys": {
+      "agreement_points[]": [
+        "consumer_comment_ids",
+        "evidence_strength",
+        "match_tier",
+        "reviewer_quote",
+        "topic"
+      ],
+      "consumer_questions[]": [
+        "question_text_id",
+        "short_answer",
+        "similar_count"
+      ],
+      "spec_changes[]": [
+        "after",
+        "before",
+        "delta",
+        "spec_name"
+      ]
+    },
+    "has_meta": false
+  },
+  "contract_status": "ok"
+}

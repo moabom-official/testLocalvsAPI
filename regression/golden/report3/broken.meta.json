@@ -1,0 +1,59 @@
+{
+  "report_kind": "report3",
+  "label": "broken",
+  "captured_at": "2026-05-18T16:51:39.408265+00:00",
+  "source_path": "/Users/hansangmin/Moabom_Prototype/.claude/worktrees/sharp-chandrasekhar-89ebfd/regression/golden/report3/broken.json",
+  "fingerprint": {
+    "report_kind": "report3",
+    "form": "json",
+    "valid_dict": true,
+    "key_paths": [
+      "_meta",
+      "_meta.agreement_count",
+      "_meta.consumer_question_count",
+      "_meta.disagreement_count",
+      "_meta.model_used",
+      "_meta.product_name",
+      "_meta.schema_version",
+      "_meta.spec_change_count",
+      "_meta.video_id",
+      "agreement_points",
+      "agreement_points[].consumer_comment_ids",
+      "agreement_points[].consumer_comments",
+      "agreement_points[].consumer_comments[].author_name",
+      "agreement_points[].consumer_comments[].comment_id",
+      "agreement_points[].consumer_comments[].like_count",
+      "agreement_points[].consumer_comments[].text_raw",
+      "agreement_points[].evidence_strength",
+      "agreement_points[].match_tier",
+      "agreement_points[].reviewer_quote",
+      "agreement_points[].topic",
+      "consumer_only",
+      "consumer_questions",
+      "disagreement_points",
+      "fallback_notes",
+      "fallback_notes.data_scope",
+      "fallback_notes.disagreement_empty_message",
+      "reviewer_only",
+      "spec_changes"
+    ],
+    "list_elem_keys": {
+      "agreement_points[]": [
+        "consumer_comment_ids",
+        "consumer_comments",
+        "evidence_strength",
+        "match_tier",
+        "reviewer_quote",
+        "topic"
+      ],
+      "agreement_points[].consumer_comments[]": [
+        "author_name",
+        "comment_id",
+        "like_count",
+        "text_raw"
+      ]
+    },
+    "has_meta": true
+  },
+  "contract_status": "violated"
+}

@@ -1,0 +1,42 @@
+{
+  "sentiment_summary": {
+    "positive_pct": 50.0,
+    "neutral_pct": 25.0,
+    "negative_pct": 25.0,
+    "one_line_mood": "의견이 갈리는 편입니다."
+  },
+  "positive_points": [
+    {
+      "aspect_name": "배터리",
+      "summary_line": "하루 사용 무난",
+      "comment_count": 12,
+      "representative_comment_ids": [
+        "cmt_3001"
+      ],
+      "representative_comments": [
+        {
+          "comment_id": "cmt_3001",
+          "text_raw": "하루 종일 써도 버티네요",
+          "like_count": 20,
+          "author_name": "user_b"
+        }
+      ]
+    }
+  ],
+  "negative_points": [
+    {
+      "aspect_name": "카메라",
+      "summary_line": "저조도 약점",
+      "comment_count": 8,
+      "representative_comment_ids": [],
+      "representative_comments": []
+    }
+  ],
+  "_meta": {
+    "video_id": "yt_demo_video_02",
+    "product_name": "데모 제품",
+    "total_analyzed_comments": 20,
+    "model_used": "openai/gpt-4.1-2025-04-14",
+    "schema_version": "v2.comment_report.1"
+  }
+}

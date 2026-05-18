@@ -1,0 +1,43 @@
+{
+  "agreement_points": [
+    {
+      "topic": "디스플레이",
+      "match_tier": "strict",
+      "evidence_strength": "strong",
+      "reviewer_quote": "화면이 매우 밝아 야외 시인성이 좋습니다.",
+      "consumer_comment_ids": [
+        "cmt_6001"
+      ]
+    }
+  ],
+  "disagreement_points": [],
+  "reviewer_only": [
+    "방수 성능"
+  ],
+  "consumer_only": [
+    "가격 체감"
+  ],
+  "spec_changes": [
+    {
+      "spec_name": "배터리 용량",
+      "before": "4500mAh",
+      "after": "5000mAh",
+      "delta": "+500mAh"
+    }
+  ],
+  "consumer_questions": [
+    {
+      "question_text_id": "cmt_7001",
+      "similar_count": 2,
+      "short_answer": null
+    }
+  ],
+  "verdict": {
+    "trust_score": 70,
+    "summary": "리뷰어와 소비자 평가가 비교적 일치합니다."
+  },
+  "fallback_notes": {
+    "disagreement_empty_message": "의견이 대체로 일치합니다.",
+    "data_scope": "분석 대상 댓글 60건 기준"
+  }
+}
