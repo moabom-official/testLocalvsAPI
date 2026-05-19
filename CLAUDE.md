@@ -35,11 +35,12 @@
 - MLOps: Airflow 실험 단계 (`dags/youtube_product_sync_dag.py`) — 운영 미연결
 - 감성 분석: 현재 RunYourAI GPT-4.1 API. **KLUE-BERT 자체 운영 검토 중** (Break-even 약 1.24만 댓글/일).
 - 회원/인증: **미구현** (5월 4주차 착수 예정, Google OAuth)
-- 명세 임시안 중 **미적용/미구현**: Redis, VectorDB, Gemini, Transformers, scikit-learn, vLLM, RAG, ELK
+- **보고서 파이프라인 v2 (Phase 0~3, 전부 운영 연결·머지 완료)**: Phase0 회귀 안전망 `regression/` (보고서 4종 contract+golden, dev 의존성 `requirements-dev.txt`) · Phase1 4종 다중 LLM 검증 `scripts/reports/_verification.py` (환각 최소화) · Phase2-a 입력 ①②③ 종합 확장 `scripts/reports/_pir_input.py` · Phase2-b RAG `scripts/rag/` (sqlite3 + 순수 파이썬 코사인, RunYourAI 게이트웨이 임베딩 — pgvector 의도적 미선택) · Phase3 제품 이미지 `scripts/product_image/` (Serper 검색 + 비전 LLM, `tech_products.image_url` 컬럼)
+- 명세 임시안 중 **미적용/미구현**: Redis, VectorDB, Gemini, Transformers, scikit-learn, vLLM, ELK (RAG는 위 Phase2-b로 적용됨 — VectorDB는 여전히 미사용)
 
 ## 핵심 동작 메모
 - **7 섹션 종합 보고서** (`product_integrated_reports`, INSERT 누적 — UPSERT 아님): ①한 줄 구매 판정 + 종합 점수 + 합의도 ②핵심 요약(카드 3장) ③6차원 평가표(배터리·가격·카메라·성능·디스플레이·디자인) ④합의 기반 장단점(2명 이상 + 빈도 N/N, 다이버징 막대) ⑤소비자 여론(댓글 기반 — 가중 비율 + aspect 상위 + 대표 댓글) ⑥전작 대비 변화표 ⑦추천/비추(2열 칩 매처, 영상 N 근거). v1 사용자 피드백 반영해 v0의 Divergence·리뷰어 vs 실사용자 갭·경쟁/대체 비교 3 섹션 제거 후, ⑤ 소비자 여론은 `_pir_comment_aggregator` 가 `comment_filtering_agent` 결과(comments/comment_sentiments/aspect_extractions)를 READ ONLY 로 제품 단위 집계해 LLM 입력으로 주입한다.
-- **환각 방지 4규칙** (보고서 ④ 생성 시 자동 검증): ①근거 명시 ②합의도 정량화 ③등장 제품만 비교 ④데이터 부족 명시. 검증 실패 시 Heuristic Fallback("데이터 부족" 명시 모드)으로 자동 전환.
+- **환각 방지 4규칙** (보고서 ④ 생성 시 자동 검증): ①근거 명시 ②합의도 정량화 ③등장 제품만 비교 ④데이터 부족 명시. 검증 실패 시 Heuristic Fallback("데이터 부족" 명시 모드)으로 자동 전환. 추가로 보고서 4종은 `_verification.py` 로 다중 LLM 교차 검증 후 적재 (Phase 1).
 - **토큰 예산 안전망**: 영상별 보고서 1500자 cap + 전체 18K 토큰 자동 비례 축소.
 - **Self-Healing** (한상민 담당, 보고서 ④ 통합 인사이트 엔드포인트):
   - 자막: 선정 영상 중 `video_transcripts` / `video_reports.transcript_report` 가 없는 영상은 `collect_transcript_reports_for_product` 가 fetch+build 후 UPSERT.
@@ -50,10 +51,12 @@
 ## 저장소 구조
 ```
 main.py                       # FastAPI 진입점
-scripts/                      # 운영 본체 (api / database / youtube / analysis / reports / utils)
+scripts/                      # 운영 본체 (api / database / youtube / analysis / reports / rag / product_image / utils)
 comment_filtering_agent/      # 댓글 7-step 필터 Agent (filters / classifiers / analyzers / core)
 video_selection_agent/        # 영상 선정 LangGraph Agent (graph / scoring / youtube / llm / persistence / api)
-app/  services/  dags/  llm/  # 병렬 리팩터링·실험 모듈 (운영 미연결)
+regression/                   # 보고서 양식 회귀 안전망 (Phase 0, pytest · requirements-dev.txt)
+services/fetch_worker/        # 홈서버 자막 fetch worker (운영 — 실험 아님)
+app/  dags/  llm/             # 병렬 리팩터링·실험 모듈 (운영 미연결)
 templates/                    # Jinja2 HTML
 docs/                         # 과제 기획서, 요구사항명세서, 설계 문서, 중간 산출물
 ```
