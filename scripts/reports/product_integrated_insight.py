@@ -604,6 +604,60 @@ def _heuristic_fallback_report(
     return "\n".join(sections)
 
 
+def _verify_report4(
+    draft: str,
+    per_video_reports: List[Dict],
+    consumer_aggregate: Optional[Dict],
+) -> str:
+    """보고서 ④ 다중 검증 (사용자 직접 대기 — 가장 보수적 튜닝).
+
+    코드 게이트(⑤ 섹션 수치 ↔ 집계 대조) 필수. perf 는 기존 _LAST_LLM_PERF 에
+    'verification' 새 키로만 추가(기존 키 불변). 어떤 실패에서도 초안 반환.
+    폴백(_heuristic_fallback_report) 경로는 이 함수를 거치지 않는다.
+    """
+    if not draft or draft.startswith("[ERROR]"):
+        return draft
+    try:
+        from scripts.reports._verification import (
+            code_gate_report4_consumer,
+            verify_markdown_report,
+        )
+
+        gate_issues = code_gate_report4_consumer(draft, consumer_aggregate)
+        blocks = []
+        for i, r in enumerate(per_video_reports):
+            blocks.append(
+                f"[영상 {i+1} | video_id={r.get('video_id','')} | 제목: "
+                f"{(r.get('title') or '').strip()}]\n"
+                f"{(r.get('transcript_report') or '').strip()}"
+            )
+        grounding = "\n\n".join(blocks)
+        if consumer_aggregate:
+            grounding += "\n\n[댓글 집계]\n" + json.dumps(
+                consumer_aggregate, ensure_ascii=False
+            )
+
+        vr = verify_markdown_report(
+            "report4", draft, grounding, precomputed_gate_issues=gate_issues
+        )
+        # 기존 _LAST_LLM_PERF 키 불변 — 'verification' 새 키로만 추가.
+        try:
+            _LAST_LLM_PERF["verification"] = vr.perf.to_dict()
+        except Exception:  # noqa: BLE001 — perf 기록 실패가 보고서를 막지 않음
+            pass
+        p = vr.perf
+        print(
+            f"[PERF][verification] report4 enabled={p.enabled} skipped={p.skipped} "
+            f"code_gate={p.code_gate_issues} critique_calls={p.critique_calls} "
+            f"critique_issues={p.critique_issues} revise_calls={p.revise_calls} "
+            f"applied={p.revise_applied} rejected={p.revise_rejected} ms={p.total_ms}"
+        )
+        return vr.output if isinstance(vr.output, str) and vr.output.strip() else draft
+    except Exception as e:  # noqa: BLE001 — 검증 때문에 ④ 가 실패하면 안 됨
+        print(f"[WARN][verification] report4 검증 건너뜀: {type(e).__name__}: {e}")
+        return draft
+
+
 def build_product_integrated_insight_report(
     product_name: str,
     per_video_reports: List[Dict],
@@ -694,6 +748,7 @@ def build_product_integrated_insight_report(
             _LAST_LLM_PERF["fallback"] = True
             return (_heuristic_fallback_report(product_name, truncated, consumer_aggregate, selected_video_count=selected_video_count), HEURISTIC_MODEL_LABEL)
         print(f"[DEBUG] product_integrated_insight: report length={len(text)}")
+        text = _verify_report4(text, truncated, consumer_aggregate)
         return (text, REPORT_LLM_DEPLOYMENT)
     except Exception as e:
         print(f"[ERROR] product_integrated_insight LLM call failed: {type(e).__name__}: {e}")

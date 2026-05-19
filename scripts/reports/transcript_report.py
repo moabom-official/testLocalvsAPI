@@ -278,6 +278,32 @@ def _call_llm(prompt: str, system_prompt: str = "", temperature: float = 0.3) ->
     return response.choices[0].message.content.strip()
 
 
+def _verify_report1(draft: str, grounding: str) -> str:
+    """보고서 ① 다중 검증. 어떤 실패에서도 초안을 반환(보고서 통째 실패 없음).
+
+    str 반환이라 본문에 메타를 못 섞으므로 perf 는 [PERF][verification] 로그로만 남긴다.
+    """
+    if not draft or draft.startswith("[ERROR]"):
+        return draft
+    try:
+        from scripts.reports._verification import verify_markdown_report
+
+        vr = verify_markdown_report("report1", draft, grounding)
+        p = vr.perf
+        print(
+            f"[PERF][verification] report1 enabled={p.enabled} skipped={p.skipped} "
+            f"code_gate={p.code_gate_issues} critique_calls={p.critique_calls} "
+            f"critique_issues={p.critique_issues} revise_calls={p.revise_calls} "
+            f"applied={p.revise_applied} rejected={p.revise_rejected} "
+            f"crit_failed={p.critique_failed} rev_failed={p.revise_failed} "
+            f"ms={p.total_ms} ptok={p.prompt_tokens} ctok={p.completion_tokens}"
+        )
+        return vr.output if isinstance(vr.output, str) and vr.output.strip() else draft
+    except Exception as e:  # noqa: BLE001 — 검증 때문에 보고서가 실패하면 안 됨
+        print(f"[WARN][verification] report1 검증 건너뜀: {type(e).__name__}: {e}")
+        return draft
+
+
 # ── 메인 함수 ────────────────────────────────────────────────────
 
 def build_transcript_report(transcript_text: str) -> str:
@@ -302,6 +328,7 @@ def build_transcript_report(transcript_text: str) -> str:
         if len(normalized) <= CHUNK_THRESHOLD:
             prompt = _FINAL_PROMPT.format(text=normalized)
             report = _call_llm(prompt, _SYSTEM_PROMPT)
+            grounding = normalized
         else:
             chunks = _split_chunks(normalized)
             print(f"  [자막 보고서] {len(chunks)}개 청크로 분할 처리")
@@ -317,7 +344,11 @@ def build_transcript_report(transcript_text: str) -> str:
             print(f"  [자막 보고서] 최종 보고서 생성 중...")
             final_prompt = _FINAL_PROMPT.format(text=combined)
             report = _call_llm(final_prompt, _SYSTEM_PROMPT)
+            # 청크별 중간요약은 검증 미적용. 최종 합성 보고서에만 검증 적용.
+            grounding = combined
 
+        # 다중 검증 (생성 → 코드게이트 → 비평 → 수정). 실패 시 초안 그대로 퇴화.
+        report = _verify_report1(report, grounding)
         return fix_encoding(report)
 
     except Exception as e:

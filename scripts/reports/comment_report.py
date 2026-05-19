@@ -93,6 +93,24 @@ def build_comment_sentiment_report(
             )
             continue
 
+        # 다중 환각 검증 (생성 → 코드게이트 → 비평 → 수정). 한 attempt 안의
+        # 추가 단계 — attempt 의미(JSON/양식 실패 시 재생성)는 그대로.
+        verification_perf = None
+        try:
+            from scripts.reports._verification import verify_json_report
+
+            _vr = verify_json_report(
+                "report2",
+                data,
+                grounding=json.dumps(aggregated, ensure_ascii=False),
+                format_validator=validate_report2_json,
+            )
+            if isinstance(_vr.output, dict) and validate_report2_json(_vr.output):
+                data = _vr.output
+            verification_perf = _vr.perf.to_dict()
+        except Exception as e:  # noqa: BLE001 — 검증 실패는 초안 채택으로 퇴화
+            print(f"[WARN][verification] report2 검증 건너뜀: {type(e).__name__}: {e}")
+
         # 환각 차단: LLM 이 입력 외 ID 를 지목한 경우 화이트리스트로 필터
         data = _filter_ids_by_whitelist(data, aggregated)
 
@@ -112,6 +130,9 @@ def build_comment_sentiment_report(
             "model_used": REPORT_LLM_DEPLOYMENT,
             "schema_version": SCHEMA_VERSION,
         }
+        # 기존 _meta 키 불변. 검증 perf 는 새 키로만 추가 (Phase 0 계약 보존).
+        if verification_perf is not None:
+            data["_meta"]["verification"] = verification_perf
         return data
 
     print(f"[ERROR] comment_report: failed after {MAX_LLM_ATTEMPTS} attempts (video_id={video_id})")
