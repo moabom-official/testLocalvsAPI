@@ -66,6 +66,7 @@ def build_product_integrated_insight_prompt(
     today_str: str = "",
     consumer_aggregate: dict | None = None,
     selected_video_count: int | None = None,
+    expanded_input_blocks: str | None = None,
 ) -> str:
     """
     제품 단위 통합 인사이트 보고서 프롬프트 (7 섹션).
@@ -78,19 +79,36 @@ def build_product_integrated_insight_prompt(
     selected_video_count: 사용자가 선정한 영상 총 수 (자막 부재로 제외되기 전).
         None / per_video_reports 길이와 같으면 메타박스에 추가 표기 안 함.
         per_video_reports 보다 크면 "선정 N개 중 M개 분석 (X개 자막 없음)" 표기.
+    expanded_input_blocks: Phase 2-a 입력 확장. 주어지면 입력부(입력 A)를 영상별
+        ①②③ 종합 블록으로 대체한다. None 이면 기존 ① 전용 입력(완전 하위호환).
+        ★ 이 인자는 "입력부"에만 영향 — "출력 형식" 구획 이하 7섹션 정의는 불변.
 
     환각 방지를 위해 절대 규칙을 강하게 명시한다 — 입력 보고서/집계에 등장하지 않은
     사실/수치/사양/가격/비교 제품/출시일/리뷰어 이름을 만들어 내지 못하도록 한다.
     댓글 원문은 전달된 representative_comments 의 text_raw 만 인용 가능.
     """
-    joined_blocks = []
-    for i, r in enumerate(per_video_reports):
-        title = (r.get("title") or "").strip()
-        body = (r.get("transcript_report") or "").strip()
-        joined_blocks.append(
-            f"[영상 {i+1} | video_id={r.get('video_id','')} | 제목: {title}]\n{body}"
+    if expanded_input_blocks is not None:
+        # Phase 2-a: 영상별 ①②③ 종합 입력. 영상 경계·video_id·제목은
+        # 블록 안에 보존돼 있다(_pir_input.assemble_input_blocks).
+        joined = expanded_input_blocks
+        input_a_label = (
+            "입력 A: 영상별 종합 보고서 (각 영상마다 ① 자막 기반 / ② 댓글 기반 / "
+            "③ 자막+댓글 통합)"
         )
-    joined = "\n\n".join(joined_blocks)
+        rule1_scope = "아래 영상별 보고서 ①②③/댓글 집계"
+        input_a_intro = '영상별 "① 자막 / ② 댓글 / ③ 통합 분석 보고서"'
+    else:
+        joined_blocks = []
+        for i, r in enumerate(per_video_reports):
+            title = (r.get("title") or "").strip()
+            body = (r.get("transcript_report") or "").strip()
+            joined_blocks.append(
+                f"[영상 {i+1} | video_id={r.get('video_id','')} | 제목: {title}]\n{body}"
+            )
+        joined = "\n\n".join(joined_blocks)
+        input_a_label = "입력 A: 영상별 자막 기반 보고서"
+        rule1_scope = "아래 영상별 보고서/댓글 집계"
+        input_a_intro = '"자막 기반 분석 보고서"'
     n = len(per_video_reports)
     today_line = f"보고서 생성일: {today_str}" if today_str else "보고서 생성일: (오늘 날짜)"
 
@@ -118,11 +136,11 @@ def build_product_integrated_insight_prompt(
     return f"""당신은 테크 제품 리뷰 메타분석 전문가입니다.
 
 아래는 동일 제품 "{product_name}"에 대한 서로 다른 유튜브 리뷰 영상 {n}건의
-"자막 기반 분석 보고서"와 영상 댓글에서 집계된 "소비자 여론 집계"입니다.
+{input_a_intro}와 영상 댓글에서 집계된 "소비자 여론 집계"입니다.
 이 두 입력만을 유일한 근거로 사용하여, 제품 단위 통합 인사이트 보고서를 작성하세요.
 
 ================ 절대 규칙 (위반 시 작성 실패로 간주) ================
-1. 아래 영상별 보고서/댓글 집계에 등장하지 않은 사실, 수치, 사양, 가격, 비교 제품,
+1. {rule1_scope}에 등장하지 않은 사실, 수치, 사양, 가격, 비교 제품,
    출시일, 리뷰어 이름 등을 새로 만들어 내지 않는다.
 2. 어떤 차원/항목에 대해 입력에 정보가 없으면 반드시 "데이터 부족"으로 표기한다.
    추정, 일반 상식, 사전 지식으로 빈칸을 채우지 않는다.
@@ -133,7 +151,7 @@ def build_product_integrated_insight_prompt(
    직접 계산·반올림·재추정하지 않는다. 대표 댓글은 representative_comments 의
    text_raw 만 인용 가능. 다른 댓글을 창작·재구성하지 않는다.
 
-================ 입력 A: 영상별 자막 기반 보고서 ================
+================ {input_a_label} ================
 {joined}
 
 ================ 입력 B: 소비자 여론 집계 (status={consumer_status}) ================

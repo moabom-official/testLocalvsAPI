@@ -53,6 +53,8 @@ COMMENT_HEAL_MAX_CONCURRENCY = 3
 _LAST_COLLECT_PERF: Dict = {}
 _LAST_LLM_PERF: Dict = {}
 _LAST_COMMENT_HEAL_PERF: Dict = {}
+# Phase 2-a: ①②③ self-healing + 입력 확장 측정치 (라우트가 읽음)
+_LAST_INPUT_EXPANSION_PERF: Dict = {}
 
 
 # ── 1) 입력 수집 ─────────────────────────────────────────────────
@@ -277,6 +279,169 @@ def get_last_llm_perf() -> Dict:
 def get_last_comment_heal_perf() -> Dict:
     """라우트가 응답 JSON 조립용으로 마지막 댓글 self-healing perf 를 읽는다."""
     return dict(_LAST_COMMENT_HEAL_PERF)
+
+
+def get_last_input_expansion_perf() -> Dict:
+    """라우트가 마지막 ①②③ self-healing/입력확장 perf 를 읽는다 (Phase 2-a)."""
+    return dict(_LAST_INPUT_EXPANSION_PERF)
+
+
+# ── 1.6) ①②③ self-healing (Phase 2-a) ──────────────────────────
+#
+# ④ 가 영상별 ①②③ 을 종합하려면 그 3종이 video_reports 에 있어야 한다.
+# 설계 (중복 LLM 호출 제거 + 순서 의존성):
+#   Pass A: video_transcripts 존재 보장 (없으면 fetch_video_transcript +
+#           _save_transcript_row 만 — ① build 안 함. ① build 는 Pass B 의
+#           generate_and_save_all_reports 가 단 한 번 수행 → ① 이중 생성 방지).
+#   Pass B: 영상별 generate_and_save_all_reports 호출 → ①②③ 생성/캐시.
+#           (내부 캐시 hit: 3종 다 있으면 재생성 안 함.)
+#   Pass C: video_reports 에서 ①②③ READ ONLY 수집 → bundle 반환.
+# 순서 의존성: 댓글 agent self-healing(ensure_comment_analysis_for_videos)이
+#   ②③ 생성보다 먼저 끝나야 한다 — 호출부(products.py)가 그 순서를 보장한다
+#   (comment heal → ensure_all_reports → ⑤ 집계). 기존
+#   collect_transcript_reports_for_product 는 부분 upsert 로 ②③ 을 NULL 로
+#   덮으므로 ON 경로에서는 호출하지 않는다(OFF 경로 전용으로 보존).
+
+def _videos_missing_transcript(video_ids: List[str]) -> List[str]:
+    """video_transcripts 행이 없는 video_id (READ ONLY)."""
+    if not video_ids:
+        return []
+    placeholders = ",".join(["%s"] * len(video_ids))
+    rows = query_all(
+        f"SELECT video_id FROM video_transcripts WHERE video_id IN ({placeholders})",
+        tuple(video_ids),
+    )
+    have = {r["video_id"] for r in rows}
+    return [v for v in video_ids if v not in have]
+
+
+def _worker_fetch_transcript_only(vid: str) -> Dict:
+    """병렬 워커(DB 접근 금지): 자막만 fetch. ① build 안 함."""
+    t0 = perf_counter()
+    try:
+        fetched = fetch_video_transcript(vid)
+    except Exception as e:  # noqa: BLE001 — per-video 격리
+        return {"video_id": vid, "fetched": None,
+                "error": f"fetch_failed: {type(e).__name__}: {e}",
+                "ms": (perf_counter() - t0) * 1000}
+    if not fetched or not fetched.get("transcript_text"):
+        return {"video_id": vid, "fetched": None, "error": "fetch_empty",
+                "ms": (perf_counter() - t0) * 1000}
+    return {"video_id": vid, "fetched": fetched, "error": None,
+            "ms": (perf_counter() - t0) * 1000}
+
+
+async def ensure_all_reports_for_product(
+    product_id: int,
+    product_name: str,
+    video_ids: List[str],
+) -> List[Dict]:
+    """영상별 ①②③ 을 보장하고 bundle 리스트를 반환한다 (Phase 2-a).
+
+    안전 퇴화: 특정 영상의 자막 fetch / ①②③ 생성이 실패해도 그 영상은 가능한
+    보고서만으로 포함하거나 제외하고, 전체는 계속 진행한다.
+    """
+    global _LAST_INPUT_EXPANSION_PERF
+    route_t0 = perf_counter()
+    perf = {
+        "total_videos": len(video_ids), "transcript_fetched": 0,
+        "transcript_fetch_failed": 0, "reports_ok": 0, "reports_failed": 0,
+        "bundles": 0, "total_ms": 0.0,
+        "with_r1": 0, "with_r2": 0, "with_r3": 0,
+    }
+    if not video_ids:
+        perf["total_ms"] = round((perf_counter() - route_t0) * 1000, 1)
+        _LAST_INPUT_EXPANSION_PERF = perf
+        return []
+
+    # ── Pass A: 자막 존재 보장 (① build 없음) ──────────────────
+    missing = _videos_missing_transcript(video_ids)
+    if missing:
+        sem_a = asyncio.Semaphore(COLLECT_MAX_CONCURRENCY)
+
+        async def _bounded_fetch(vid: str) -> Dict:
+            async with sem_a:
+                return await asyncio.to_thread(_worker_fetch_transcript_only, vid)
+
+        fetched_results = await asyncio.gather(
+            *[_bounded_fetch(v) for v in missing], return_exceptions=True
+        )
+        for res in fetched_results:
+            if isinstance(res, BaseException):
+                perf["transcript_fetch_failed"] += 1
+                continue
+            if res.get("error") or not res.get("fetched"):
+                perf["transcript_fetch_failed"] += 1
+                print(f"[WARN] ensure_all_reports: transcript fetch skip "
+                      f"{res.get('video_id')} — {res.get('error')}")
+                continue
+            try:
+                _save_transcript_row(res["video_id"], res["fetched"])
+                perf["transcript_fetched"] += 1
+            except Exception as e:  # noqa: BLE001
+                perf["transcript_fetch_failed"] += 1
+                print(f"[WARN] ensure_all_reports: save transcript failed "
+                      f"{res['video_id']}: {type(e).__name__}: {e}")
+
+    # ── Pass B: 영상별 ①②③ 생성/캐시 (generate_and_save 호출만) ──
+    from scripts.reports.integrated_report import generate_and_save_all_reports
+
+    sem_b = asyncio.Semaphore(COLLECT_MAX_CONCURRENCY)
+
+    async def _gen_one(vid: str) -> Dict:
+        async with sem_b:
+            t0 = perf_counter()
+            try:
+                tr, cm, it = await generate_and_save_all_reports(vid, product_name)
+                return {"video_id": vid, "ok": True,
+                        "r1": bool(tr), "r2": bool(cm), "r3": bool(it),
+                        "ms": (perf_counter() - t0) * 1000}
+            except Exception as e:  # noqa: BLE001 — per-video 격리
+                print(f"[WARN] ensure_all_reports: generate_and_save failed "
+                      f"{vid}: {type(e).__name__}: {e}")
+                return {"video_id": vid, "ok": False, "r1": False,
+                        "r2": False, "r3": False, "ms": (perf_counter() - t0) * 1000}
+
+    gen_results = await asyncio.gather(
+        *[_gen_one(v) for v in video_ids], return_exceptions=True
+    )
+    for res in gen_results:
+        if isinstance(res, BaseException):
+            perf["reports_failed"] += 1
+            continue
+        if res.get("ok"):
+            perf["reports_ok"] += 1
+        else:
+            perf["reports_failed"] += 1
+        perf["with_r1"] += int(bool(res.get("r1")))
+        perf["with_r2"] += int(bool(res.get("r2")))
+        perf["with_r3"] += int(bool(res.get("r3")))
+
+    # ── Pass C: ①②③ READ ONLY 수집 → bundle ──────────────────
+    placeholders = ",".join(["%s"] * len(video_ids))
+    meta_rows = query_all(
+        f"SELECT video_id, title FROM videos WHERE video_id IN ({placeholders}) "
+        f"AND product_id = %s",
+        tuple(video_ids) + (product_id,),
+    )
+    video_meta = {r["video_id"]: r for r in meta_rows}
+
+    from scripts.reports.integrated_report import _safe_json_loads
+    from scripts.reports._pir_input import collect_report_bundles
+
+    bundles = collect_report_bundles(video_ids, video_meta, _safe_json_loads)
+    perf["bundles"] = len(bundles)
+    perf["total_ms"] = round((perf_counter() - route_t0) * 1000, 1)
+    _LAST_INPUT_EXPANSION_PERF = perf
+    print(
+        f"[PERF][input_expansion] product_id={product_id} "
+        f"videos={perf['total_videos']} tx_fetched={perf['transcript_fetched']} "
+        f"tx_fail={perf['transcript_fetch_failed']} reports_ok={perf['reports_ok']} "
+        f"reports_fail={perf['reports_failed']} bundles={perf['bundles']} "
+        f"r1={perf['with_r1']} r2={perf['with_r2']} r3={perf['with_r3']} "
+        f"total_ms={perf['total_ms']:.1f}"
+    )
+    return bundles
 
 
 # ── 1.5) 댓글 self-healing ───────────────────────────────────────
@@ -624,14 +789,25 @@ def _verify_report4(
         )
 
         gate_issues = code_gate_report4_consumer(draft, consumer_aggregate)
-        blocks = []
-        for i, r in enumerate(per_video_reports):
-            blocks.append(
-                f"[영상 {i+1} | video_id={r.get('video_id','')} | 제목: "
-                f"{(r.get('title') or '').strip()}]\n"
-                f"{(r.get('transcript_report') or '').strip()}"
-            )
-        grounding = "\n\n".join(blocks)
+        # 입력 확장 ON 이면 grounding 도 LLM 에 실제로 넣은 ①②③ 종합과
+        # 일치시켜야 비평이 "본 적 있는 근거"를 "없는 근거"로 오판하지 않는다.
+        is_expanded = any(
+            ("comment_text" in r or "integrated_text" in r)
+            for r in per_video_reports
+        )
+        if is_expanded:
+            from scripts.reports._pir_input import assemble_input_blocks
+
+            grounding = assemble_input_blocks(per_video_reports)
+        else:
+            blocks = []
+            for i, r in enumerate(per_video_reports):
+                blocks.append(
+                    f"[영상 {i+1} | video_id={r.get('video_id','')} | 제목: "
+                    f"{(r.get('title') or '').strip()}]\n"
+                    f"{(r.get('transcript_report') or '').strip()}"
+                )
+            grounding = "\n\n".join(blocks)
         if consumer_aggregate:
             grounding += "\n\n[댓글 집계]\n" + json.dumps(
                 consumer_aggregate, ensure_ascii=False
@@ -686,8 +862,51 @@ def build_product_integrated_insight_report(
         _LAST_LLM_PERF["fallback"] = True
         return ("[ERROR] 입력 보고서가 없습니다.", HEURISTIC_MODEL_LABEL)
 
-    truncated = _truncate_per_video(per_video_reports)
     today_str = date.today().isoformat()
+
+    # ── Phase 2-a: 입력 확장 (영상별 ①②③ 종합) ─────────────────
+    # ON 조건: config 스위치 + per_video_reports 가 ②③ 을 담은 bundle.
+    # OFF/레거시: 기존 ① 전용 절삭·프롬프트 (동작 100% 동일).
+    from scripts.config import REPORT4_INPUT_EXPANSION
+
+    has_bundles = any(
+        ("comment_report" in r or "integrated_report" in r)
+        for r in per_video_reports
+    )
+    expansion_on = bool(REPORT4_INPUT_EXPANSION and has_bundles)
+    expanded_blocks: Optional[str] = None
+    if expansion_on:
+        try:
+            from scripts.reports._pir_input import (
+                assemble_input_blocks,
+                serialize_bundles,
+                truncate_bundles,
+            )
+
+            serialized = serialize_bundles(per_video_reports)
+            truncated_bundles, trunc_measure = truncate_bundles(serialized)
+            expanded_blocks = assemble_input_blocks(truncated_bundles)
+            # _verify_report4 grounding 정합용 — 실제 LLM 에 넣는 ①②③ 입력.
+            truncated = truncated_bundles
+            _LAST_LLM_PERF["input_expansion"] = {
+                "enabled": True,
+                "videos": len(truncated_bundles),
+                **trunc_measure,
+            }
+            print(
+                f"[INPUT] report4 expansion ON videos={len(truncated_bundles)} "
+                f"chars_after={trunc_measure.get('total_chars_after')} "
+                f"shrink={trunc_measure.get('proportional_shrink')}"
+            )
+        except Exception as e:  # noqa: BLE001 — 확장 실패 시 레거시로 안전 퇴화
+            print(f"[WARN] report4 input expansion failed → legacy input: "
+                  f"{type(e).__name__}: {e}")
+            expansion_on = False
+            expanded_blocks = None
+
+    if not expansion_on:
+        truncated = _truncate_per_video(per_video_reports)
+        _LAST_LLM_PERF["input_expansion"] = {"enabled": False}
 
     # ⑤ 소비자 여론 — 제품 단위 댓글 집계 (READ ONLY)
     if video_ids is None:
@@ -711,6 +930,7 @@ def build_product_integrated_insight_report(
     prompt = build_product_integrated_insight_prompt(
         product_name, truncated, today_str=today_str, consumer_aggregate=consumer_aggregate,
         selected_video_count=selected_video_count,
+        expanded_input_blocks=expanded_blocks,
     )
 
     if not RUNYOURAI_API_KEY:
