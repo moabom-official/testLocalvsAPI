@@ -39,9 +39,12 @@ REPORT4_INPUT_EXPANSION = os.getenv(
 REPORT4_RAG = os.getenv(
     "REPORT4_RAG", "1"
 ).strip().lower() not in ("0", "false", "no", "off")
-# 임베딩 모델 (기존 OpenAI 호환 경로 재활용). 변경 시 재인덱싱 필요.
+# 임베딩 모델 (기존 OpenAI 호환 RunYourAI 게이트웨이 재활용). RunYourAI
+# 게이트웨이는 RUNYOURAI_MODEL(openai/gpt-4.1-...) 처럼 provider/model
+# 형식을 요구한다(실측: 'text-embedding-3-small' → 400 'model should be in
+# provider/model format'). 변경 시 재인덱싱 필요.
 REPORT4_RAG_EMBED_MODEL = os.getenv(
-    "REPORT4_RAG_EMBED_MODEL", "text-embedding-3-small"
+    "REPORT4_RAG_EMBED_MODEL", "openai/text-embedding-3-small"
 )
 # RAG 전용 SQLite 벡터 저장소 경로 (기존 14테이블·PostgreSQL 과 완전 분리).
 REPORT4_RAG_DB_PATH = os.getenv(
