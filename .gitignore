@@ -2,6 +2,10 @@
 .env
 .env.local
 .env.*.local
+.env.bak
+.env.backup
+# .env.example 은 의도적으로 추적 (템플릿)
+!.env.example
 
 # Python
 __pycache__/
