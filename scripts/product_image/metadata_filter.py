@@ -18,9 +18,15 @@ def metadata_prefilter(
     candidates: List[Dict[str, Any]],
     *,
     min_px: int,
-    max_keep: int,
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-    """반환: (kept, rejected). rejected 원소에 'reject_reason' 부착."""
+    """반환: (kept, rejected). rejected 원소에 'reject_reason' 부착.
+
+    ★ 보강 B: 검색 순위 기반 컷(kept[:max_keep])을 제거했다. 명백한
+    노이즈(작은 이미지·svg/gif·밈 도메인)만 거르고, 그 외 후보는 검색
+    순위와 무관하게 전부 비전으로 넘긴다 — 검색 하위의 좋은 후보(예: 애플
+    공식 이미지)가 평가도 못 받고 잘리던 문제 해결. 비전 비용은 검색 수
+    (PRODUCT_IMAGE_SEARCH_NUM)로 통제한다.
+    """
     kept: List[Dict[str, Any]] = []
     rejected: List[Dict[str, Any]] = []
     for c in candidates:
@@ -42,8 +48,5 @@ def metadata_prefilter(
             continue
         kept.append(c)
 
-    # 비전 비용 통제: 상위 max_keep 만 넘김(검색 순위=position 보존).
-    overflow = kept[max_keep:]
-    for o in overflow:
-        rejected.append({**o, "reject_reason": "비전 후보 상한 초과(검색 하위)"})
-    return kept[:max_keep], rejected
+    # 검색 순위 컷 없음 — 노이즈 아닌 후보는 전부 비전으로.
+    return kept, rejected

@@ -69,8 +69,15 @@ SERPER_IMAGES_ENDPOINT = os.getenv(
 )
 # 검색 후보 수(1등이 늘 정확하진 않음 → 여러 개 받아 검증).
 PRODUCT_IMAGE_SEARCH_NUM = int(os.getenv("PRODUCT_IMAGE_SEARCH_NUM", "10"))
-# 1차(메타데이터) 필터를 통과시켜 비전 검증에 넘길 최대 후보 수(비용 통제).
-PRODUCT_IMAGE_VISION_MAX = int(os.getenv("PRODUCT_IMAGE_VISION_MAX", "4"))
+# (보강 B) 검색 순위 기반 컷 제거 — 명백한 노이즈가 아닌 후보는 검색
+# 순위와 무관하게 전부 비전으로 넘긴다. 비전 비용은 검색 단계에서 받는
+# 수(PRODUCT_IMAGE_SEARCH_NUM)로 통제. (구 PRODUCT_IMAGE_VISION_MAX 폐지)
+# (보강 A) 후보 이미지를 서버가 직접 다운로드해 base64 로 비전에 전달 —
+# 제공자측 다운로드 실패를 원천 차단, 후보 1개 실패가 전체를 막지 않음.
+PRODUCT_IMAGE_DL_TIMEOUT = float(os.getenv("PRODUCT_IMAGE_DL_TIMEOUT", "12"))
+# 다운로드 이미지 1장 용량 상한(base64 페이로드 폭주 방지). 초과 시 그
+# 후보만 탈락. 기본 8MB — 일반 제품컷 충분.
+PRODUCT_IMAGE_MAX_BYTES = int(os.getenv("PRODUCT_IMAGE_MAX_BYTES", str(8 * 1024 * 1024)))
 # 명백히 작은 이미지(썸네일/아이콘) 배제 최소 변(px). 너무 높게 잡지 않는다.
 PRODUCT_IMAGE_MIN_PX = int(os.getenv("PRODUCT_IMAGE_MIN_PX", "300"))
 # 비전 검증 모델 — RunYourAI 게이트웨이는 provider/model 형식 요구

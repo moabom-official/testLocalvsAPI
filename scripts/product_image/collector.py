@@ -29,7 +29,6 @@ def collect_and_store_product_image(
             PRODUCT_IMAGE_ENABLED,
             PRODUCT_IMAGE_MIN_PX,
             PRODUCT_IMAGE_SEARCH_NUM,
-            PRODUCT_IMAGE_VISION_MAX,
         )
         from scripts.product_image.store import get_product, set_product_image
 
@@ -84,24 +83,28 @@ def collect_and_store_product_image(
             return result
 
         # 2) 메타데이터 1차 필터 (명백한 노이즈만)
+        # 보강 B: 검색 순위 컷 없음 — 명백한 노이즈만 거르고 전부 비전으로.
         kept, meta_rejected = metadata_prefilter(
-            candidates, min_px=PRODUCT_IMAGE_MIN_PX,
-            max_keep=PRODUCT_IMAGE_VISION_MAX)
+            candidates, min_px=PRODUCT_IMAGE_MIN_PX)
         for r in meta_rejected:
             print(f"[IMG]   ✗ meta-reject ({r.get('reject_reason')}) "
                   f"url={r.get('image_url')}")
+        # 로그 보강: 비전에 넘기는(=1차 통과) 후보 URL 전부 출력.
+        for k in kept:
+            print(f"[IMG]   → vision-candidate url={k.get('image_url')}")
         print(f"[PERF][img] product={product_id} meta_kept={len(kept)} "
-              f"meta_rejected={len(meta_rejected)}")
+              f"meta_rejected={len(meta_rejected)} → vision={len(kept)}")
         if not kept:
             print(f"[IMG] product={product_id} 1차 필터 후 후보 0 → no_image")
             result["status"] = "no_image"
             result["reason"] = "all_metadata_rejected"
             return result
 
-        # 3) 비전 검증 (1차 통과 후보만 — 일괄 1회 호출)
+        # 3) 비전 검증 — 보강 A: 서버가 후보를 다운로드(격리)해 base64 로
+        #    평가. 후보 1개 다운로드 실패는 그 후보만 탈락.
         try:
             chosen, evals, v_perf = vision_select(name, kept)
-        except Exception as e:  # noqa: BLE001 — 비전 오류 안전 퇴화
+        except Exception as e:  # noqa: BLE001 — 최후 안전망(예외 격리)
             print(f"[IMG] product={product_id} vision FAILED "
                   f"{type(e).__name__}: {e} → no_image")
             result["status"] = "no_image"
@@ -109,15 +112,23 @@ def collect_and_store_product_image(
             return result
         for e in evals:
             v = e.get("vision", {})
-            mark = "✓ pick" if (chosen and e.get("image_url") ==
-                                chosen.get("image_url")) else "✗"
+            if v.get("download_failed"):
+                mark = "✗ dl-fail"
+            elif chosen and e.get("image_url") == chosen.get("image_url"):
+                mark = "✓ pick"
+            else:
+                mark = "✗"
             print(f"[IMG]   {mark} score={v.get('score')} "
                   f"noise={v.get('is_noise')} "
                   f"reason={v.get('reason')!r} url={e.get('image_url')}")
-        print(f"[PERF][img] product={product_id} vision_calls="
-              f"{v_perf.get('vision_calls')} vision_ms={v_perf.get('ms')} "
+        print(f"[PERF][img] product={product_id} "
+              f"downloaded={v_perf.get('downloaded')} "
+              f"dl_failed={v_perf.get('download_failed')} "
+              f"vision_calls={v_perf.get('vision_calls')} "
+              f"vision_ms={v_perf.get('ms')} "
               f"all_noise={v_perf.get('all_noise')} "
-              f"parse_failed={v_perf.get('parse_failed')}")
+              f"parse_failed={v_perf.get('parse_failed')} "
+              f"err={v_perf.get('error')}")
 
         if not chosen:
             print(f"[IMG] product={product_id} 모든 후보 명백한 노이즈 "
