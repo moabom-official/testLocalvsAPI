@@ -10,9 +10,11 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 from scripts.database.queries import query_one, query_all, execute_insert, execute_update
 from scripts.reports.pdf_generator import render_report_pdf
+from scripts.config import REPORT4_INPUT_EXPANSION
 from scripts.reports.product_integrated_insight import (
     collect_transcript_reports_for_product,
     ensure_comment_analysis_for_videos,
+    ensure_all_reports_for_product,
     build_product_integrated_insight_report,
     save_product_integrated_report,
     get_latest_product_integrated_report,
@@ -20,6 +22,7 @@ from scripts.reports.product_integrated_insight import (
     get_last_collect_perf,
     get_last_llm_perf,
     get_last_comment_heal_perf,
+    get_last_input_expansion_perf,
 )
 from scripts.utils.markdown_renderer import markdown_to_html
 
@@ -123,17 +126,25 @@ def register_product_routes(app):
 
         route_t0 = perf_counter()
 
-        # ── 자막·댓글 self-healing 병렬 실행 ────────────────────────────
-        # 자막: collect_transcript_reports_for_product (기존)
-        # 댓글: ensure_comment_analysis_for_videos — agent_decisions 미존재 영상에
-        #       기존 process_comments_with_agent (sync.py 의 7-step 댓글 agent) 호출.
-        # 두 self-healing 은 서로 다른 YouTube API endpoint + 다른 LLM 호출 + 다른
-        # DB 테이블을 사용하므로 독립. asyncio.gather 로 동시 실행해 latency 단축.
+        # ── self-healing ──────────────────────────────────────────────
+        # Phase 2-a ON: 댓글 agent self-heal 을 먼저(②③ 이 comment_sentiments
+        #   에 의존) → ensure_all_reports_for_product 가 ①②③ 보장+수집.
+        #   collect_transcript_reports_for_product 는 부분 upsert 로 ②③ 을
+        #   NULL 로 덮으므로 ON 경로에서 호출하지 않는다(중복 ① build 도 방지).
+        # OFF: Phase 2-a 이전과 정확히 동일 — 자막 ① + 댓글 agent 를 병렬.
         collect_t0 = perf_counter()
-        per_video_reports, comment_heal_stats = await asyncio.gather(
-            collect_transcript_reports_for_product(product_id, video_ids),
-            ensure_comment_analysis_for_videos(product["name"], video_ids),
-        )
+        if REPORT4_INPUT_EXPANSION:
+            comment_heal_stats = await ensure_comment_analysis_for_videos(
+                product["name"], video_ids
+            )
+            per_video_reports = await ensure_all_reports_for_product(
+                product_id, product["name"], video_ids
+            )
+        else:
+            per_video_reports, comment_heal_stats = await asyncio.gather(
+                collect_transcript_reports_for_product(product_id, video_ids),
+                ensure_comment_analysis_for_videos(product["name"], video_ids),
+            )
         collect_ms = (perf_counter() - collect_t0) * 1000
 
         if len(per_video_reports) < 2:
@@ -172,6 +183,7 @@ def register_product_routes(app):
         collect_detail = get_last_collect_perf()
         llm_detail = get_last_llm_perf()
         comment_heal_detail = get_last_comment_heal_perf()
+        input_expansion_detail = get_last_input_expansion_perf()
         print(
             f"[PERF][insight_route] product_id={product_id} total_ms={total_ms:.1f} "
             f"collect_ms={collect_ms:.1f} build_ms={build_ms:.1f} llm_ms={llm_detail.get('llm_ms')} "
@@ -179,6 +191,8 @@ def register_product_routes(app):
             f"comment_heal={comment_heal_detail.get('healed', 0)}/{comment_heal_detail.get('total_videos', 0)} "
             f"comment_already={comment_heal_detail.get('already_analyzed', 0)} "
             f"comment_failed={comment_heal_detail.get('failed', 0)} "
+            f"input_expansion={REPORT4_INPUT_EXPANSION} "
+            f"bundles={input_expansion_detail.get('bundles', 0)} "
             f"fallback={llm_detail.get('fallback')}"
         )
 
@@ -203,6 +217,7 @@ def register_product_routes(app):
                 "llm_fallback": llm_detail.get("fallback"),
                 "collect_detail": collect_detail,
                 "comment_heal_detail": comment_heal_detail,
+                "input_expansion_detail": input_expansion_detail,
             },
         }
 

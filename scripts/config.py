@@ -22,3 +22,11 @@ RUNYOURAI_MODEL = os.getenv("RUNYOURAI_MODEL", "openai/gpt-4.1-2025-04-14")
 # Server
 PORT = int(os.getenv("PORT", 8000))
 HOST = "0.0.0.0"
+
+# ── Phase 2-a: 보고서 ④ 입력 확장 (영상별 ①②③ 종합) on/off ──
+# on  : ④ 가 영상 N개의 ①②③ 을 종합 (Phase 2-a 기본)
+# off : Phase 2-a 이전과 정확히 동일 (영상별 ① + ⑤용 댓글 집계만)
+# 회귀 비교·긴급 대응용. REPORT4_INPUT_EXPANSION=0/false/no/off → 비활성.
+REPORT4_INPUT_EXPANSION = os.getenv(
+    "REPORT4_INPUT_EXPANSION", "1"
+).strip().lower() not in ("0", "false", "no", "off")
