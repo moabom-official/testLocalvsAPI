@@ -12,6 +12,9 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localho
 # API Keys
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "")
 HF_TOKEN = os.getenv("HF_TOKEN", "")
+# Serper (serper.dev) — Google Images 검색. 키 값은 .env 에만 존재하며
+# (gitignore), 여기서는 환경변수로 읽기만 한다 — 코드/커밋 하드코딩 금지.
+SERPER_API_KEY = os.getenv("SERPER_API_KEY", "")
 
 # RunYourAI — 통합 LLM provider (OpenAI / Claude / Gemini 단일 키).
 # 모델 형식: "openai/gpt-4.1", "claude/claude-haiku-4-5", "gemini/gemini-2.5-flash" 등.
@@ -53,3 +56,30 @@ REPORT4_RAG_DB_PATH = os.getenv(
 )
 # 검색 쿼리당 상위 청크 수.
 REPORT4_RAG_TOP_K = int(os.getenv("REPORT4_RAG_TOP_K", "8"))
+
+# ── Phase 3: 제품 이미지 검색·검증·저장 ──
+# off 면 이미지 수집을 통째로 건너뜀(긴급 대응·비용 통제). 키 부재여도
+# 안전 퇴화(이미지 없이 진행) — 호출부가 죽지 않는다.
+PRODUCT_IMAGE_ENABLED = os.getenv(
+    "PRODUCT_IMAGE_ENABLED", "1"
+).strip().lower() not in ("0", "false", "no", "off")
+# Serper Google Images 엔드포인트 (공식 문서 기준).
+SERPER_IMAGES_ENDPOINT = os.getenv(
+    "SERPER_IMAGES_ENDPOINT", "https://google.serper.dev/images"
+)
+# 검색 후보 수(1등이 늘 정확하진 않음 → 여러 개 받아 검증).
+PRODUCT_IMAGE_SEARCH_NUM = int(os.getenv("PRODUCT_IMAGE_SEARCH_NUM", "10"))
+# 1차(메타데이터) 필터를 통과시켜 비전 검증에 넘길 최대 후보 수(비용 통제).
+PRODUCT_IMAGE_VISION_MAX = int(os.getenv("PRODUCT_IMAGE_VISION_MAX", "4"))
+# 명백히 작은 이미지(썸네일/아이콘) 배제 최소 변(px). 너무 높게 잡지 않는다.
+PRODUCT_IMAGE_MIN_PX = int(os.getenv("PRODUCT_IMAGE_MIN_PX", "300"))
+# 비전 검증 모델 — RunYourAI 게이트웨이는 provider/model 형식 요구
+# (Phase 2-b 에서 겪은 이슈). 기본은 비전 가능한 RUNYOURAI_MODEL.
+PRODUCT_IMAGE_VISION_MODEL = os.getenv(
+    "PRODUCT_IMAGE_VISION_MODEL", RUNYOURAI_MODEL
+)
+# 검색 쿼리에 덧붙여 단독 제품 사진을 유도하는 표현(상수 — 근거: 리뷰
+# 썸네일·밈·비교짤보다 공식/스토어 제품컷이 잘 잡히도록).
+PRODUCT_IMAGE_QUERY_SUFFIX = os.getenv(
+    "PRODUCT_IMAGE_QUERY_SUFFIX", "공식 제품 사진"
+)
