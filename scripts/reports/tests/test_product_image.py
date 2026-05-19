@@ -4,7 +4,7 @@ vision_call 주입으로 비전 API 없이 채택 규칙 검증.
 """
 from scripts.product_image.search import build_query
 from scripts.product_image.metadata_filter import metadata_prefilter
-from scripts.product_image.vision_verify import vision_select
+from scripts.product_image.vision_verify import source_tier, vision_select
 
 
 def _cands(n=5):
@@ -64,36 +64,77 @@ def test_metadata_prefilter_keeps_when_size_unknown():
     assert len(kept) == 1
 
 
-# ── vision_select: 노이즈만 탈락 + 최선 채택 ───────────────────
+# 새 스키마 비전 응답 빌더: front_back/not_cropped/clarity (각 0~5)
+def _vr(*rows):
+    items = []
+    for i, (fb, cr, cl, noise, rs) in enumerate(rows):
+        items.append(
+            f'{{"idx":{i},"front_back":{fb},"not_cropped":{cr},'
+            f'"clarity":{cl},"is_noise":{str(noise).lower()},'
+            f'"reason":"{rs}"}}')
+    return '{"results":[' + ",".join(items) + "]}"
 
 
-def test_vision_select_picks_best_non_noise():
-    def fake(_name, cs):
-        return ('{"results":['
-                '{"idx":0,"product_visible_score":4,"is_noise":false,"reason":"ok"},'
-                '{"idx":1,"product_visible_score":9,"is_noise":false,"reason":"best"},'
-                '{"idx":2,"product_visible_score":10,"is_noise":true,"reason":"밈"}'
-                ']}')
+# ── vision_select: 노이즈만 탈락 + 최선 채택 (1순위=제품 드러남) ──
+
+
+def test_vision_select_picks_highest_reveal_non_noise():
+    # idx1: 전후면·온전 → 드러남 최고. idx2: 노이즈. idx0: 한면/잘림.
+    def fake(_n, cs):
+        return _vr((1, 1, 2, False, "한면 잘림"),
+                   (5, 5, 5, False, "전후면 온전"),
+                   (5, 5, 5, True, "밈"))
 
     chosen, evals, perf = vision_select(
         "p", _cands(3), vision_call=fake, download_fn=_all_ok)
-    assert chosen is not None
     assert chosen["image_url"] == "http://x/1.jpg"
     assert perf["vision_calls"] == 1 and perf["downloaded"] == 3
     noisy = [e for e in evals if e["vision"]["is_noise"]]
     assert noisy and noisy[0]["image_url"] == "http://x/2.jpg"
 
 
+def test_front_back_beats_single_face():
+    # 전후면 다 보임(idx1) > 한 면만(idx0). 잘림·선명도는 동일.
+    def fake(_n, cs):
+        return _vr((1, 5, 5, False, "전면만"),
+                   (5, 5, 5, False, "전후면"))
+
+    chosen, _, _ = vision_select(
+        "p", _cands(2), vision_call=fake, download_fn=_all_ok)
+    assert chosen["image_url"] == "http://x/1.jpg"
+
+
+def test_not_cropped_beats_cropped():
+    # 온전(idx1) > 잘림(idx0). 전후면·선명도 동일.
+    def fake(_n, cs):
+        return _vr((5, 1, 5, False, "아래 잘림"),
+                   (5, 5, 5, False, "온전"))
+
+    chosen, _, _ = vision_select(
+        "p", _cands(2), vision_call=fake, download_fn=_all_ok)
+    assert chosen["image_url"] == "http://x/1.jpg"
+
+
 def test_vision_select_all_noise_returns_none():
     def fake(_n, cs):
-        rs = ",".join(
-            f'{{"idx":{i},"product_visible_score":0,"is_noise":true,"reason":"x"}}'
-            for i in range(len(cs)))
-        return '{"results":[' + rs + "]}"
+        return _vr(*[(0, 0, 0, True, "x") for _ in cs])
 
     chosen, _, perf = vision_select(
         "p", _cands(3), vision_call=fake, download_fn=_all_ok)
     assert chosen is None and perf.get("all_noise") is True
+
+
+def test_vision_select_no_perfect_candidate_still_picks_best():
+    # 아무도 완벽치 않아도(전부 부분 점수) 최선이 반드시 채택 — no_image X
+    def fake(_n, cs):
+        return _vr((1, 1, 1, False, "약함"),
+                   (2, 3, 1, False, "그나마 나음"),
+                   (1, 0, 2, False, "약함2"))
+
+    chosen, _, perf = vision_select(
+        "p", _cands(3), vision_call=fake, download_fn=_all_ok)
+    assert chosen is not None and chosen["image_url"] == "http://x/1.jpg"
+    assert perf.get("all_noise") is None
 
 
 def test_vision_select_parse_fail_falls_back_to_first_downloadable():
@@ -105,10 +146,88 @@ def test_vision_select_parse_fail_falls_back_to_first_downloadable():
     assert perf.get("parse_failed") is True
 
 
+def test_vision_select_missing_fields_conservative_no_crash():
+    # 새 항목 누락 → 보수적 0 처리, 크래시·무조건 no_image 아님
+    def fake(_n, cs):
+        return ('{"results":['
+                '{"idx":0,"is_noise":false,"reason":"필드없음"},'
+                '{"idx":1,"front_back":5,"not_cropped":5,"clarity":5,'
+                '"is_noise":false,"reason":"풀"}'
+                ']}')
+
+    chosen, evals, _ = vision_select(
+        "p", _cands(2), vision_call=fake, download_fn=_all_ok)
+    assert chosen["image_url"] == "http://x/1.jpg"   # 필드있는 쪽이 우월
+    assert evals[0]["vision"]["reveal_score"] == 0.0  # 누락→보수적 0
+
+
 def test_vision_select_no_candidates():
     chosen, _, perf = vision_select(
         "p", [], vision_call=lambda n, c: "{}", download_fn=_all_ok)
     assert chosen is None and perf.get("error") == "no_candidates"
+
+
+# ── 출처 등급(2순위) + 동점 깨기 ───────────────────────────────
+
+
+def test_source_tier_light_classification():
+    assert source_tier("apple.com") == 2
+    assert source_tier("store.storeimages.cdn-apple.com") == 2  # 공식>‘store’
+    assert source_tier("www.lge.co.kr") == 2
+    assert source_tier("kt-mall.co.kr") == 0
+    assert source_tier("i.namu.wiki") == 0
+    assert source_tier("blog.naver.com") == 0
+    assert source_tier("somerandomnews.co.kr") == 1   # 애매 → 기본 중간
+    assert source_tier("") == 1
+
+
+def _c(url, dom):
+    return {"image_url": url, "domain": dom, "link": "", "title": "",
+            "width": 800, "height": 800}
+
+
+def test_tie_broken_by_source_official_over_shop():
+    # 제품 드러남 동점(둘 다 5/5/5) → 출처 등급으로 공식(뒤 순서) 채택
+    cands = [_c("http://kt-mall.co.kr/a.jpg", "kt-mall.co.kr"),
+             _c("http://apple.com/b.jpg", "apple.com")]
+
+    def fake(_n, cs):
+        return _vr((5, 5, 5, False, "shop"), (5, 5, 5, False, "official"))
+
+    chosen, _, perf = vision_select(
+        "p", cands, vision_call=fake, download_fn=_all_ok)
+    assert chosen["domain"] == "apple.com"
+    assert perf["chosen_source_tier"] == 2
+    assert perf["tie_broken_by_source"] is True
+
+
+def test_reveal_precedence_not_overridden_by_source():
+    # 쇼핑몰 드러남 高 vs 공식 드러남 低 → 드러남 우선(쇼핑몰 채택)
+    cands = [_c("http://kt-mall.co.kr/a.jpg", "kt-mall.co.kr"),
+             _c("http://apple.com/b.jpg", "apple.com")]
+
+    def fake(_n, cs):
+        return _vr((5, 5, 5, False, "shop full"),
+                   (1, 1, 1, False, "official partial"))
+
+    chosen, _, perf = vision_select(
+        "p", cands, vision_call=fake, download_fn=_all_ok)
+    assert chosen["domain"] == "kt-mall.co.kr"   # 드러남 1순위
+    assert perf["tie_broken_by_source"] is False
+
+
+def test_full_tie_keeps_search_order():
+    # 드러남도 출처등급도 동일(둘 다 tier1) → 먼저 온 후보 유지
+    cands = [_c("http://news-a.com/a.jpg", "news-a.com"),
+             _c("http://news-b.com/b.jpg", "news-b.com")]
+
+    def fake(_n, cs):
+        return _vr((4, 4, 4, False, "a"), (4, 4, 4, False, "b"))
+
+    chosen, _, perf = vision_select(
+        "p", cands, vision_call=fake, download_fn=_all_ok)
+    assert chosen["domain"] == "news-a.com"
+    assert perf["tie_broken_by_source"] is False
 
 
 # ── 보강 A: 후보별 다운로드 실패 격리 ──────────────────────────
@@ -127,10 +246,7 @@ def test_vision_select_one_download_fail_others_proceed():
         return out
 
     def fake(_n, cs):  # cs = 다운로드 성공분만 (idx 재부여)
-        return ('{"results":['
-                '{"idx":0,"product_visible_score":7,"is_noise":false,"reason":"ok"},'
-                '{"idx":1,"product_visible_score":9,"is_noise":false,"reason":"best"}'
-                ']}')
+        return _vr((3, 3, 3, False, "ok"), (5, 5, 5, False, "best"))
 
     chosen, evals, perf = vision_select(
         "p", _cands(3), vision_call=fake, download_fn=dl)
@@ -139,7 +255,8 @@ def test_vision_select_one_download_fail_others_proceed():
     # 다운로드 실패 후보가 사유와 함께 평가목록에 남음
     dlf = [e for e in evals if e["vision"].get("download_failed")]
     assert dlf and "HTTP 404" in dlf[0]["vision"]["reason"]
-    # 평가된 2개 중 최고점 채택
+    # 평가된 2개 중 드러남 최고 채택 (다운로드 성공분 idx0=cands[0],
+    # idx1=cands[2]; best 는 두 번째 → http://x/2.jpg)
     assert chosen["image_url"] == "http://x/2.jpg"
 
 

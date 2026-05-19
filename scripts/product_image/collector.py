@@ -118,7 +118,9 @@ def collect_and_store_product_image(
                 mark = "✓ pick"
             else:
                 mark = "✗"
-            print(f"[IMG]   {mark} score={v.get('score')} "
+            print(f"[IMG]   {mark} reveal={v.get('reveal_score')} "
+                  f"(fb={v.get('front_back')} crop={v.get('not_cropped')} "
+                  f"clr={v.get('clarity')}) tier={v.get('source_tier')} "
                   f"noise={v.get('is_noise')} "
                   f"reason={v.get('reason')!r} url={e.get('image_url')}")
         print(f"[PERF][img] product={product_id} "
@@ -128,6 +130,9 @@ def collect_and_store_product_image(
               f"vision_ms={v_perf.get('ms')} "
               f"all_noise={v_perf.get('all_noise')} "
               f"parse_failed={v_perf.get('parse_failed')} "
+              f"chosen_reveal={v_perf.get('chosen_reveal_score')} "
+              f"chosen_tier={v_perf.get('chosen_source_tier')} "
+              f"tie_by_source={v_perf.get('tie_broken_by_source')} "
               f"err={v_perf.get('error')}")
 
         if not chosen:
@@ -151,8 +156,8 @@ def collect_and_store_product_image(
 
         vv = chosen.get("vision", {})
         print(f"[IMG] product={product_id}({name}) ✅ STORED "
-              f"score={vv.get('score')} reason={vv.get('reason')!r} "
-              f"url={url}")
+              f"reveal={vv.get('reveal_score')} tier={vv.get('source_tier')} "
+              f"reason={vv.get('reason')!r} url={url}")
         result["status"] = "stored"
         result["image_url"] = url
         return result
