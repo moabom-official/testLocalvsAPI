@@ -18,7 +18,12 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
 
-from scripts.database.queries import query_all
+# ⚠️ scripts.database.queries (→ psycopg2) 는 모듈 최상단에서 import 하지
+# 않는다. DB 를 실제로 쓰는 함수는 collect_report_bundles 하나뿐이고,
+# serialize_*/truncate_bundles/assemble_input_blocks/serialize_bundles 는
+# 순수 함수다. DB import 를 collect_report_bundles 내부로 지연시켜, 순수
+# 함수만 쓰는 경로(테스트·오프라인)에서 psycopg2 가 끌려오지 않게 한다.
+# 이는 본 모듈의 "수집(DB) / 순수 변환 분리" 설계와도 일치한다.
 
 # ── 길이 관리 상수 (근거: §4-3) ──────────────────────────────────
 # 영상당 입력이 보고서 1개(①) → 3개(①②③) 로 늘었다. 일반 영상 수(5~10)면
@@ -66,6 +71,8 @@ def collect_report_bundles(
     """
     if not video_ids:
         return []
+    from scripts.database.queries import query_all  # 지연 import (psycopg2 격리)
+
     placeholders = ",".join(["%s"] * len(video_ids))
     rows = query_all(
         f"SELECT video_id, transcript_report, comment_report, integrated_report "
