@@ -30,3 +30,23 @@ HOST = "0.0.0.0"
 REPORT4_INPUT_EXPANSION = os.getenv(
     "REPORT4_INPUT_EXPANSION", "1"
 ).strip().lower() not in ("0", "false", "no", "off")
+
+# ── Phase 2-b: 보고서 ④ 생성 RAG (의미 검색·재정렬) on/off ──
+# on  : truncate_bundles(절삭) 자리에 RAG 검색·재정렬 (Phase 2-b 기본)
+# off : Phase 2-a 동작(=truncate_bundles 절삭)과 정확히 동일
+# REPORT4_INPUT_EXPANSION 이 off 면 RAG 도 무의미하므로 자동 off.
+# RAG 실패(임베딩 API·벡터DB)는 절삭으로 안전 퇴화 — ④ 생성은 계속.
+REPORT4_RAG = os.getenv(
+    "REPORT4_RAG", "1"
+).strip().lower() not in ("0", "false", "no", "off")
+# 임베딩 모델 (기존 OpenAI 호환 경로 재활용). 변경 시 재인덱싱 필요.
+REPORT4_RAG_EMBED_MODEL = os.getenv(
+    "REPORT4_RAG_EMBED_MODEL", "text-embedding-3-small"
+)
+# RAG 전용 SQLite 벡터 저장소 경로 (기존 14테이블·PostgreSQL 과 완전 분리).
+REPORT4_RAG_DB_PATH = os.getenv(
+    "REPORT4_RAG_DB_PATH",
+    os.path.join(os.path.dirname(os.path.dirname(__file__)), ".rag", "rag_vectors.sqlite3"),
+)
+# 검색 쿼리당 상위 청크 수.
+REPORT4_RAG_TOP_K = int(os.getenv("REPORT4_RAG_TOP_K", "8"))

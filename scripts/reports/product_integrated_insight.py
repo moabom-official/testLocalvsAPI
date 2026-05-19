@@ -878,13 +878,44 @@ def build_product_integrated_insight_report(
     if expansion_on:
         try:
             from scripts.reports._pir_input import (
+                TOTAL_INPUT_MAX_CHARS,
                 assemble_input_blocks,
                 serialize_bundles,
                 truncate_bundles,
             )
+            from scripts.config import (
+                REPORT4_RAG,
+                REPORT4_RAG_DB_PATH,
+                REPORT4_RAG_TOP_K,
+            )
 
             serialized = serialize_bundles(per_video_reports)
-            truncated_bundles, trunc_measure = truncate_bundles(serialized)
+
+            # Phase 2-b: truncate_bundles 자리에 RAG 검색·재정렬.
+            # 동일 입출력 계약. RAG 경로의 어떤 예외도 절삭으로 안전 퇴화
+            # → ④ 생성 계속(Phase 2-a 동작 보장).
+            if REPORT4_RAG:
+                try:
+                    from scripts.rag.retriever import retrieve_bundles
+
+                    truncated_bundles, trunc_measure = retrieve_bundles(
+                        serialized,
+                        product_key=product_name,
+                        db_path=REPORT4_RAG_DB_PATH,
+                        top_k=REPORT4_RAG_TOP_K,
+                        total_cap=TOTAL_INPUT_MAX_CHARS,
+                    )
+                except Exception as e:  # noqa: BLE001 — RAG→절삭 안전 퇴화
+                    print(f"[WARN] report4 RAG failed → truncate fallback: "
+                          f"{type(e).__name__}: {e}")
+                    truncated_bundles, trunc_measure = truncate_bundles(serialized)
+                    trunc_measure = {**trunc_measure, "rag": False,
+                                     "rag_fallback": True}
+            else:
+                truncated_bundles, trunc_measure = truncate_bundles(serialized)
+                trunc_measure = {**trunc_measure, "rag": False,
+                                 "rag_fallback": False}
+
             expanded_blocks = assemble_input_blocks(truncated_bundles)
             # _verify_report4 grounding 정합용 — 실제 LLM 에 넣는 ①②③ 입력.
             truncated = truncated_bundles
@@ -895,9 +926,24 @@ def build_product_integrated_insight_report(
             }
             print(
                 f"[INPUT] report4 expansion ON videos={len(truncated_bundles)} "
+                f"rag={trunc_measure.get('rag')} "
+                f"rag_fallback={trunc_measure.get('rag_fallback')} "
                 f"chars_after={trunc_measure.get('total_chars_after')} "
                 f"shrink={trunc_measure.get('proportional_shrink')}"
             )
+            if trunc_measure.get("rag") and not trunc_measure.get("rag_fallback"):
+                print(
+                    f"[PERF][rag] product={product_name} "
+                    f"indexed={trunc_measure.get('indexed_total')} "
+                    f"embedded_new={trunc_measure.get('embedded_new')} "
+                    f"cached={trunc_measure.get('cached_skipped')} "
+                    f"embed_calls={trunc_measure.get('embed_calls')} "
+                    f"embed_ms={trunc_measure.get('embed_ms')} "
+                    f"queries={trunc_measure.get('queries')} "
+                    f"retrieved={trunc_measure.get('retrieved_chunks')} "
+                    f"dropped={trunc_measure.get('dropped_low_relevance')} "
+                    f"chars_after={trunc_measure.get('total_chars_after')}"
+                )
         except Exception as e:  # noqa: BLE001 — 확장 실패 시 레거시로 안전 퇴화
             print(f"[WARN] report4 input expansion failed → legacy input: "
                   f"{type(e).__name__}: {e}")
