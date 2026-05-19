@@ -5,7 +5,7 @@ import asyncio
 import os
 from time import perf_counter
 
-from fastapi import HTTPException, Request
+from fastapi import BackgroundTasks, HTTPException, Request
 from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 from scripts.database.queries import query_one, query_all, execute_insert, execute_update
@@ -85,6 +85,21 @@ def register_product_routes(app):
             "videos": videos,
         })
 
+    @app.post("/products/{product_id}/image")
+    async def collect_product_image(product_id: int, force: bool = False):
+        """Phase 3: 제품 이미지 수집을 명시적으로 트리거(수동/검증용).
+
+        collect_and_store_product_image 는 절대 예외를 던지지 않으므로
+        결과 dict 를 그대로 반환. 동기 함수라 to_thread 로 분리.
+        """
+        from scripts.product_image.collector import (
+            collect_and_store_product_image,
+        )
+        result = await asyncio.to_thread(
+            collect_and_store_product_image, product_id, force=force
+        )
+        return result
+
     @app.delete("/products/{product_id}")
     async def delete_product(product_id: int):
         """Delete a product. CASCADE removes related videos, comments, transcripts, reports."""
@@ -101,11 +116,24 @@ def register_product_routes(app):
     # ────────────────────────────────────────────────────────────────
 
     @app.post("/products/{product_id}/integrated-insight")
-    async def create_product_integrated_insight(product_id: int, data: dict):
+    async def create_product_integrated_insight(
+        product_id: int, data: dict, background_tasks: BackgroundTasks
+    ):
         """선택된 영상들의 자막 기반 보고서를 합성하여 제품 단위 통합 인사이트 보고서를 생성한다."""
         product = query_one("SELECT * FROM tech_products WHERE product_id = %s", (product_id,))
         if not product:
             raise HTTPException(status_code=404, detail="Product not found")
+
+        # Phase 3: 제품 이미지 수집을 백그라운드로 예약 — 응답 송신 후 실행
+        # 되므로 ④ 생성 지연·실패에 영향 0(독립). 없으면 수집·있으면 캐시
+        # 재사용. collect_and_store_product_image 는 절대 예외를 던지지 않음.
+        def _bg_collect_image(pid: int):
+            from scripts.product_image.collector import (
+                collect_and_store_product_image,
+            )
+            collect_and_store_product_image(pid)
+
+        background_tasks.add_task(_bg_collect_image, product_id)
 
         raw_ids = data.get("video_ids") or []
         if not isinstance(raw_ids, list):

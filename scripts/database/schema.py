@@ -16,8 +16,22 @@ def init_db():
             name         VARCHAR(255) NOT NULL,
             brand        VARCHAR(255),
             category     VARCHAR(255),
+            image_url    TEXT,
             created_at   TIMESTAMP DEFAULT NOW()
         );
+    """)
+
+    # Phase 3 마이그레이션: 기존 tech_products 에 image_url 1개만 추가.
+    # (CREATE TABLE IF NOT EXISTS 는 기존 테이블에 컬럼을 더하지 않음)
+    # ★ 이미지 컬럼 1개에만 적용 — 다른 테이블/스키마는 손대지 않는다.
+    cursor.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                          WHERE table_name='tech_products' AND column_name='image_url') THEN
+                ALTER TABLE tech_products ADD COLUMN image_url TEXT;
+            END IF;
+        END $$;
     """)
     
     cursor.execute("""
