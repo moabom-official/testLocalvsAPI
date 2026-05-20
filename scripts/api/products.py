@@ -271,6 +271,85 @@ def register_product_routes(app):
             "created_at": latest.get("created_at").isoformat() if latest.get("created_at") else None,
         }
 
+    @app.get("/products/{product_id}/popup-summary")
+    async def get_product_popup_summary(product_id: int):
+        """Phase 5: 최종 판정 팝업이 쓰는 모든 값을 한 JSON 으로 반환.
+
+        ★ LLM 호출 0건 — ④ 마크다운을 결정론적으로 추출(§4) + 가격·스펙 캐시
+        (§5)만 사용. ④ 가 아직 없으면 404 (프론트는 안전 퇴화로 곧장 ④ 화면).
+        외부 호출(가격·스펙) 실패는 §7 fallback 으로 항목만 빈 값.
+        """
+        from scripts.popup.extractor import extract_popup_data
+        from scripts.popup.product_meta import collect_and_cache_meta
+
+        product = query_one(
+            "SELECT product_id, name, brand, category, image_url "
+            "FROM tech_products WHERE product_id = %s",
+            (product_id,),
+        )
+        if not product:
+            raise HTTPException(status_code=404, detail="Product not found")
+
+        latest = get_latest_product_integrated_report(product_id)
+        if not latest or not latest.get("report_text"):
+            # ④ 부재 — 프론트는 모달 띄우지 않고 곧장 ④ 생성/조회로(§3-C).
+            raise HTTPException(status_code=404,
+                                detail="통합 인사이트 보고서가 아직 없습니다")
+
+        # 1) ④ 결정론적 추출 (순수)
+        popup = extract_popup_data(latest["report_text"])
+
+        # 2) 가격·스펙 — 외부 수집(캐시 hit 우선). sync → to_thread 로 비동기화.
+        meta_result = await asyncio.to_thread(
+            collect_and_cache_meta, product_id,
+            product.get("name") or "", product.get("brand") or "",
+        )
+
+        # 3) 스펙 한 줄 조립 (가져온 항목만 — §7)
+        spec_parts = []
+        if meta_result.get("screen_size"):
+            spec_parts.append(meta_result["screen_size"])
+        if meta_result.get("release_year"):
+            spec_parts.append(f"{meta_result['release_year']}년 출시")
+        if product.get("category"):
+            spec_parts.append(product["category"])
+        spec_display = " · ".join(spec_parts) if spec_parts else None
+
+        # 4) missing 합산
+        missing = list(popup.get("missing", []))
+        if not meta_result.get("price_display"):
+            missing.append("price")
+        if not meta_result.get("screen_size"):
+            missing.append("spec.screen_size")
+        if not meta_result.get("release_year"):
+            missing.append("spec.release_year")
+        if not (product.get("image_url") or "").strip():
+            missing.append("image_url")
+        if not spec_display:
+            missing.append("spec_display")
+
+        return {
+            "product": {
+                "product_id": product_id,
+                "name": product.get("name"),
+                "brand": product.get("brand"),
+                "category": product.get("category"),
+                "image_url": product.get("image_url"),
+            },
+            "meta": {
+                "videos": popup.get("videos_n"),
+                "comments": popup.get("comments_n"),
+            },
+            "verdict": popup["verdict"],
+            "pros": popup["pros"],
+            "cons": popup["cons"],
+            "caveat": popup["caveat"],
+            "price_display": meta_result.get("price_display"),
+            "spec_display": spec_display,
+            "missing": missing,
+            "report_id": latest["id"],   # 프론트가 후속 PDF 등 연결 가능
+        }
+
     @app.get("/products/{product_id}/integrated-insight/{report_id}.pdf")
     async def download_integrated_insight_pdf(product_id: int, report_id: int):
         """통합 인사이트 보고서를 PDF로 다운로드한다."""
