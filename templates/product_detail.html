@@ -297,6 +297,9 @@
             display: none;
         }
         .integrated-insight-panel.show { display: block; }
+        /* fix/integrated-insight-screen-mode: 인사이트 화면 모드 진입 시
+           분석 영상 섹션(h2 + 그리드) 만 숨김. 모달·패널은 형제 노드라 영향 X. */
+        body.insight-mode #videosSection { display: none; }
         .integrated-insight-panel h3 {
             margin: 0 0 12px; font-size: 18px; font-weight: 700; letter-spacing: -0.01em;
         }
@@ -1126,7 +1129,12 @@
         </div>
 
         <div class="back-link">
-            <a href="/products">← 제품 목록으로</a>
+            <!-- fix/integrated-insight-screen-mode: 모드별 라벨·동작 분기.
+                 기본 모드 → href="/products" 그대로 이동 (검색창 최초화면).
+                 인사이트 모드 → handleBackLink 가 모드 이탈 처리 + 페이지 이동 차단. -->
+            <a href="/products"
+               id="backLinkAnchor"
+               onclick="return handleBackLink(event)">← <span id="backLinkLabel">제품 목록으로</span></a>
         </div>
 
         <!-- Header card -->
@@ -1173,32 +1181,37 @@
 
         <!-- Videos section -->
         <section class="section">
-            <h2>분석 영상 <span class="count">{{ videos|length }}</span></h2>
-            {% if videos %}
-                <div class="video-grid">
-                    {% for video in videos %}
-                        <a class="video-card"
-                           href="/products/{{ product.product_id }}/videos/{{ video.video_id }}"
-                           data-video-id="{{ video.video_id }}">
-                            <div class="thumb-wrap">
-                                {% if video.thumbnail_url %}
-                                    <img src="{{ video.thumbnail_url }}" alt="thumbnail">
-                                {% endif %}
-                            </div>
-                            <div class="body">
-                                <div class="title">{{ video.title }}</div>
-                                <div class="stats">
-                                    <span>👁 {{ video.view_count }}</span>
-                                    <span>👍 {{ video.like_count }}</span>
-                                    <span>💬 {{ video.comment_count }}</span>
+            <!-- fix/integrated-insight-screen-mode: h2 + 영상 그리드만
+                 #videosSection 래핑. 같은 <section> 안의 p5Overlay(모달)·
+                 integratedInsightPanel 은 형제 노드로 유지(숨김 영향 X). -->
+            <div id="videosSection">
+                <h2>분석 영상 <span class="count">{{ videos|length }}</span></h2>
+                {% if videos %}
+                    <div class="video-grid">
+                        {% for video in videos %}
+                            <a class="video-card"
+                               href="/products/{{ product.product_id }}/videos/{{ video.video_id }}"
+                               data-video-id="{{ video.video_id }}">
+                                <div class="thumb-wrap">
+                                    {% if video.thumbnail_url %}
+                                        <img src="{{ video.thumbnail_url }}" alt="thumbnail">
+                                    {% endif %}
                                 </div>
-                            </div>
-                        </a>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <div class="empty">아직 분석된 영상이 없습니다. 위 "AI 영상 선택" 버튼을 눌러 시작하세요.</div>
-            {% endif %}
+                                <div class="body">
+                                    <div class="title">{{ video.title }}</div>
+                                    <div class="stats">
+                                        <span>👁 {{ video.view_count }}</span>
+                                        <span>👍 {{ video.like_count }}</span>
+                                        <span>💬 {{ video.comment_count }}</span>
+                                    </div>
+                                </div>
+                            </a>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="empty">아직 분석된 영상이 없습니다. 위 "AI 영상 선택" 버튼을 눌러 시작하세요.</div>
+                {% endif %}
+            </div>
 
             <!-- Phase 5: 최종 판정 팝업 (모달, 평소 hidden) -->
             <div id="p5Overlay" class="p5-overlay" aria-hidden="true" role="dialog" aria-modal="true">
@@ -1445,6 +1458,12 @@
                 const result = await response.json();
                 lastSelection = result;
                 status.textContent = '✓ 완료 (' + result.candidate_count + '개 후보 → ' + result.selected.length + '개 선정)';
+                // 영상 재선정 시 종합 보고서 캐시 무효화 — 다음 인사이트 클릭은 새 fetch.
+                {
+                    const _iiPanel = document.getElementById('integratedInsightPanel');
+                    if (_iiPanel) _iiPanel.dataset.rendered = '';
+                    window._p5Summary = null;
+                }
                 openSelectModal(result, mode);
             } catch (error) {
                 status.textContent = '에러: ' + error;
@@ -1585,6 +1604,14 @@
                 }
                 const result = await response.json();
                 lastSelection = result;
+                // 영상 재선정 시 종합 보고서 캐시 무효화. 아래 location.reload()
+                // 가 JS 상태를 전부 날리므로 사실상 중복이지만 — 향후 reload 가
+                // 제거돼도 캐시 stale 이 안 되도록 방어적으로 명시.
+                {
+                    const _iiPanel = document.getElementById('integratedInsightPanel');
+                    if (_iiPanel) _iiPanel.dataset.rendered = '';
+                    window._p5Summary = null;
+                }
                 alert('Custom ' + result.selected.length + '개 확정 완료. 페이지를 새로고침합니다.');
                 location.reload();
             } catch (e) {
@@ -1780,6 +1807,24 @@
             const status = document.getElementById('integratedInsightStatus');
             if (!btn) return;
 
+            // ── 재진입 캐시: 같은 페이지 세션에서 두 번째 이상 클릭이면 ──
+            //   네트워크 호출 없이 즉시 모달 + 패널 표시.
+            //   첫 호출에서 renderIntegratedInsight 가 panel.dataset.rendered='true'
+            //   로 박아두고 window._p5Summary 에 popup-summary 캐시.
+            //   영상 재선정(/select-videos 성공 응답) 시 두 플래그 모두 무효화.
+            const panel = document.getElementById('integratedInsightPanel');
+            const alreadyRendered = panel && panel.dataset.rendered === 'true';
+            if (alreadyRendered && window._p5Summary) {
+                _enterInsightMode();
+                p5ShowSummary({ useCache: true }).then(() => {
+                    _p5RevealPanelOnClose();
+                }).catch(() => {
+                    _p5RevealPanelOnClose();
+                });
+                return;
+            }
+            // ───────────────────────────────────────────────────────
+
             const videoIds = collectVideoIdsForIntegrated();
             if (videoIds.length < 2) {
                 status.textContent = '영상 2개 이상을 선택해 주세요';
@@ -1846,12 +1891,20 @@
                 pdfLink.style.display = 'none';
             }
 
-            // 보강 1: ④ 패널은 모달이 닫힌 뒤에 비로소 노출(.show 부여).
-            //   여기선 DOM 만 채워두고 노출하지 않는다 — 모달이 먼저 뜨고,
-            //   닫힐 때 p5Close() 가 _p5RevealPanelOnClose() 로 노출 책임.
-            //   추출/외부 호출 실패면 _p5RevealPanelOnClose() 가 즉시 호출돼
-            //   ④ 패널이 fallback 으로 노출된다(§3-1).
-            p5ShowSummary().catch((e) => {
+            // fix/integrated-insight-screen-mode (옵션 a + 모달 우선):
+            //   영상 섹션 즉시 숨김 → popup-summary fetch 후 모달이 *실제로*
+            //   뜨는 시점(p5ShowSummary().then)에 패널 .show 동시 부여.
+            //   이전 버전은 fetch 시작 전 패널에 .show 를 부여해 ~5초 잔상
+            //   (보고서가 먼저 보이다가 모달이 덮임)이 있었음. 잔상 제거.
+            //   _p5RevealPanelOnClose() 는 이중 호출 안전(이미 .show 면 skip)
+            //   이라 p5Close 가 끝나는 시점에 다시 호출돼도 동작 망가지지 않음.
+            // 재진입 캐시 플래그 — 같은 페이지 세션에서 다음 클릭부터 fetch 생략.
+            //   영상 재선정(/select-videos 응답 처리부) 에서 'false' 로 무효화.
+            if (panel) panel.dataset.rendered = 'true';
+            _enterInsightMode();
+            p5ShowSummary().then(() => {
+                _p5RevealPanelOnClose();
+            }).catch((e) => {
                 console.warn('[P5] popup skipped:', e);
                 _p5RevealPanelOnClose();
             });
@@ -1871,6 +1924,43 @@
             const panel = document.getElementById('integratedInsightPanel');
             panel.classList.remove('show');
             panel.setAttribute('aria-hidden', 'true');
+            // fix/integrated-insight-screen-mode: 패널 안 '닫기' 버튼도
+            // 모드 이탈 — 영상 섹션 다시 노출, 라벨 복귀.
+            _exitInsightMode();
+        }
+
+        // ── fix/integrated-insight-screen-mode: 화면 모드 토글 ─────────
+        // 종합 인사이트 화면 모드 진입/이탈. <body>.insight-mode 토글로
+        // 영상 섹션 표시 ON/OFF + 뒤로가기 버튼 라벨 변경.
+        // window._p5Summary 캐시는 손대지 않음 — 모드 이탈 후 다시 진입
+        // 시 캐시로 즉시 모달 재진입 가능(보강 2 동작 보존).
+        function _enterInsightMode() {
+            document.body.classList.add('insight-mode');
+            const label = document.getElementById('backLinkLabel');
+            if (label) label.textContent = '영상 목록으로';
+        }
+
+        function _exitInsightMode() {
+            document.body.classList.remove('insight-mode');
+            const label = document.getElementById('backLinkLabel');
+            if (label) label.textContent = '제품 목록으로';
+        }
+
+        function handleBackLink(event) {
+            if (document.body.classList.contains('insight-mode')) {
+                // 인사이트 모드 → 모드 이탈 + 패널 숨김. 페이지 이동 없음.
+                event.preventDefault();
+                _exitInsightMode();
+                const panel = document.getElementById('integratedInsightPanel');
+                if (panel) {
+                    panel.classList.remove('show');
+                    panel.setAttribute('aria-hidden', 'true');
+                }
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                return false;
+            }
+            // 기본 모드 → href="/products" 기본 동작 (검색창 최초화면 이동)
+            return true;
         }
 
         // ── Phase 5: 최종 판정 팝업 (모달) ─────────────────────────
