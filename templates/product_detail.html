@@ -1458,6 +1458,12 @@
                 const result = await response.json();
                 lastSelection = result;
                 status.textContent = '✓ 완료 (' + result.candidate_count + '개 후보 → ' + result.selected.length + '개 선정)';
+                // 영상 재선정 시 종합 보고서 캐시 무효화 — 다음 인사이트 클릭은 새 fetch.
+                {
+                    const _iiPanel = document.getElementById('integratedInsightPanel');
+                    if (_iiPanel) _iiPanel.dataset.rendered = '';
+                    window._p5Summary = null;
+                }
                 openSelectModal(result, mode);
             } catch (error) {
                 status.textContent = '에러: ' + error;
@@ -1598,6 +1604,14 @@
                 }
                 const result = await response.json();
                 lastSelection = result;
+                // 영상 재선정 시 종합 보고서 캐시 무효화. 아래 location.reload()
+                // 가 JS 상태를 전부 날리므로 사실상 중복이지만 — 향후 reload 가
+                // 제거돼도 캐시 stale 이 안 되도록 방어적으로 명시.
+                {
+                    const _iiPanel = document.getElementById('integratedInsightPanel');
+                    if (_iiPanel) _iiPanel.dataset.rendered = '';
+                    window._p5Summary = null;
+                }
                 alert('Custom ' + result.selected.length + '개 확정 완료. 페이지를 새로고침합니다.');
                 location.reload();
             } catch (e) {
@@ -1793,6 +1807,24 @@
             const status = document.getElementById('integratedInsightStatus');
             if (!btn) return;
 
+            // ── 재진입 캐시: 같은 페이지 세션에서 두 번째 이상 클릭이면 ──
+            //   네트워크 호출 없이 즉시 모달 + 패널 표시.
+            //   첫 호출에서 renderIntegratedInsight 가 panel.dataset.rendered='true'
+            //   로 박아두고 window._p5Summary 에 popup-summary 캐시.
+            //   영상 재선정(/select-videos 성공 응답) 시 두 플래그 모두 무효화.
+            const panel = document.getElementById('integratedInsightPanel');
+            const alreadyRendered = panel && panel.dataset.rendered === 'true';
+            if (alreadyRendered && window._p5Summary) {
+                _enterInsightMode();
+                p5ShowSummary({ useCache: true }).then(() => {
+                    _p5RevealPanelOnClose();
+                }).catch(() => {
+                    _p5RevealPanelOnClose();
+                });
+                return;
+            }
+            // ───────────────────────────────────────────────────────
+
             const videoIds = collectVideoIdsForIntegrated();
             if (videoIds.length < 2) {
                 status.textContent = '영상 2개 이상을 선택해 주세요';
@@ -1859,17 +1891,20 @@
                 pdfLink.style.display = 'none';
             }
 
-            // fix/integrated-insight-screen-mode (옵션 a): 보강 1 의 '모달 먼저,
-            //   패널은 모달 닫힐 때 노출' 흐름을 의도적으로 변경.
-            //   이유 — 사용자 요구: "최종 팝업 뒤에는 종합 보고서가 어둡게
-            //   떠있어야 함" + "영상 섹션은 인사이트 모드에서 숨김".
-            //   순서: ① 영상 섹션 숨김 (insight mode 진입) → ② 패널 .show
-            //   부여 (모달 뒷배경이 패널을 어둡게 가리도록) → ③ 모달 띄움.
+            // fix/integrated-insight-screen-mode (옵션 a + 모달 우선):
+            //   영상 섹션 즉시 숨김 → popup-summary fetch 후 모달이 *실제로*
+            //   뜨는 시점(p5ShowSummary().then)에 패널 .show 동시 부여.
+            //   이전 버전은 fetch 시작 전 패널에 .show 를 부여해 ~5초 잔상
+            //   (보고서가 먼저 보이다가 모달이 덮임)이 있었음. 잔상 제거.
             //   _p5RevealPanelOnClose() 는 이중 호출 안전(이미 .show 면 skip)
             //   이라 p5Close 가 끝나는 시점에 다시 호출돼도 동작 망가지지 않음.
+            // 재진입 캐시 플래그 — 같은 페이지 세션에서 다음 클릭부터 fetch 생략.
+            //   영상 재선정(/select-videos 응답 처리부) 에서 'false' 로 무효화.
+            if (panel) panel.dataset.rendered = 'true';
             _enterInsightMode();
-            _p5RevealPanelOnClose();
-            p5ShowSummary().catch((e) => {
+            p5ShowSummary().then(() => {
+                _p5RevealPanelOnClose();
+            }).catch((e) => {
                 console.warn('[P5] popup skipped:', e);
                 _p5RevealPanelOnClose();
             });
