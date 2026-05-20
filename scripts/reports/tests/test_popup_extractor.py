@@ -227,6 +227,156 @@ def test_caveat_empty_when_no_ambiguous():
 # ── 전체 실패 안전 (빈 입력) ───────────────────────────────────
 
 
+# ── 보강 3: '한 문장 결론:' 등 접두어 결정론적 제거 ─────────────
+
+
+def test_oneliner_prefix_stripped_korean_variants():
+    for prefix in (
+        "한 문장 결론: ",
+        "한문장결론:",
+        "한 줄 결론 : ",
+        "한줄 결론: ",
+        "결론: ",
+        "판정: ",
+        "한 문장 결론：",  # 전각 콜론
+    ):
+        md = (
+            "## ① 한줄 구매 판정 + 종합 점수\n"
+            f"- {prefix}진짜 결론 텍스트\n"
+            "- 종합 평가: 7.0 / 10  (분석 영상 3개 기반)\n"
+            "- 리뷰어 합의도: 중간\n"
+        )
+        d = extract_popup_data(md)
+        assert d["verdict"]["one_liner"] == "진짜 결론 텍스트", f"prefix={prefix!r}"
+
+
+def test_oneliner_no_prefix_passes_through():
+    md = """## ① 한줄 구매 판정 + 종합 점수
+- 접두어 없이 그냥 결론 문장이다
+- 종합 평가: 8.0 / 10
+- 리뷰어 합의도: 높음
+"""
+    d = extract_popup_data(md)
+    assert d["verdict"]["one_liner"] == "접두어 없이 그냥 결론 문장이다"
+
+
+# ── 보강 4: ⑦ 페르소나 → 두 줄 템플릿 (LLM 0건) ──────────────────
+
+
+_BASE_FOR_TIER = """## ① 한줄 구매 판정 + 종합 점수
+- 한 줄 결론(폴백용)
+- 종합 평가: 8.0 / 10  (분석 영상 5개 기반)
+- 리뷰어 합의도: 높음
+"""
+
+
+def test_two_line_desc_both_personas_present():
+    md = _BASE_FOR_TIER + """
+## ⑦ 이런 사람에게 추천 / 비추
+### 추천
+- 카메라 화질과 화면 품질 (근거: 영상 1, 2, 3)
+- 디자인 중시 (근거: 영상 2)
+### 비추
+- 게이밍 성능 (근거: 영상 4)
+- 가성비 최우선 (근거: 영상 5)
+"""
+    d = extract_popup_data(md)
+    v = d["verdict"]
+    # 첫 페르소나만 채택
+    assert v["recommend_persona"] == "카메라 화질과 화면 품질"
+    assert v["not_recommend_persona"] == "게이밍 성능"
+    # 받침 처리: '품질'(받침 ㄹ) → 을 / '성능'(받침 ㅇ) → 이
+    assert v["one_liner_main"] == "카메라 화질과 화면 품질을 중시한다면 긍정적으로 고려하세요."
+    assert v["one_liner_sub"] == "게이밍 성능이 최우선이라면 유사 제품과 비교를 권합니다."
+
+
+def test_two_line_josa_no_jongseong():
+    # 받침 없는 마지막 음절('시')·('야') → 를/가
+    md = _BASE_FOR_TIER + """
+## ⑦ 이런 사람에게 추천 / 비추
+### 추천
+- 사진 촬영 중시 (근거: 영상 1)
+### 비추
+- 야간 카메라 (근거: 영상 2)
+"""
+    d = extract_popup_data(md)
+    v = d["verdict"]
+    # '중시'의 '시'는 받침 X → 를
+    assert v["one_liner_main"].startswith("사진 촬영 중시를 중시한다면")
+    # '야간 카메라'의 '라'는 받침 X → 가
+    assert v["one_liner_sub"].startswith("야간 카메라가 최우선이라면")
+
+
+def test_two_line_only_recommend_then_sub_empty():
+    md = _BASE_FOR_TIER + """
+## ⑦ 이런 사람에게 추천 / 비추
+### 추천
+- 디자인 (근거: 영상 1)
+### 비추
+- 데이터 부족
+"""
+    d = extract_popup_data(md)
+    v = d["verdict"]
+    assert v["recommend_persona"] == "디자인"
+    assert v["not_recommend_persona"] is None
+    assert "디자인" in v["one_liner_main"]
+    assert v["one_liner_sub"] == ""    # 억지 생성 금지
+
+
+def test_two_line_only_not_recommend_main_falls_back_to_oneliner():
+    md = _BASE_FOR_TIER + """
+## ⑦ 이런 사람에게 추천 / 비추
+### 추천
+- 데이터 부족
+### 비추
+- 게이밍 성능 (근거: 영상 1)
+"""
+    d = extract_popup_data(md)
+    v = d["verdict"]
+    assert v["recommend_persona"] is None
+    assert v["not_recommend_persona"] == "게이밍 성능"
+    # 윗줄은 한 줄 결론 fallback
+    assert v["one_liner_main"] == "한 줄 결론(폴백용)"
+    assert "게이밍 성능이" in v["one_liner_sub"]
+
+
+def test_two_line_both_missing_fallback_to_oneliner():
+    md = _BASE_FOR_TIER + """
+## ⑦ 이런 사람에게 추천 / 비추
+### 추천
+- 데이터 부족
+### 비추
+- 데이터 부족
+"""
+    d = extract_popup_data(md)
+    v = d["verdict"]
+    assert v["one_liner_main"] == "한 줄 결론(폴백용)"
+    assert v["one_liner_sub"] == ""
+
+
+def test_two_line_section7_absent_fallback():
+    d = extract_popup_data(_BASE_FOR_TIER)
+    v = d["verdict"]
+    # ⑦ 자체가 없음 → 윗줄 = 한 줄 결론, 아랫줄 빈 값
+    assert v["one_liner_main"] == "한 줄 결론(폴백용)"
+    assert v["one_liner_sub"] == ""
+
+
+def test_two_line_english_persona_conservative_josa():
+    # 페르소나가 영문/숫자로 끝나면 보수적으로 받침 있음 처리 → 을/이
+    md = _BASE_FOR_TIER + """
+## ⑦ 이런 사람에게 추천 / 비추
+### 추천
+- iOS 18 신기능 (근거: 영상 1)
+### 비추
+- AAA 게임 60fps (근거: 영상 2)
+"""
+    d = extract_popup_data(md)
+    v = d["verdict"]
+    assert v["one_liner_main"].startswith("iOS 18 신기능을 중시한다면")
+    assert v["one_liner_sub"].startswith("AAA 게임 60fps이 최우선이라면")
+
+
 def test_empty_input_no_crash_all_missing():
     d = extract_popup_data("")
     assert d["verdict"]["score"] is None

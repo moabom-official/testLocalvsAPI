@@ -937,7 +937,31 @@
             justify-content: center; line-height: 1;
         }
         .p5-close:hover { background: #eef0f3; }
-        .p5-row-top { display: flex; gap: 22px; align-items: center; margin-top: 6px; }
+        /* 보강 8: 모달 상단 좌·우 분할 — 좌(제품정보 + 강조카드 수직),
+           우(도넛 단독, 두 행 높이). 하단(장단점·주의·버튼)은 전폭. */
+        .p5-modal-top {
+            display: grid;
+            grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+            grid-template-rows: auto auto;
+            column-gap: 24px; row-gap: 14px;
+            margin-top: 6px; align-items: stretch;
+        }
+        .p5-product-info { grid-column: 1; grid-row: 1;
+            display: flex; gap: 18px; align-items: center; min-width: 0; }
+        .p5-modal-top > #p5Verdict { grid-column: 1; grid-row: 2;
+            margin-top: 0; }
+        .p5-gauge-area { grid-column: 2; grid-row: 1 / span 2;
+            display: flex; align-items: center; justify-content: center;
+            min-width: 0; }
+        /* 모바일/좁은 폭: 세로로 자연스럽게 쌓이게 */
+        @media (max-width: 640px) {
+            .p5-modal-top { grid-template-columns: 1fr;
+                grid-template-rows: auto auto auto; row-gap: 14px; }
+            .p5-product-info { grid-column: 1; grid-row: 1; }
+            .p5-modal-top > #p5Verdict { grid-column: 1; grid-row: 3; }
+            .p5-gauge-area { grid-column: 1; grid-row: 2; }
+        }
+        /* (구) .p5-row-top — Boost 8 이전 호환용 빈 정의(현재 미사용) */
         .p5-image-box {
             flex: 0 0 168px; width: 168px; height: 168px;
             background: #f3f4f6; border-radius: 14px;
@@ -951,24 +975,32 @@
             font-size: 12px; color: #6b7280; text-align: center; padding: 8px;
         }
         .p5-meta { flex: 1 1 auto; min-width: 0; }
-        /* 제품명 — 사용자가 직관적으로 인지하도록 다른 텍스트와 확실한
-           크기/굵기 격차. 스펙 13px / 가격 17px 대비 거의 2배 크기. */
+        /* 보강 1: 제품명 압도적 강조. 한 줄 유지(nowrap+ellipsis+min-width:0
+           부모) — 긴 이름도 두 줄로 떨어지지 않고 끝이 잘림(…). */
         .p5-name {
-            font-size: 34px; font-weight: 800; margin: 0 0 8px; color: #0a0a0a;
-            letter-spacing: -0.5px; line-height: 1.15;
+            font-size: 40px; font-weight: 800; margin: 0 0 8px; color: #0a0a0a;
+            letter-spacing: -0.7px; line-height: 1.1;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            max-width: 100%;
         }
         .p5-spec { font-size: 13px; color: #6b7280; margin: 0 0 14px; }
         .p5-price { font-size: 17px; font-weight: 700; color: #111; margin: 0; }
+        /* 보강 8: 도넛 단독 영역에서 큰 크기로(권장 220~260px) */
         .p5-gauge {
-            flex: 0 0 130px; width: 130px; height: 130px; position: relative;
+            flex: 0 0 230px; width: 230px; height: 230px; position: relative;
             display: flex; flex-direction: column; align-items: center;
             justify-content: center;
         }
         .p5-gauge svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
         .p5-gauge .ring-bg { fill: none; stroke: #e8efe8; stroke-width: 11; }
-        .p5-gauge .ring-fg { fill: none; stroke: #22c55e; stroke-width: 11; stroke-linecap: round; }
-        .p5-gauge-score { font-size: 28px; font-weight: 700; color: #111; line-height: 1; }
-        .p5-gauge-score small { font-size: 13px; color: #6b7280; font-weight: 500; }
+        /* 보강 7: stroke 하드코딩 제거 — JS scoreToColor() 가 동적으로 설정.
+           초기값은 중립 회색(데이터 부족 / 점수 추출 실패 시). */
+        .p5-gauge .ring-fg { fill: none; stroke: #ccc; stroke-width: 11; stroke-linecap: round; }
+        /* 보강 8: 도넛 커진 만큼 안쪽 점수도 그에 비례 (위쪽 큰 점수 — 보강
+           6 에서 변경 금지였던 그 점수. 크기만 도넛 사이즈에 맞춰 확대.) */
+        .p5-gauge-score { font-size: 44px; font-weight: 800; color: #0a0a0a;
+            line-height: 1; letter-spacing: -1px; }
+        .p5-gauge-score small { font-size: 18px; color: #6b7280; font-weight: 500; }
         /* (보강 4: 아래 등급별 색 변동 정의로 대체) */
 
         /* 보강 5: 가로 흐름 — 좌(체크) 중(▶ 추천도) 우(본문).
@@ -988,13 +1020,23 @@
         .p5-verdict.green .p5-verdict-icon { background: #22c55e; }
         .p5-verdict.amber .p5-verdict-icon { background: #f59e0b; }
         .p5-verdict.red   .p5-verdict-icon { background: #ef4444; }
-        .p5-verdict-label { font-weight: 700; font-size: 15px; margin: 0;
-            flex: 0 0 auto; white-space: nowrap; }
+        /* 보강 2: 라벨 폰트 크게 — 카드의 시각 주인공 */
+        .p5-verdict-label { font-weight: 800; font-size: 20px; margin: 0;
+            flex: 0 0 auto; white-space: nowrap; letter-spacing: -0.3px; }
         .p5-verdict.green .p5-verdict-label { color: #15803d; }
         .p5-verdict.amber .p5-verdict-label { color: #b45309; }
         .p5-verdict.red   .p5-verdict-label { color: #b91c1c; }
-        .p5-verdict-desc { font-size: 13.5px; color: #374151; margin: 0;
-            flex: 1 1 220px; min-width: 0; }
+        /* 보강 4: 본문 두 줄 위계 (윗줄 굵음/큼 / 아랫줄 옅음/작음) */
+        .p5-verdict-desc { margin: 0; flex: 1 1 220px; min-width: 0;
+            display: flex; flex-direction: column; gap: 4px; }
+        .p5-verdict-desc-main {
+            font-size: 15.5px; font-weight: 700; color: #1f2937;
+            line-height: 1.35; word-break: keep-all;
+        }
+        .p5-verdict-desc-sub {
+            font-size: 13px; font-weight: 400; color: #888;
+            line-height: 1.4; word-break: keep-all;
+        }
 
         /* 보강 4: 도넛 안쪽 라벨 — 추천도(구매판정) 색 변동 */
         .p5-gauge-cons { font-size: 11px; font-weight: 600; line-height: 1.2;
@@ -1034,7 +1076,8 @@
         .p5-item .p5-bullet .p5-icon { width: 16px; flex: 0 0 16px; text-align: center; }
         .p5-card-pros .p5-icon { color: #16a34a; }
         .p5-card-cons .p5-icon { color: #dc2626; }
-        .p5-item .p5-freq { font-size: 12px; color: #9aa0a6; padding-left: 8px; flex: 0 0 auto; }
+        /* 보강 5: UI 숨김(데이터는 응답 JSON 의 n/total 필드로 그대로 유지) */
+        .p5-item .p5-freq { display: none; }
         .p5-item.muted { color: #9aa0a6; font-style: italic; }
 
         .p5-caveat {
@@ -1153,28 +1196,38 @@
                 <div id="p5Modal" class="p5-modal" role="document">
                     <button type="button" class="p5-close" id="p5CloseBtn" aria-label="닫기">×</button>
                     <div id="p5MetaLine" class="p5-meta-line"></div>
-                    <div class="p5-row-top">
-                        <div id="p5ImageBox" class="p5-image-box"></div>
-                        <div class="p5-meta">
-                            <h2 id="p5Name" class="p5-name"></h2>
-                            <p id="p5Spec" class="p5-spec"></p>
-                            <p id="p5Price" class="p5-price"></p>
+                    <!-- 보강 8: 모달 상단 좌·우 grid 분할.
+                         좌측 — 제품 정보(이미지+메타) + 강조 카드 수직 스택.
+                         우측 — 도넛 단독, 두 행 높이 차지. -->
+                    <div class="p5-modal-top">
+                        <div class="p5-product-info">
+                            <div id="p5ImageBox" class="p5-image-box"></div>
+                            <div class="p5-meta">
+                                <h2 id="p5Name" class="p5-name"></h2>
+                                <p id="p5Spec" class="p5-spec"></p>
+                                <p id="p5Price" class="p5-price"></p>
+                            </div>
                         </div>
-                        <div id="p5Gauge" class="p5-gauge">
-                            <svg viewBox="0 0 120 120">
-                                <circle class="ring-bg" cx="60" cy="60" r="50"></circle>
-                                <circle class="ring-fg" id="p5GaugeArc" cx="60" cy="60" r="50"
-                                        stroke-dasharray="314.16" stroke-dashoffset="0"></circle>
-                            </svg>
-                            <div class="p5-gauge-score" id="p5GaugeScore">—<small>/10</small></div>
-                            <div class="p5-gauge-cons" id="p5GaugeCons"></div>
+                        <div id="p5Verdict" class="p5-verdict" style="display:none">
+                            <div class="p5-verdict-icon">✓</div>
+                            <p id="p5VerdictLabel" class="p5-verdict-label"></p>
+                            <!-- 보강 4: 두 줄 구조 (윗줄 굵음/큼, 아랫줄 옅음/작음) -->
+                            <p class="p5-verdict-desc">
+                                <span id="p5VerdictDescMain" class="p5-verdict-desc-main"></span>
+                                <span id="p5VerdictDescSub"  class="p5-verdict-desc-sub"></span>
+                            </p>
                         </div>
-                    </div>
-                    <!-- 보강 5: 가로 흐름 — 좌(체크) 중(▶ 추천도) 우(본문) -->
-                    <div id="p5Verdict" class="p5-verdict" style="display:none">
-                        <div class="p5-verdict-icon">✓</div>
-                        <p id="p5VerdictLabel" class="p5-verdict-label"></p>
-                        <p id="p5VerdictDesc"  class="p5-verdict-desc"></p>
+                        <div class="p5-gauge-area">
+                            <div id="p5Gauge" class="p5-gauge">
+                                <svg viewBox="0 0 120 120">
+                                    <circle class="ring-bg" cx="60" cy="60" r="50"></circle>
+                                    <circle class="ring-fg" id="p5GaugeArc" cx="60" cy="60" r="50"
+                                            stroke-dasharray="314.16" stroke-dashoffset="0"></circle>
+                                </svg>
+                                <div class="p5-gauge-score" id="p5GaugeScore">—<small>/10</small></div>
+                                <div class="p5-gauge-cons" id="p5GaugeCons"></div>
+                            </div>
+                        </div>
                     </div>
                     <div class="p5-grid">
                         <div class="p5-card-pros">
@@ -1700,6 +1753,17 @@
             }, 500);
         }
 
+        // 보강 7: 점수 → 도넛 색 공유 헬퍼 (사용자 결정 임계: 8/5/1).
+        //   양쪽 도넛(④ 보고서·팝업)이 이 함수를 호출 → 임계·hex 한 곳에서.
+        function scoreToColor(score) {
+            const s = parseFloat(score);
+            if (!isFinite(s)) return '#ccc';   // 데이터 부족
+            if (s >= 8.0)  return '#22c55e';   // 8.0~10.0 → 녹
+            if (s >= 5.0)  return '#f5a623';   // 5.0~7.99 → 주황
+            if (s >= 1.0)  return '#e35d6a';   // 1.0~4.99 → 빨강
+            return '#ccc';
+        }
+
         async function runIntegratedInsight() {
             const btn = document.getElementById('integratedInsightBtn');
             const status = document.getElementById('integratedInsightStatus');
@@ -1874,28 +1938,36 @@
             const ratio = isFinite(scoreNum) ? Math.max(0, Math.min(1, scoreNum / 10)) : 0;
             arc.setAttribute('stroke-dasharray', C.toFixed(2));
             arc.setAttribute('stroke-dashoffset', (C * (1 - ratio)).toFixed(2));
-            // 합의도 라벨
-            // 보강 4: 도넛 안쪽 라벨 = "⊙ 구매판정 {추천도}" (등급별 색).
-            //   합의도는 도넛에서 빠짐(목업 의도). 합의도 자체는 백엔드
-            //   응답엔 그대로 유지(다른 화면 활용 여지).
+            // 보강 7: 도넛 색 = 점수 기준(8/5/1) — verdict.color 무관.
+            //   양쪽 도넛(팝업·④)이 같은 scoreToColor() 헬퍼 호출.
+            arc.setAttribute('stroke', scoreToColor(scoreNum));
+            // 보강 6: 도넛 아래쪽 라벨 = '⊙ 구매판정' 만(등급 라벨 결합 X).
+            //   위쪽 큰 점수(p5GaugeScore)는 무변경. 색은 점수 기반 톤
+            //   (도넛과 통일) — 그러나 너무 강하지 않게 verdict.color 클래스
+            //   를 보조로 유지(라벨 텍스트 색만, 도넛 stroke 와 별개).
             const gc = $('p5GaugeCons');
             gc.classList.remove('green', 'amber', 'red');
-            if (verdict.label && verdict.color) {
-                gc.textContent = '⊙ 구매판정 ' + verdict.label;
-                gc.classList.add(verdict.color);
-                gc.style.display = '';
-            } else {
-                gc.textContent = '';
-                gc.style.display = 'none';
-            }
+            gc.textContent = '⊙ 구매판정';
+            if (verdict.color) gc.classList.add(verdict.color);
+            gc.style.display = '';
 
-            // 강조 카드(등급별 색·라벨)
+            // 보강 5·4: 강조 카드 — 등급별 색·라벨 + 두 줄 본문(main/sub)
             const card = $('p5Verdict');
             card.classList.remove('green', 'amber', 'red');
             if (verdict.color && verdict.label) {
                 card.classList.add(verdict.color);
                 $('p5VerdictLabel').textContent = '▸ ' + verdict.label;
-                $('p5VerdictDesc').textContent = verdict.one_liner || '';
+                // 보강 4 (UI): 두 줄 분리 — 추출기에서 결정론적으로 조립된
+                //   verdict.one_liner_main / .one_liner_sub 사용. 둘 중
+                //   빈 값이면 그 줄만 숨김(억지 생성 금지, §7).
+                const main = (verdict.one_liner_main || verdict.one_liner || '').trim();
+                const sub  = (verdict.one_liner_sub || '').trim();
+                const mEl = $('p5VerdictDescMain');
+                const sEl2 = $('p5VerdictDescSub');
+                mEl.textContent = main;
+                mEl.style.display = main ? '' : 'none';
+                sEl2.textContent = sub;
+                sEl2.style.display = sub ? '' : 'none';
                 card.style.display = '';
             } else {
                 card.style.display = 'none';
@@ -2219,7 +2291,9 @@
             heading.after(wrapper);
 
             // Render donut chart
-            const color = score >= 8 ? '#20c997' : score >= 6 ? '#f5a623' : '#e35d6a';
+            // 보강 7: 양쪽 도넛(④ 보고서·팝업)이 같은 헬퍼·hex 사용.
+            //   기존 8/6 임계 → 사용자 결정 8/5 임계로 통일.
+            const color = scoreToColor(score);
             const chart = new Chart(canvas, {
                 type: 'doughnut',
                 data: {

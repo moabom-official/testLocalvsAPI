@@ -105,16 +105,32 @@ def _extract_section1(md: str) -> Dict[str, Any]:
         except ValueError:
             pass
 
-    # 첫 번째 불릿 = 한 줄 결론(점수/합의도 라인 제외)
+    # 첫 번째 불릿 = 한 줄 결론(점수/합의도 라인 제외).
+    # 보강 3: LLM 응답에 따라 '한 문장 결론:' 등 접두어가 붙기도 한다 — 결정
+    # 론적 정규식으로 제거(빈 텍스트가 되면 다음 후보 불릿로 넘어가지 않고,
+    # 그 자리에서 빈 채로 둔다 — 추후 §7 fallback 으로 처리).
     for b in _RE_FIRST_BULLET.finditer(sec):
         txt = b.group(1).strip()
         if not txt:
             continue
         if txt.startswith("종합 평가") or txt.startswith("리뷰어 합의도"):
             continue
-        out["one_liner"] = txt
+        out["one_liner"] = _strip_oneliner_prefix(txt)
         break
     return out
+
+
+# ── 보강 3: '한 문장 결론:' 등 접두어 결정론적 제거 ────────────────
+
+_RE_ONELINER_PREFIX = re.compile(
+    r"^\s*(?:한\s*문장\s*결론|한\s*줄\s*결론|한줄\s*결론|결론|판정)"
+    r"\s*[:：]\s*"
+)
+
+
+def _strip_oneliner_prefix(text: str) -> str:
+    """텍스트 시작의 결론 접두어를 제거(매칭 안 되면 원문 그대로)."""
+    return _RE_ONELINER_PREFIX.sub("", text or "", count=1).strip()
 
 
 # ── §4-D: 추천도 등급 도출 (옵션 1, 규칙 기반) ───────────────────
@@ -284,6 +300,90 @@ def _extract_caveat(md: str) -> str:
     return notes[0] if notes else ""
 
 
+# ── 보강 4: ④ ⑦ 추천/비추 페르소나 추출 + 두 줄 템플릿 조립 ───────
+#  결정론적(LLM 0건). prompt_manager 의 ⑦ 절대 규칙(페르소나 10자 내외
+#  명사구) 패턴을 그대로 활용.
+
+_RE_PERSONA_ITEM = re.compile(
+    r"^-\s*(.+?)\s*\(\s*근거\s*[:：]\s*영상\s*[\d,\s]+\)\s*$", re.M
+)
+
+
+def _extract_personas(md: str) -> Tuple[Optional[str], Optional[str]]:
+    """⑦ 섹션의 '### 추천' / '### 비추' 첫 페르소나 한 줄씩.
+
+    반환: (recommend_persona, not_recommend_persona). 각 None 가능.
+    근거 괄호는 버리고 페르소나 명사구만.
+    """
+    sec = _section_body(md, "⑦ ")
+    if not sec:
+        sec = _section_body(md, "⑦")
+    if not sec:
+        return None, None
+
+    def _first(h3_token: str) -> Optional[str]:
+        body = _h3_body(sec, h3_token)
+        if not body:
+            return None
+        for m in _RE_PERSONA_ITEM.finditer(body):
+            p = m.group(1).strip()
+            if p and p != "데이터 부족":
+                return p
+        return None
+
+    return _first("추천"), _first("비추")
+
+
+def _has_final_jongseong(text: str) -> bool:
+    """문자열의 마지막 의미 글자(한글)의 종성(받침) 유무.
+
+    한글 음절(0xAC00~0xD7A3): (ord-0xAC00) % 28 != 0 → 받침 있음.
+    한글이 아닌 경우(영문/숫자 등) — 보수적으로 받침 있다(True) 반환 →
+    '을'/'이' 채택.
+    """
+    s = (text or "").rstrip()
+    if not s:
+        return True
+    ch = s[-1]
+    code = ord(ch)
+    if 0xAC00 <= code <= 0xD7A3:
+        return (code - 0xAC00) % 28 != 0
+    return True
+
+
+def _assemble_two_line_desc(
+    one_liner: str,
+    recommend_persona: Optional[str],
+    not_recommend_persona: Optional[str],
+) -> Tuple[str, str]:
+    """결정론적 두 줄 조립.
+
+    윗줄(main): {추천 페르소나}{을/를} 중시한다면 긍정적으로 고려하세요.
+    아랫줄(sub): {비추 페르소나}{이/가} 최우선이라면 유사 제품과 비교를 권합니다.
+
+    Fallback (스펙 §3-4):
+      - 추천 없음 → 윗줄 = one_liner (한 줄 결론 fallback).
+      - 비추 없음 → 아랫줄 = '' (억지 생성 금지, UI 에서 숨김).
+      - 둘 다 없음 → 윗줄 = one_liner, 아랫줄 = ''.
+      - 추천만 없고 one_liner 도 없으면 윗줄 = '' (§7 fallback).
+    """
+    if recommend_persona:
+        josa1 = "을" if _has_final_jongseong(recommend_persona) else "를"
+        main = f"{recommend_persona}{josa1} 중시한다면 긍정적으로 고려하세요."
+    else:
+        main = (one_liner or "").strip()
+
+    if not_recommend_persona:
+        josa2 = "이" if _has_final_jongseong(not_recommend_persona) else "가"
+        sub = (
+            f"{not_recommend_persona}{josa2} 최우선이라면 "
+            "유사 제품과 비교를 권합니다."
+        )
+    else:
+        sub = ""
+    return main, sub
+
+
 # ── 메인 진입점 ──────────────────────────────────────────────────
 
 
@@ -327,11 +427,22 @@ def extract_popup_data(report_md: str) -> Dict[str, Any]:
         missing.append("verdict.tier")
 
     caveat = _extract_caveat(md)
+    # 보강 4: ④ ⑦ 추천/비추 페르소나 → 결정론적 두 줄 문구 조립
+    rec_p, notrec_p = _extract_personas(md)
+    one_liner_main, one_liner_sub = _assemble_two_line_desc(
+        s1["one_liner"], rec_p, notrec_p
+    )
     return {
         "verdict": {
             "score": s1["score"],
             "consensus": s1["consensus"],
             "one_liner": s1["one_liner"],
+            # 보강 4: UI 가 카드 본문을 두 줄로 표시 (윗줄 굵음/큼, 아랫줄
+            # 옅음/작음). 둘 중 하나가 빈 문자열이면 UI 는 그 줄을 숨김.
+            "one_liner_main": one_liner_main,
+            "one_liner_sub": one_liner_sub,
+            "recommend_persona": rec_p,
+            "not_recommend_persona": notrec_p,
             "tier": tier,
             "label": label,
             "color": color,
