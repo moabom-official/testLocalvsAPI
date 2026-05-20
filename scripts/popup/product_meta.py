@@ -26,8 +26,11 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 # ── 순수 파서 ────────────────────────────────────────────────────
 
 # "129만 원", "1,290,000원", "1290000원" 등을 정수(원)로 환산해 최저값 선택.
-_RE_PRICE_MAN = re.compile(r"(\d{2,4}(?:[,．]\d{3})?)\s*만\s*원")
-_RE_PRICE_WON = re.compile(r"(\d{1,3}(?:,\d{3})+|\d{6,9})\s*원")
+# 작업 3 재시도 — 가격 정규식 강화:
+# "299,000원", "1,290,000원", "129만 원", "1만원", "190 만원" 등 다양한
+# 한국어 가격 표기를 폭넓게 매칭. 천 단위 콤마는 선택.
+_RE_PRICE_MAN = re.compile(r"(\d{1,4}(?:[,．]\d{3})?)\s*만\s*원?")  # '만'만 있어도 (예: "129만")
+_RE_PRICE_WON = re.compile(r"(\d{1,3}(?:,\d{3})+|\d{5,9})\s*원")    # 5자리(만원)부터
 _RE_SCREEN = re.compile(r"(\d{1,2}\.\d{1,2})\s*인치")
 _RE_YEAR = re.compile(r"(20\d{2})\s*년")
 
@@ -85,12 +88,13 @@ def parse_prices(text: str) -> List[int]:
         digits = m.group(1).replace(",", "")
         try:
             v = int(digits)
-            if v >= 100000:  # 10만 원 미만은 노이즈로 간주
+            if v >= 10000:  # 1만 원 이상만(이어폰·액세서리도 포함)
                 out.append(v)
         except ValueError:
             continue
-    # 합리적 범위(5만~1500만)만 통과 — 광고/잡음 차단
-    return [v for v in out if 50_000 <= v <= 15_000_000]
+    # 작업 3 재시도 — 합리 범위 확장: 1만 ~ 1500만 (이어폰/액세서리부터
+    # 고급 노트북까지 모두 포함). 광고/잡음(0원·1억원) 차단.
+    return [v for v in out if 10_000 <= v <= 15_000_000]
 
 
 def parse_screen(text: str) -> Optional[str]:
@@ -270,10 +274,17 @@ def collect_and_cache_meta(
 
         if not force:
             cached = store.get_meta(product_id)
-            # 보강 6 — 정책 버전 태그가 source 에 있는 캐시만 신뢰. 구 정책
-            # 캐시(태그 없음/다른 버전)는 무시·재수집(스키마 무변경).
+            # 캐시 유효 조건: (a) 정책 태그 일치 AND (b) 의미있는 값 1개 이상.
+            # 작업 3 재시도 — 빈 결과 캐시(전 필드 None) 가 재시도를 막던
+            # 문제 해결. 의미있는 값이 하나도 없으면 캐시 무효로 보고 재수집.
             src = (cached or {}).get("source") or ""
-            if cached and src.startswith(_POLICY_TAG + "|") or src == _POLICY_TAG:
+            tag_ok = (src.startswith(_POLICY_TAG + "|") or src == _POLICY_TAG)
+            has_value = cached and any((
+                cached.get("price_display"),
+                cached.get("screen_size"),
+                cached.get("release_year"),
+            ))
+            if cached and tag_ok and has_value:
                 result.update({
                     "status": "cached",
                     "price_display": cached.get("price_display"),

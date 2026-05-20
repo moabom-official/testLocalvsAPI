@@ -342,6 +342,20 @@ def _has_final_jongseong(text: str) -> bool:
     return True
 
 
+# 작업 1 (사용자 결정): 템플릿이 "중시한다면"/"최우선이라면" 으로 끝맺음을
+# 또 붙이므로, 페르소나가 같은 토큰("중시", "최우선" 등)으로 끝나면 중복
+# 발생("중시 중시한다면"). 결정론적 정규식으로 끝맺음 토큰 제거 후 조합.
+_RE_RECO_TAIL = re.compile(r"\s*(중시|중요|선호|우선시)\s*$")
+_RE_NOT_RECO_TAIL = re.compile(r"\s*(최우선|우선|중시|중요)\s*$")
+
+
+def _strip_persona_tail(persona: Optional[str], pattern: re.Pattern) -> Optional[str]:
+    """페르소나 끝맺음 토큰 제거. 매칭 없으면 원문 그대로(strip 처리)."""
+    if not persona:
+        return persona
+    return pattern.sub("", persona).strip() or persona  # 모두 잘리면 원문
+
+
 def _assemble_two_line_desc(
     one_liner: str,
     recommend_persona: Optional[str],
@@ -352,22 +366,29 @@ def _assemble_two_line_desc(
     윗줄(main): {추천 페르소나}{을/를} 중시한다면 긍정적으로 고려하세요.
     아랫줄(sub): {비추 페르소나}{이/가} 최우선이라면 유사 제품과 비교를 권합니다.
 
-    Fallback (스펙 §3-4):
+    작업 1: 페르소나에서 끝맺음 토큰(중시/우선/선호/중요/최우선) 제거 후
+    조합 → "X 중시 중시한다면" 같은 중복 제거. 조사도 후처리 결과 마지막
+    글자 기준으로 재계산.
+
+    Fallback:
       - 추천 없음 → 윗줄 = one_liner (한 줄 결론 fallback).
       - 비추 없음 → 아랫줄 = '' (억지 생성 금지, UI 에서 숨김).
       - 둘 다 없음 → 윗줄 = one_liner, 아랫줄 = ''.
-      - 추천만 없고 one_liner 도 없으면 윗줄 = '' (§7 fallback).
     """
-    if recommend_persona:
-        josa1 = "을" if _has_final_jongseong(recommend_persona) else "를"
-        main = f"{recommend_persona}{josa1} 중시한다면 긍정적으로 고려하세요."
+    rec_clean = _strip_persona_tail(recommend_persona, _RE_RECO_TAIL)
+    notrec_clean = _strip_persona_tail(not_recommend_persona, _RE_NOT_RECO_TAIL)
+
+    if rec_clean:
+        # 조사는 후처리 후 마지막 글자 기준으로 재계산(중요!)
+        josa1 = "을" if _has_final_jongseong(rec_clean) else "를"
+        main = f"{rec_clean}{josa1} 중시한다면 긍정적으로 고려하세요."
     else:
         main = (one_liner or "").strip()
 
-    if not_recommend_persona:
-        josa2 = "이" if _has_final_jongseong(not_recommend_persona) else "가"
+    if notrec_clean:
+        josa2 = "이" if _has_final_jongseong(notrec_clean) else "가"
         sub = (
-            f"{not_recommend_persona}{josa2} 최우선이라면 "
+            f"{notrec_clean}{josa2} 최우선이라면 "
             "유사 제품과 비교를 권합니다."
         )
     else:

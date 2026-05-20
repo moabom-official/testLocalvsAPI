@@ -998,9 +998,12 @@
         }
         .p5-gauge svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
         .p5-gauge .ring-bg { fill: none; stroke: #e8efe8; stroke-width: 11; }
-        /* 보강 7: stroke 하드코딩 제거 — JS scoreToColor() 가 동적으로 설정.
-           초기값은 중립 회색(데이터 부족 / 점수 추출 실패 시). */
-        .p5-gauge .ring-fg { fill: none; stroke: #ccc; stroke-width: 11; stroke-linecap: round; }
+        /* 작업 2 — 도넛 색 재시도: CSS 의 stroke 선언을 *완전히* 제거.
+           직전 두 차례는 `stroke: #ccc` 가 남아 있어 SVG presentation
+           attribute(JS setAttribute)를 author CSS 우선순위로 덮어버렸다.
+           이제 JS 가 inline `style.stroke` 로 적용 → 어떤 author CSS rule
+           보다 specificity 가 높아 확실히 적용됨. fill·stroke-width 만 유지. */
+        .p5-gauge .ring-fg { fill: none; stroke-width: 11; stroke-linecap: round; }
         /* 보강 8: 도넛 커진 만큼 안쪽 점수도 그에 비례 (위쪽 큰 점수 — 보강
            6 에서 변경 금지였던 그 점수. 크기만 도넛 사이즈에 맞춰 확대.) */
         .p5-gauge-score { font-size: 44px; font-weight: 800; color: #0a0a0a;
@@ -1946,9 +1949,11 @@
             const ratio = isFinite(scoreNum) ? Math.max(0, Math.min(1, scoreNum / 10)) : 0;
             arc.setAttribute('stroke-dasharray', C.toFixed(2));
             arc.setAttribute('stroke-dashoffset', (C * (1 - ratio)).toFixed(2));
-            // 보강 7: 도넛 색 = 점수 기준(8/5/1) — verdict.color 무관.
-            //   양쪽 도넛(팝업·④)이 같은 scoreToColor() 헬퍼 호출.
-            arc.setAttribute('stroke', scoreToColor(scoreNum));
+            // 작업 2 — 도넛 색 재시도: inline style.stroke 사용 → 어떤
+            //   author CSS rule 보다도 specificity 높아 확실히 적용.
+            //   (setAttribute 는 author CSS 에 덮였던 직전 두 번의 실패 원인.)
+            //   양쪽 도넛(팝업·④) 공유 헬퍼 scoreToColor(score) 호출.
+            arc.style.stroke = scoreToColor(scoreNum);
             // 보강 6: 도넛 아래쪽 라벨 = '⊙ 구매판정' 만(등급 라벨 결합 X).
             //   위쪽 큰 점수(p5GaugeScore)는 무변경. 색은 점수 기반 톤
             //   (도넛과 통일) — 그러나 너무 강하지 않게 verdict.color 클래스
@@ -2299,8 +2304,9 @@
             heading.after(wrapper);
 
             // Render donut chart
-            // 보강 7: 양쪽 도넛(④ 보고서·팝업)이 같은 헬퍼·hex 사용.
-            //   기존 8/6 임계 → 사용자 결정 8/5 임계로 통일.
+            // 보강 7 + 작업 2 재시도: 양쪽 도넛(④·팝업) 공유 헬퍼 scoreToColor.
+            //   임계 7.5/4.0/1.0 (보강 2 의 derive_tier 와 동일).
+            //   ④는 Chart.js dataset.backgroundColor — CSS 무영향(정상).
             const color = scoreToColor(score);
             const chart = new Chart(canvas, {
                 type: 'doughnut',

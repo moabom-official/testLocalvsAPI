@@ -292,7 +292,7 @@ def test_two_line_desc_both_personas_present():
 
 
 def test_two_line_josa_no_jongseong():
-    # 받침 없는 마지막 음절('시')·('야') → 를/가
+    # 받침 없는 마지막 음절·작업 1 끝맺음 토큰 후처리 적용 후 조사 재계산.
     md = _BASE_FOR_TIER + """
 ## ⑦ 이런 사람에게 추천 / 비추
 ### 추천
@@ -302,10 +302,64 @@ def test_two_line_josa_no_jongseong():
 """
     d = extract_popup_data(md)
     v = d["verdict"]
-    # '중시'의 '시'는 받침 X → 를
-    assert v["one_liner_main"].startswith("사진 촬영 중시를 중시한다면")
-    # '야간 카메라'의 '라'는 받침 X → 가
+    # 작업 1: 끝 '중시' 제거 → '사진 촬영' / '영'(받침 있음) → 을
+    assert v["one_liner_main"].startswith("사진 촬영을 중시한다면")
+    # '야간 카메라'(끝 토큰 없음, 라→받침 X) → 가
     assert v["one_liner_sub"].startswith("야간 카메라가 최우선이라면")
+
+
+def test_persona_tail_strip_removes_duplicate_tokens():
+    """작업 1: 페르소나 끝의 '중시'/'최우선' 토큰 제거 → '중복 중복' 회피."""
+    md = _BASE_FOR_TIER + """
+## ⑦ 이런 사람에게 추천 / 비추
+### 추천
+- 디자인·내구성 중시 (근거: 영상 1)
+### 비추
+- 가성비 최우선 (근거: 영상 2)
+"""
+    d = extract_popup_data(md)
+    v = d["verdict"]
+    # '중시' 토큰 제거 → '디자인·내구성'(성→ㅇ받침→을)
+    assert v["one_liner_main"] == "디자인·내구성을 중시한다면 긍정적으로 고려하세요."
+    assert "중시 중시" not in v["one_liner_main"]
+    # '최우선' 토큰 제거 → '가성비'(비→ㅣ받침 X→가)
+    assert v["one_liner_sub"] == "가성비가 최우선이라면 유사 제품과 비교를 권합니다."
+    assert "최우선이 최우선" not in v["one_liner_sub"]
+
+
+def test_persona_tail_strip_other_synonyms():
+    """선호/중요/우선시/우선 같은 동의 토큰도 제거."""
+    md = _BASE_FOR_TIER + """
+## ⑦ 이런 사람에게 추천 / 비추
+### 추천
+- 휴대성 선호 (근거: 영상 1)
+### 비추
+- 게임 성능 우선 (근거: 영상 2)
+"""
+    d = extract_popup_data(md)
+    v = d["verdict"]
+    # '선호' 제거 → '휴대성'(성→을)
+    assert v["one_liner_main"].startswith("휴대성을 중시한다면")
+    # '우선' 제거 → '게임 성능'(능→을). 그러나 NOT_RECO 템플릿이 '최우선이라면'
+    # 이므로 — 결과는 '게임 성능이 최우선이라면…' 으로 자연 합쳐짐.
+    assert v["one_liner_sub"].startswith("게임 성능이 최우선이라면")
+
+
+def test_persona_tail_strip_no_match_passthrough():
+    """끝맺음 토큰이 없는 페르소나는 원문 그대로."""
+    md = _BASE_FOR_TIER + """
+## ⑦ 이런 사람에게 추천 / 비추
+### 추천
+- 카메라 화질 좋음 (근거: 영상 1)
+### 비추
+- 무게 부담 큼 (근거: 영상 2)
+"""
+    d = extract_popup_data(md)
+    v = d["verdict"]
+    # '좋음'(음→ㅁ받침→을), 원문 그대로
+    assert v["one_liner_main"].startswith("카메라 화질 좋음을 중시한다면")
+    # '큼'(음→ㅁ받침→이), 원문 그대로
+    assert v["one_liner_sub"].startswith("무게 부담 큼이 최우선이라면")
 
 
 def test_two_line_only_recommend_then_sub_empty():
