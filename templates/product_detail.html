@@ -911,6 +911,208 @@
             animation: vc-pulse 1.2s ease-in-out infinite;
         }
         @keyframes vc-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+        /* ── Phase 5: 최종 판정 팝업 모달 (라이트 톤, 목업 그대로) ── */
+        .p5-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+            display: none; align-items: flex-start; justify-content: center;
+            z-index: 9000; overflow-y: auto; padding: 40px 16px;
+        }
+        .p5-overlay.show { display: flex; }
+        .p5-modal {
+            background: #fff; color: #111; width: min(820px, 100%);
+            border-radius: 18px; box-shadow: 0 24px 60px rgba(0,0,0,0.18);
+            padding: 22px 28px 24px; position: relative;
+            font-family: inherit; line-height: 1.45;
+        }
+        .p5-meta-line {
+            font-size: 11px; color: #9aa0a6; margin: -6px 0 12px;
+            font-weight: 400; letter-spacing: 0;
+        }
+        .p5-close {
+            position: absolute; top: 14px; right: 14px; width: 32px;
+            height: 32px; border-radius: 50%; border: 1px solid #e5e7eb;
+            background: #f7f8fa; color: #374151; font-size: 16px;
+            cursor: pointer; display: flex; align-items: center;
+            justify-content: center; line-height: 1;
+        }
+        .p5-close:hover { background: #eef0f3; }
+        /* 보강 8: 모달 상단 좌·우 분할 — 좌(제품정보 + 강조카드 수직),
+           우(도넛 단독, 두 행 높이). 하단(장단점·주의·버튼)은 전폭. */
+        .p5-modal-top {
+            display: grid;
+            grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+            grid-template-rows: auto auto;
+            column-gap: 24px; row-gap: 14px;
+            margin-top: 6px; align-items: stretch;
+        }
+        .p5-product-info { grid-column: 1; grid-row: 1;
+            display: flex; gap: 18px; align-items: center; min-width: 0; }
+        .p5-modal-top > #p5Verdict { grid-column: 1; grid-row: 2;
+            margin-top: 0; }
+        .p5-gauge-area { grid-column: 2; grid-row: 1 / span 2;
+            display: flex; align-items: center; justify-content: center;
+            min-width: 0; }
+        /* 모바일/좁은 폭: 세로로 자연스럽게 쌓이게 */
+        @media (max-width: 640px) {
+            .p5-modal-top { grid-template-columns: 1fr;
+                grid-template-rows: auto auto auto; row-gap: 14px; }
+            .p5-product-info { grid-column: 1; grid-row: 1; }
+            .p5-modal-top > #p5Verdict { grid-column: 1; grid-row: 3; }
+            .p5-gauge-area { grid-column: 1; grid-row: 2; }
+        }
+        /* (구) .p5-row-top — Boost 8 이전 호환용 빈 정의(현재 미사용) */
+        .p5-image-box {
+            flex: 0 0 168px; width: 168px; height: 168px;
+            background: #f3f4f6; border-radius: 14px;
+            display: flex; align-items: center; justify-content: center;
+            overflow: hidden;
+        }
+        .p5-image-box img {
+            max-width: 100%; max-height: 100%; object-fit: contain;
+        }
+        .p5-image-fallback {
+            font-size: 12px; color: #6b7280; text-align: center; padding: 8px;
+        }
+        .p5-meta { flex: 1 1 auto; min-width: 0; }
+        /* 보강 1: 제품명 압도적 강조. 강한 선택자(.p5-modal h2.p5-name)로
+           UA/상속/잠재 충돌 차단. 한 줄 유지(nowrap+ellipsis+부모 min-width:0).
+           가격 ×2 이상, 강조 카드 라벨 ×1.8 이상의 시각 위계 보장. */
+        .p5-modal h2.p5-name,
+        .p5-name {
+            font-size: 42px; font-weight: 800; margin: 0 0 10px; color: #0a0a0a;
+            letter-spacing: -0.8px; line-height: 1.08;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            max-width: 100%;
+        }
+        /* 보강 1 위계 — 제품명 42px / 가격 20px / 스펙 13.5px(옅음).
+           제품명 ≥ 가격×2, 제품명 ≥ 라벨(20px)×1.8 보장. */
+        .p5-spec { font-size: 13.5px; color: #9ca3af; margin: 0 0 14px;
+            font-weight: 400; }
+        .p5-price { font-size: 20px; font-weight: 700; color: #111; margin: 0; }
+        /* 보강 8: 도넛 단독 영역에서 큰 크기로(권장 220~260px) */
+        .p5-gauge {
+            flex: 0 0 230px; width: 230px; height: 230px; position: relative;
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center;
+        }
+        .p5-gauge svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+        .p5-gauge .ring-bg { fill: none; stroke: #e8efe8; stroke-width: 11; }
+        /* 작업 2 — 도넛 색 재시도: CSS 의 stroke 선언을 *완전히* 제거.
+           직전 두 차례는 `stroke: #ccc` 가 남아 있어 SVG presentation
+           attribute(JS setAttribute)를 author CSS 우선순위로 덮어버렸다.
+           이제 JS 가 inline `style.stroke` 로 적용 → 어떤 author CSS rule
+           보다 specificity 가 높아 확실히 적용됨. fill·stroke-width 만 유지. */
+        .p5-gauge .ring-fg { fill: none; stroke-width: 11; stroke-linecap: round; }
+        /* 보강 8: 도넛 커진 만큼 안쪽 점수도 그에 비례 (위쪽 큰 점수 — 보강
+           6 에서 변경 금지였던 그 점수. 크기만 도넛 사이즈에 맞춰 확대.) */
+        .p5-gauge-score { font-size: 44px; font-weight: 800; color: #0a0a0a;
+            line-height: 1; letter-spacing: -1px; }
+        .p5-gauge-score small { font-size: 18px; color: #6b7280; font-weight: 500; }
+        /* (보강 4: 아래 등급별 색 변동 정의로 대체) */
+
+        /* 보강 5: 가로 흐름 — 좌(체크) 중(▶ 추천도) 우(본문).
+           좁은 폭에선 우측 본문이 추천도 아래로 자연 줄바꿈. */
+        .p5-verdict {
+            margin-top: 18px; border-radius: 14px; padding: 14px 16px;
+            display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+        }
+        .p5-verdict.green { background: #e8f6ee; }
+        .p5-verdict.amber { background: #fff4e0; }
+        .p5-verdict.red   { background: #fde7e7; }
+        .p5-verdict-icon {
+            flex: 0 0 46px; height: 46px; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; font-weight: 800; font-size: 22px;
+        }
+        .p5-verdict.green .p5-verdict-icon { background: #22c55e; }
+        .p5-verdict.amber .p5-verdict-icon { background: #f59e0b; }
+        .p5-verdict.red   .p5-verdict-icon { background: #ef4444; }
+        /* 보강 2: 라벨 폰트 크게 — 카드의 시각 주인공 */
+        .p5-verdict-label { font-weight: 800; font-size: 20px; margin: 0;
+            flex: 0 0 auto; white-space: nowrap; letter-spacing: -0.3px; }
+        .p5-verdict.green .p5-verdict-label { color: #15803d; }
+        .p5-verdict.amber .p5-verdict-label { color: #b45309; }
+        .p5-verdict.red   .p5-verdict-label { color: #b91c1c; }
+        /* 보강 4: 본문 두 줄 위계 (윗줄 굵음/큼 / 아랫줄 옅음/작음) */
+        .p5-verdict-desc { margin: 0; flex: 1 1 220px; min-width: 0;
+            display: flex; flex-direction: column; gap: 4px; }
+        .p5-verdict-desc-main {
+            font-size: 15.5px; font-weight: 700; color: #1f2937;
+            line-height: 1.35; word-break: keep-all;
+        }
+        .p5-verdict-desc-sub {
+            font-size: 13px; font-weight: 400; color: #888;
+            line-height: 1.4; word-break: keep-all;
+        }
+
+        /* 보강 4: 도넛 안쪽 라벨 — 추천도(구매판정) 색 변동 */
+        .p5-gauge-cons { font-size: 11px; font-weight: 600; line-height: 1.2;
+            text-align: center; max-width: 110px; padding: 0 4px;
+            white-space: normal; word-break: keep-all; }
+        .p5-gauge-cons.green { color: #15803d; }
+        .p5-gauge-cons.amber { color: #b45309; }
+        .p5-gauge-cons.red   { color: #b91c1c; }
+
+        /* 보강 2: ④ 패널 헤더 우측 "종합 판정" 버튼 */
+        .integrated-insight-header {
+            display: flex; justify-content: space-between; align-items: center;
+            gap: 12px; margin-bottom: 6px;
+        }
+        .integrated-insight-header h3 { margin: 0; }
+        .p5-reopen-btn {
+            background: #f7f8fa; color: #111; border: 1px solid #e5e7eb;
+            padding: 7px 14px; border-radius: 999px; font-size: 13px;
+            font-weight: 600; cursor: pointer; flex-shrink: 0;
+        }
+        .p5-reopen-btn:hover { background: #eef0f3; }
+
+        .p5-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px;
+        }
+        .p5-card-pros, .p5-card-cons {
+            background: #fff; border: 1px solid #eceef0; border-radius: 12px;
+            padding: 14px 16px;
+        }
+        .p5-card-title { font-weight: 700; font-size: 14px; margin: 0 0 10px;
+            display: flex; align-items: center; gap: 6px; }
+        .p5-card-pros .p5-card-title { color: #16a34a; }
+        .p5-card-cons .p5-card-title { color: #dc2626; }
+        /* 보강 10: 장단점 항목 텍스트·아이콘 크기 키움 (빈 공간 줄여 직관성 ↑) */
+        .p5-item { display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 0; font-size: 16.5px; color: #1f2937; line-height: 1.35; }
+        .p5-item .p5-bullet { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; }
+        .p5-item .p5-bullet .p5-icon { width: 18px; flex: 0 0 18px; text-align: center; font-size: 17px; }
+        .p5-card-pros .p5-icon { color: #16a34a; }
+        .p5-card-cons .p5-icon { color: #dc2626; }
+        /* 보강 5: UI 숨김(데이터는 응답 JSON 의 n/total 필드로 그대로 유지) */
+        .p5-item .p5-freq { display: none; }
+        .p5-item.muted { color: #9aa0a6; font-style: italic; }
+
+        .p5-caveat {
+            background: #eaf2fb; border-radius: 12px; padding: 12px 14px;
+            margin-top: 14px; font-size: 13px; color: #1f2937;
+            display: flex; gap: 8px; align-items: flex-start;
+        }
+        .p5-caveat-i {
+            flex: 0 0 18px; width: 18px; height: 18px; border-radius: 50%;
+            background: #2563eb; color: #fff; font-size: 12px; font-weight: 700;
+            display: flex; align-items: center; justify-content: center; margin-top: 1px;
+        }
+        .p5-actions {
+            display: flex; gap: 12px; margin-top: 18px;
+        }
+        .p5-btn {
+            flex: 1 1 0; padding: 13px 18px; border-radius: 12px;
+            font-size: 14px; font-weight: 600; cursor: pointer;
+            border: 0; display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .p5-btn-secondary {
+            background: #fff; color: #111; border: 1px solid #e5e7eb;
+        }
+        .p5-btn-secondary:disabled { color: #9aa0a6; cursor: not-allowed; }
+        .p5-btn-primary { background: #111; color: #fff; }
+        .p5-btn-primary:hover { background: #000; }
     </style>
 </head>
 <body>
@@ -998,9 +1200,76 @@
                 <div class="empty">아직 분석된 영상이 없습니다. 위 "AI 영상 선택" 버튼을 눌러 시작하세요.</div>
             {% endif %}
 
-            <!-- Integrated insight result panel (hidden until generated) -->
+            <!-- Phase 5: 최종 판정 팝업 (모달, 평소 hidden) -->
+            <div id="p5Overlay" class="p5-overlay" aria-hidden="true" role="dialog" aria-modal="true">
+                <div id="p5Modal" class="p5-modal" role="document">
+                    <button type="button" class="p5-close" id="p5CloseBtn" aria-label="닫기">×</button>
+                    <div id="p5MetaLine" class="p5-meta-line"></div>
+                    <!-- 보강 8: 모달 상단 좌·우 grid 분할.
+                         좌측 — 제품 정보(이미지+메타) + 강조 카드 수직 스택.
+                         우측 — 도넛 단독, 두 행 높이 차지. -->
+                    <div class="p5-modal-top">
+                        <div class="p5-product-info">
+                            <div id="p5ImageBox" class="p5-image-box"></div>
+                            <div class="p5-meta">
+                                <h2 id="p5Name" class="p5-name"></h2>
+                                <p id="p5Spec" class="p5-spec"></p>
+                                <p id="p5Price" class="p5-price"></p>
+                            </div>
+                        </div>
+                        <div id="p5Verdict" class="p5-verdict" style="display:none">
+                            <div class="p5-verdict-icon">✓</div>
+                            <p id="p5VerdictLabel" class="p5-verdict-label"></p>
+                            <!-- 보강 4: 두 줄 구조 (윗줄 굵음/큼, 아랫줄 옅음/작음) -->
+                            <p class="p5-verdict-desc">
+                                <span id="p5VerdictDescMain" class="p5-verdict-desc-main"></span>
+                                <span id="p5VerdictDescSub"  class="p5-verdict-desc-sub"></span>
+                            </p>
+                        </div>
+                        <div class="p5-gauge-area">
+                            <div id="p5Gauge" class="p5-gauge">
+                                <svg viewBox="0 0 120 120">
+                                    <circle class="ring-bg" cx="60" cy="60" r="50"></circle>
+                                    <circle class="ring-fg" id="p5GaugeArc" cx="60" cy="60" r="50"
+                                            stroke-dasharray="314.16" stroke-dashoffset="0"></circle>
+                                </svg>
+                                <div class="p5-gauge-score" id="p5GaugeScore">—<small>/10</small></div>
+                                <div class="p5-gauge-cons" id="p5GaugeCons"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p5-grid">
+                        <div class="p5-card-pros">
+                            <p class="p5-card-title">👍 확실한 장점</p>
+                            <div id="p5ProsList"></div>
+                        </div>
+                        <div class="p5-card-cons">
+                            <p class="p5-card-title">⚠ 확실한 단점</p>
+                            <div id="p5ConsList"></div>
+                        </div>
+                    </div>
+                    <div id="p5Caveat" class="p5-caveat" style="display:none">
+                        <div class="p5-caveat-i">i</div>
+                        <div id="p5CaveatText"></div>
+                    </div>
+                    <div class="p5-actions">
+                        <button type="button" class="p5-btn p5-btn-secondary" disabled
+                                title="추후 구현">◇◇ 유사 제품 비교하기</button>
+                        <button type="button" class="p5-btn p5-btn-primary" id="p5DetailBtn">상세 보고서 보기 →</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Integrated insight result panel (보강 1: 모달이 먼저 뜨고
+                 닫힌 뒤에만 .show 부여 — runIntegratedInsight 가 더 이상
+                 직접 show 하지 않음. p5Close()가 패널 노출 책임.) -->
             <div id="integratedInsightPanel" class="integrated-insight-panel" aria-hidden="true">
-                <h3>🧩 제품 단위 종합 인사이트</h3>
+                <div class="integrated-insight-header">
+                    <h3>🧩 제품 단위 종합 인사이트</h3>
+                    <!-- 보강 2: 캐시된 popup-summary 로 모달 재진입 -->
+                    <button type="button" id="p5ReopenBtn" class="p5-reopen-btn"
+                            title="종합 판정 팝업 다시 보기">종합 판정</button>
+                </div>
                 <div id="integratedInsightMeta" class="integrated-insight-meta"></div>
                 <div id="integratedInsightBody" class="integrated-insight-body"></div>
                 <div class="integrated-insight-actions">
@@ -1493,6 +1762,19 @@
             }, 500);
         }
 
+        // 보강 7: 점수 → 도넛 색 공유 헬퍼 (사용자 결정, 임계 갱신 7.5/4.0/1.0).
+        //   양쪽 도넛(④ 보고서·팝업)이 이 함수를 호출 → 임계·hex 한 곳에서.
+        //   보강 2 의 derive_tier 임계와 정확히 동일 → 라벨 등급과 도넛 색이
+        //   같은 점수 기준으로 결정되어 시각 일관성.
+        function scoreToColor(score) {
+            const s = parseFloat(score);
+            if (!isFinite(s)) return '#ccc';   // 데이터 부족
+            if (s >= 7.5)  return '#22c55e';   // 7.5~10.0 → 녹
+            if (s >= 4.0)  return '#f5a623';   // 4.0~7.49 → 주황
+            if (s >= 1.0)  return '#e35d6a';   // 1.0~3.99 → 빨강
+            return '#ccc';
+        }
+
         async function runIntegratedInsight() {
             const btn = document.getElementById('integratedInsightBtn');
             const status = document.getElementById('integratedInsightStatus');
@@ -1564,9 +1846,25 @@
                 pdfLink.style.display = 'none';
             }
 
-            panel.classList.add('show');
-            panel.setAttribute('aria-hidden', 'false');
-            panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            // 보강 1: ④ 패널은 모달이 닫힌 뒤에 비로소 노출(.show 부여).
+            //   여기선 DOM 만 채워두고 노출하지 않는다 — 모달이 먼저 뜨고,
+            //   닫힐 때 p5Close() 가 _p5RevealPanelOnClose() 로 노출 책임.
+            //   추출/외부 호출 실패면 _p5RevealPanelOnClose() 가 즉시 호출돼
+            //   ④ 패널이 fallback 으로 노출된다(§3-1).
+            p5ShowSummary().catch((e) => {
+                console.warn('[P5] popup skipped:', e);
+                _p5RevealPanelOnClose();
+            });
+        }
+
+        function _p5RevealPanelOnClose() {
+            const panel = document.getElementById('integratedInsightPanel');
+            if (!panel) return;
+            if (!panel.classList.contains('show')) {
+                panel.classList.add('show');
+                panel.setAttribute('aria-hidden', 'false');
+                panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
         }
 
         function closeIntegratedInsight() {
@@ -1574,6 +1872,196 @@
             panel.classList.remove('show');
             panel.setAttribute('aria-hidden', 'true');
         }
+
+        // ── Phase 5: 최종 판정 팝업 (모달) ─────────────────────────
+        // 보강 2: popup-summary 응답을 메모리에 보관 — 재진입 시 즉시 사용
+        window._p5Summary = null;
+
+        async function p5ShowSummary({ useCache = false } = {}) {
+            try {
+                if (useCache && window._p5Summary) {
+                    p5Populate(window._p5Summary);
+                    p5Open();
+                    return;
+                }
+                const r = await fetch('/products/' + PRODUCT_ID + '/popup-summary');
+                if (!r.ok) {
+                    console.warn('[P5] summary not available:', r.status);
+                    _p5RevealPanelOnClose();   // 추출 실패 → ④ 패널 곧장
+                    return;
+                }
+                const d = await r.json();
+                window._p5Summary = d;          // 보강 2 캐시
+                p5Populate(d);
+                p5Open();
+            } catch (e) {
+                console.warn('[P5] fetch failed:', e);
+                _p5RevealPanelOnClose();
+            }
+        }
+
+        function p5Populate(d) {
+            const $ = (id) => document.getElementById(id);
+            // 상단 작은 메타 줄
+            const v = (d.meta && d.meta.videos) || null;
+            const c = (d.meta && d.meta.comments) || null;
+            let metaParts = [];
+            if (v) metaParts.push('리뷰 영상 ' + v + '개');
+            if (c) metaParts.push('핵심 댓글 ' + c + '개');
+            $('p5MetaLine').textContent = metaParts.length
+                ? (metaParts.join(' · ') + ' 분석 기준') : '';
+            $('p5MetaLine').style.display = metaParts.length ? '' : 'none';
+
+            // 이미지 박스
+            const img = (d.product && d.product.image_url) || '';
+            const box = $('p5ImageBox');
+            box.innerHTML = '';
+            if (img) {
+                const el = document.createElement('img');
+                el.src = img; el.alt = (d.product && d.product.name) || '제품 이미지';
+                el.onerror = () => { box.innerHTML = '<div class="p5-image-fallback">이미지를 가져올 수 없습니다</div>'; };
+                box.appendChild(el);
+            } else {
+                box.innerHTML = '<div class="p5-image-fallback">이미지를 가져올 수 없습니다</div>';
+            }
+
+            // 메타 텍스트
+            $('p5Name').textContent = (d.product && d.product.name) || '';
+            $('p5Spec').textContent = d.spec_display || '';
+            $('p5Spec').style.display = d.spec_display ? '' : 'none';
+            $('p5Price').textContent = d.price_display || '가격 정보 없음';
+
+            // 점수 게이지
+            const verdict = d.verdict || {};
+            const scoreStr = verdict.score;
+            let scoreNum = NaN;
+            if (scoreStr && scoreStr !== '데이터 부족') {
+                scoreNum = parseFloat(scoreStr);
+            }
+            const sEl = $('p5GaugeScore');
+            if (isFinite(scoreNum)) {
+                sEl.innerHTML = scoreNum.toFixed(1) + '<small>/10</small>';
+            } else {
+                sEl.innerHTML = '—<small>/10</small>';
+            }
+            const arc = $('p5GaugeArc');
+            const C = 2 * Math.PI * 50; // ≈314.16
+            const ratio = isFinite(scoreNum) ? Math.max(0, Math.min(1, scoreNum / 10)) : 0;
+            arc.setAttribute('stroke-dasharray', C.toFixed(2));
+            arc.setAttribute('stroke-dashoffset', (C * (1 - ratio)).toFixed(2));
+            // 작업 2 — 도넛 색 재시도: inline style.stroke 사용 → 어떤
+            //   author CSS rule 보다도 specificity 높아 확실히 적용.
+            //   (setAttribute 는 author CSS 에 덮였던 직전 두 번의 실패 원인.)
+            //   양쪽 도넛(팝업·④) 공유 헬퍼 scoreToColor(score) 호출.
+            arc.style.stroke = scoreToColor(scoreNum);
+            // 보강 6: 도넛 아래쪽 라벨 = '⊙ 구매판정' 만(등급 라벨 결합 X).
+            //   위쪽 큰 점수(p5GaugeScore)는 무변경. 색은 점수 기반 톤
+            //   (도넛과 통일) — 그러나 너무 강하지 않게 verdict.color 클래스
+            //   를 보조로 유지(라벨 텍스트 색만, 도넛 stroke 와 별개).
+            const gc = $('p5GaugeCons');
+            gc.classList.remove('green', 'amber', 'red');
+            gc.textContent = '⊙ 구매판정';
+            if (verdict.color) gc.classList.add(verdict.color);
+            gc.style.display = '';
+
+            // 보강 5·4: 강조 카드 — 등급별 색·라벨 + 두 줄 본문(main/sub)
+            const card = $('p5Verdict');
+            card.classList.remove('green', 'amber', 'red');
+            if (verdict.color && verdict.label) {
+                card.classList.add(verdict.color);
+                $('p5VerdictLabel').textContent = '▸ ' + verdict.label;
+                // 보강 4 (UI): 두 줄 분리 — 추출기에서 결정론적으로 조립된
+                //   verdict.one_liner_main / .one_liner_sub 사용. 둘 중
+                //   빈 값이면 그 줄만 숨김(억지 생성 금지, §7).
+                const main = (verdict.one_liner_main || verdict.one_liner || '').trim();
+                const sub  = (verdict.one_liner_sub || '').trim();
+                const mEl = $('p5VerdictDescMain');
+                const sEl2 = $('p5VerdictDescSub');
+                mEl.textContent = main;
+                mEl.style.display = main ? '' : 'none';
+                sEl2.textContent = sub;
+                sEl2.style.display = sub ? '' : 'none';
+                card.style.display = '';
+            } else {
+                card.style.display = 'none';
+            }
+
+            // 장단점 카드
+            p5RenderItems($('p5ProsList'), d.pros || [], '✓');
+            p5RenderItems($('p5ConsList'), d.cons || [], '⊖');
+
+            // 주의 노트
+            if (d.caveat) {
+                $('p5CaveatText').textContent = d.caveat;
+                $('p5Caveat').style.display = '';
+            } else {
+                $('p5Caveat').style.display = 'none';
+            }
+        }
+
+        function p5RenderItems(container, items, icon) {
+            container.innerHTML = '';
+            if (!items || items.length === 0) {
+                const row = document.createElement('div');
+                row.className = 'p5-item muted';
+                row.textContent = '데이터 부족';
+                container.appendChild(row);
+                return;
+            }
+            for (const it of items) {
+                const row = document.createElement('div');
+                row.className = 'p5-item';
+                const bullet = document.createElement('div');
+                bullet.className = 'p5-bullet';
+                bullet.innerHTML = '<span class="p5-icon">' + icon + '</span><span>' +
+                                   p5EscapeHtml(it.label || '') + '</span>';
+                const freq = document.createElement('span');
+                freq.className = 'p5-freq';
+                if (it.n != null && it.total != null) freq.textContent = it.n + '/' + it.total;
+                row.appendChild(bullet); row.appendChild(freq);
+                container.appendChild(row);
+            }
+        }
+
+        function p5EscapeHtml(s) {
+            return String(s).replace(/[&<>"']/g, (c) => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[c]));
+        }
+
+        function p5Open() {
+            const ov = document.getElementById('p5Overlay');
+            ov.classList.add('show');
+            ov.setAttribute('aria-hidden', 'false');
+            document.body.style.overflow = 'hidden';
+        }
+        function p5Close() {
+            const ov = document.getElementById('p5Overlay');
+            ov.classList.remove('show');
+            ov.setAttribute('aria-hidden', 'true');
+            document.body.style.overflow = '';
+            // 보강 1: 모달 닫힌 뒤 비로소 ④ 패널 노출
+            _p5RevealPanelOnClose();
+        }
+        // 닫기 3가지(사용자 결정 12): X / ESC / 상세 보고서 보기
+        document.addEventListener('DOMContentLoaded', () => {
+            const cb = document.getElementById('p5CloseBtn');
+            if (cb) cb.addEventListener('click', p5Close);
+            const db = document.getElementById('p5DetailBtn');
+            if (db) db.addEventListener('click', p5Close);
+            // 보강 2: ④ 패널의 "종합 판정" 버튼 — 캐시된 응답으로 모달 재진입
+            const rb = document.getElementById('p5ReopenBtn');
+            if (rb) rb.addEventListener('click', () => {
+                p5ShowSummary({ useCache: true });
+            });
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    const ov = document.getElementById('p5Overlay');
+                    if (ov && ov.classList.contains('show')) p5Close();
+                }
+            });
+            // ★ 배경 클릭으로 닫지 않음(사용자 결정) — overlay click 무시.
+        });
 
         // ── Integrated insight visual enhancements (Option A: frontend post-processing) ──
 
@@ -1816,7 +2304,10 @@
             heading.after(wrapper);
 
             // Render donut chart
-            const color = score >= 8 ? '#20c997' : score >= 6 ? '#f5a623' : '#e35d6a';
+            // 보강 7 + 작업 2 재시도: 양쪽 도넛(④·팝업) 공유 헬퍼 scoreToColor.
+            //   임계 7.5/4.0/1.0 (보강 2 의 derive_tier 와 동일).
+            //   ④는 Chart.js dataset.backgroundColor — CSS 무영향(정상).
+            const color = scoreToColor(score);
             const chart = new Chart(canvas, {
                 type: 'doughnut',
                 data: {
