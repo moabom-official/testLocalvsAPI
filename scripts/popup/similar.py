@@ -115,6 +115,9 @@ def find_similar_internal(target_id: int) -> List[Dict[str, Any]]:
     # tech_products.category 는 NULL 케이스 다수 — 정규화 비교(LOWER+TRIM).
     # product_meta_cache 와 LEFT JOIN 으로 release_year 가져옴.
     # 1차: 카테고리 직접 일치 (대소문자·공백 정규화)
+    # ★ 후속 보강: product_integrated_reports 에 보고서 1개 이상 있는
+    #   "완성된 제품" 만 추천 (사용자 Q2=a 결정). 분석 영상 0개 빈 페이지로
+    #   넘어가는 케이스 차단. EXISTS — INNER JOIN+DISTINCT 보다 단순/성능 양호.
     rows = query_all(
         """
         SELECT tp.product_id, tp.name, tp.brand, tp.category, tp.image_url,
@@ -125,11 +128,17 @@ def find_similar_internal(target_id: int) -> List[Dict[str, Any]]:
            AND pmc.release_year IS NOT NULL
            AND pmc.release_year BETWEEN %s AND %s
            AND LOWER(TRIM(COALESCE(tp.category,''))) = LOWER(TRIM(%s))
+           AND EXISTS (
+               SELECT 1 FROM product_integrated_reports pir
+                WHERE pir.product_id = tp.product_id
+           )
         """,
         (target_id, target_year - 2, target_year + 2, target_cat),
     ) or []
 
     # 2차 (1차에 후보 부족): 제품명 기반 카테고리 추론까지 포함해 보강
+    # ★ 후속 보강: 동일하게 EXISTS 조건 적용 — 한쪽만 적용하면 fallback 에서
+    #   미완 제품이 다시 새어 들어옴.
     if len(rows) < 3:
         extra = query_all(
             """
@@ -140,6 +149,10 @@ def find_similar_internal(target_id: int) -> List[Dict[str, Any]]:
              WHERE tp.product_id <> %s
                AND pmc.release_year IS NOT NULL
                AND pmc.release_year BETWEEN %s AND %s
+               AND EXISTS (
+                   SELECT 1 FROM product_integrated_reports pir
+                    WHERE pir.product_id = tp.product_id
+               )
             """,
             (target_id, target_year - 2, target_year + 2),
         ) or []

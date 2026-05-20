@@ -2342,7 +2342,11 @@
 
         function onSimilarCardClick(item) {
             if (item.kind === 'internal' && item.product_id) {
-                window.location.href = '/products/' + item.product_id;
+                // ★ 후속 보강: ?auto_insight=1 부여 → 새 페이지 진입 직후 자동
+                //   인사이트 모달 표시. 영상 리스트 화면이 사용자에게 보이지
+                //   않도록 — _handleAutoInsightOnLoad 가 받아 _enterInsightMode
+                //   + runIntegratedInsight 호출.
+                window.location.href = '/products/' + item.product_id + '?auto_insight=1';
                 return;
             }
             // 외부 — 다이얼로그
@@ -2480,7 +2484,9 @@
             const el = document.getElementById('bgToast');
             if (!el) return;
             const productId = el.dataset.productId;
-            if (productId) window.location.href = '/products/' + productId;
+            // ★ 후속 보강: 외부 카드 → BG 분석 → 토스트 [결과 보러 가기] 도
+            //   ?auto_insight=1 부여 — 새 페이지 진입 직후 자동 모달.
+            if (productId) window.location.href = '/products/' + productId + '?auto_insight=1';
         }
 
         async function cancelBgTask() {
@@ -2500,6 +2506,40 @@
 
         // escapeAttr — escapeHtml 과 동일 (속성 컨텍스트도 같은 이스케이프로 충분)
         function escapeAttr(s) { return escapeHtml(s); }
+
+        // ── feature/similar-products 후속 보강: ?auto_insight=1 자동 모달 ──
+        //   유사 카드 클릭 / 외부 BG 토스트 [결과 보러 가기] 로 진입 시 영상
+        //   리스트 화면을 보여주지 않고 곧장 인사이트 모달. 직접 URL 진입은
+        //   파라미터 없으므로 발동 안 함(시나리오 ③ 회귀 0).
+        function _triggerAutoInsight() {
+            // 1) 인사이트 모드 즉시 진입 — 영상 섹션 숨김 + 뒤로가기 라벨 토글
+            if (typeof _enterInsightMode === 'function') {
+                _enterInsightMode();
+            }
+            // 2) 종합 인사이트 자동 호출 — 사용자 클릭과 동일한 흐름
+            //    (캐시 분기·로딩 진행 바·모달 우선 표시 모두 그대로)
+            if (typeof runIntegratedInsight === 'function') {
+                runIntegratedInsight();
+            }
+        }
+        (function _handleAutoInsightOnLoad() {
+            try {
+                const url = new URL(window.location.href);
+                if (url.searchParams.get('auto_insight') !== '1') return;
+                // URL 정리 (한 번만 실행 — 새로고침 안전, 시나리오 ④)
+                url.searchParams.delete('auto_insight');
+                history.replaceState(null, '', url.toString());
+
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', _triggerAutoInsight);
+                } else {
+                    _triggerAutoInsight();
+                }
+            } catch (e) {
+                // URL 파싱·history 호환 실패는 무시 — 사용자가 수동으로 클릭 가능
+                console.warn('[auto_insight] handler skipped:', e);
+            }
+        })();
         // 닫기 3가지(사용자 결정 12): X / ESC / 상세 보고서 보기
         document.addEventListener('DOMContentLoaded', () => {
             const cb = document.getElementById('p5CloseBtn');
