@@ -41,6 +41,53 @@ def test_parse_release_year_recent_first():
     assert parse_release_year("1999년 모델") is None
 
 
+# ── Phase 5 마지막 보강 1: 출시연도 정규식 강화 ───────────────────
+
+
+def test_parse_release_year_explicit_release_phrases():
+    """명시적 출시 표현 — '출시/발매/공개/런칭/등장/출시예정'."""
+    assert parse_release_year("2024년 출시 아이폰16") == 2024
+    assert parse_release_year("삼성 갤럭시 S25는 2025년 발매") == 2025
+    assert parse_release_year("2023년 공개된 제품") == 2023
+    assert parse_release_year("2026년 출시 예정") == 2026
+    assert parse_release_year("2024년 런칭") == 2024
+
+
+def test_parse_release_year_generic_year():
+    """일반 '20XX년' 표기 — 출시 표현이 없을 때 fallback."""
+    assert parse_release_year("2024년 모델 비교") == 2024
+    assert parse_release_year("2023년 신제품") == 2023
+
+
+def test_parse_release_year_standalone_4digit_fallback():
+    """본문에 '년' 없이 4자리만 있는 경우 — 마지막 fallback."""
+    assert parse_release_year("iPhone 2024 Pro Max") == 2024
+    assert parse_release_year("Galaxy S25 / 2025 / Best") == 2025
+
+
+def test_parse_release_year_priority_release_first():
+    """우선순위 — 명시적 출시 표현이 일반 연도보다 먼저 매칭."""
+    # 텍스트에 2023(일반)·2024(출시) 둘 다 있으면 출시 표현이 우선
+    text = "2023년 리뷰. 2024년 출시 예정."
+    assert parse_release_year(text) == 2024
+
+
+def test_parse_release_year_range_filter():
+    """2010~2030 밖은 모두 무시."""
+    assert parse_release_year("2009년 출시") is None
+    assert parse_release_year("2099년 출시") is None
+    assert parse_release_year("1999") is None
+    # 경계
+    assert parse_release_year("2010년 출시") == 2010
+    assert parse_release_year("2030년 출시") == 2030
+
+
+def test_parse_release_year_empty_or_no_match():
+    assert parse_release_year("") is None
+    assert parse_release_year(None) is None
+    assert parse_release_year("이 텍스트에는 연도가 없다") is None
+
+
 def test_format_price_display_man_unit():
     assert format_price_display(1_290_000) == "최저 129만 원~"
     assert format_price_display(500_000) == "최저 50만 원~"

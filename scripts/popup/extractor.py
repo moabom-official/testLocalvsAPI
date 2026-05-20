@@ -294,17 +294,50 @@ def _extract_caveat(md: str) -> str:
 # ── 보강 4: ④ ⑦ 추천/비추 페르소나 추출 + 두 줄 템플릿 조립 ───────
 #  결정론적(LLM 0건). prompt_manager 의 ⑦ 절대 규칙(페르소나 10자 내외
 #  명사구) 패턴을 그대로 활용.
+#
+# Phase 5 마지막 보강 2: **합의 영상 수 최대** 페르소나 선택.
+#   기존: `_first()` 가 첫 번째 매칭만 선택 → ⑦ 의 항목 순서(LLM 출력 순)에
+#   민감해 합의가 적은 항목이 표면화 가능. ⑦ 의 "(근거: 영상 1,3,5)"의
+#   콤마 개수 = 합의 영상 수. 그것이 가장 많은 항목을 선택 → "여러 리뷰어가
+#   동의한 페르소나" 가 카드에 노출됨(사용자 의도).
+#   동수면 먼저 등장한 항목(stable sort) — 결정론적.
+#   '데이터 부족' 항목은 제외.
 
+# group(1) = 페르소나 명사구, group(2) = "영상 X, Y, Z" 의 ID 부분
 _RE_PERSONA_ITEM = re.compile(
-    r"^-\s*(.+?)\s*\(\s*근거\s*[:：]\s*영상\s*[\d,\s]+\)\s*$", re.M
+    r"^-\s*(.+?)\s*\(\s*근거\s*[:：]\s*영상\s*([\d,\s]+)\)\s*$", re.M
 )
 
 
+def pick_most_supported_persona(section_body: str) -> Optional[str]:
+    """⑦ 의 ### 추천/### 비추 본문 → '합의 영상 수' 최대 페르소나 1개.
+
+    동수면 먼저 등장한 항목(items 리스트의 안정 정렬). 매칭 0 또는
+    '데이터 부족' 만 있으면 None.
+    """
+    if not section_body:
+        return None
+    items: List[Tuple[int, str]] = []
+    for m in _RE_PERSONA_ITEM.finditer(section_body):
+        persona = m.group(1).strip()
+        if not persona or persona == "데이터 부족":
+            continue
+        # group(2) 예: "1, 3, 5" → split → ['1','3','5']
+        ids = [s.strip() for s in m.group(2).split(",") if s.strip()]
+        items.append((len(ids), persona))
+    if not items:
+        return None
+    # 합의 영상 수 내림차순 — 동수면 등장 순서 유지(stable sort)
+    items.sort(key=lambda x: -x[0])
+    return items[0][1]
+
+
 def _extract_personas(md: str) -> Tuple[Optional[str], Optional[str]]:
-    """⑦ 섹션의 '### 추천' / '### 비추' 첫 페르소나 한 줄씩.
+    """⑦ 섹션의 '### 추천' / '### 비추' 합의 영상 수 최대 페르소나 한 개씩.
 
     반환: (recommend_persona, not_recommend_persona). 각 None 가능.
     근거 괄호는 버리고 페르소나 명사구만.
+    Phase 5 마지막 보강 2: 첫 매칭(_first) 대신 '근거 영상' 수 최대 항목 선택.
     """
     sec = _section_body(md, "⑦ ")
     if not sec:
@@ -312,17 +345,9 @@ def _extract_personas(md: str) -> Tuple[Optional[str], Optional[str]]:
     if not sec:
         return None, None
 
-    def _first(h3_token: str) -> Optional[str]:
-        body = _h3_body(sec, h3_token)
-        if not body:
-            return None
-        for m in _RE_PERSONA_ITEM.finditer(body):
-            p = m.group(1).strip()
-            if p and p != "데이터 부족":
-                return p
-        return None
-
-    return _first("추천"), _first("비추")
+    rec = pick_most_supported_persona(_h3_body(sec, "추천"))
+    notrec = pick_most_supported_persona(_h3_body(sec, "비추"))
+    return rec, notrec
 
 
 def _has_final_jongseong(text: str) -> bool:

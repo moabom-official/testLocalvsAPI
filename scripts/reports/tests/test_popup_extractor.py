@@ -7,6 +7,7 @@ from scripts.popup.extractor import (
     TIER_LABELS,
     derive_tier,
     extract_popup_data,
+    pick_most_supported_persona,
 )
 
 
@@ -415,6 +416,60 @@ def test_two_line_section7_absent_fallback():
     # ⑦ 자체가 없음 → 윗줄 = 한 줄 결론, 아랫줄 빈 값
     assert v["one_liner_main"] == "한 줄 결론(폴백용)"
     assert v["one_liner_sub"] == ""
+
+
+# ── Phase 5 마지막 보강 2: 합의 영상 수 최대 페르소나 선택 ──────
+
+
+def test_pick_most_supported_persona_basic():
+    """근거 영상 수가 가장 많은 페르소나를 선택."""
+    body = """
+- 사진 촬영 중시 (근거: 영상 1)
+- 디자인 중시 (근거: 영상 1, 2, 3)
+- 가성비 중시 (근거: 영상 2)
+"""
+    assert pick_most_supported_persona(body) == "디자인 중시"
+
+
+def test_pick_most_supported_persona_tie_first_wins():
+    """동수면 먼저 등장한 항목(stable sort) — 결정론적."""
+    body = """
+- 첫번째 페르소나 (근거: 영상 1, 2, 3)
+- 두번째 페르소나 (근거: 영상 4, 5, 6)
+- 세번째 페르소나 (근거: 영상 7)
+"""
+    assert pick_most_supported_persona(body) == "첫번째 페르소나"
+
+
+def test_pick_most_supported_persona_empty_inputs():
+    """빈 입력·매칭 없음·'데이터 부족' 만 → None."""
+    assert pick_most_supported_persona("") is None
+    assert pick_most_supported_persona(None) is None
+    # 매칭 없음
+    assert pick_most_supported_persona("\n- 일반 텍스트\n") is None
+    # '데이터 부족' 항목만
+    body = "- 데이터 부족 (근거: 영상 1)\n"
+    assert pick_most_supported_persona(body) is None
+
+
+def test_pick_most_supported_persona_selected_in_extract_popup_data():
+    """extract_popup_data 가 합의 최대 항목을 카드 본문에 노출."""
+    md = _BASE_FOR_TIER + """
+## ⑦ 이런 사람에게 추천 / 비추
+### 추천
+- 사진 촬영 중시 (근거: 영상 1)
+- 디자인 중시 (근거: 영상 1, 2, 3)
+- 가성비 최우선 (근거: 영상 2)
+### 비추
+- 야간 카메라 (근거: 영상 4)
+- 배터리 지속시간 중시 (근거: 영상 2, 4)
+"""
+    d = extract_popup_data(md)
+    v = d["verdict"]
+    # 추천: 디자인 중시 (영상 3개) 가 사진 촬영 중시(1개) 보다 우선
+    assert v["recommend_persona"] == "디자인 중시"
+    # 비추: 배터리 지속시간 중시(2개) 가 야간 카메라(1개) 보다 우선
+    assert v["not_recommend_persona"] == "배터리 지속시간 중시"
 
 
 def test_two_line_english_persona_conservative_josa():

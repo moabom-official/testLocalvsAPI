@@ -32,7 +32,21 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 _RE_PRICE_MAN = re.compile(r"(\d{1,4}(?:[,．]\d{3})?)\s*만\s*원?")  # '만'만 있어도 (예: "129만")
 _RE_PRICE_WON = re.compile(r"(\d{1,3}(?:,\d{3})+|\d{5,9})\s*원")    # 5자리(만원)부터
 _RE_SCREEN = re.compile(r"(\d{1,2}\.\d{1,2})\s*인치")
-_RE_YEAR = re.compile(r"(20\d{2})\s*년")
+# Phase 5 마지막 보강 1: 출시연도 추출 정규식 강화.
+#   tech_products 테이블에 release_year 컬럼이 없어 항상 Serper 텍스트에서
+#   파싱해야 한다. 실측 (iPhone17 spec_display="6.6인치 · 스마트폰" — 연도
+#   누락) → 정규식이 "2024년 출시/발매" 같은 특정 표현을 못 잡고 일반 매칭에
+#   의존하다 누락. 패턴 우선순위:
+#     1) "20XX년 출시" / "20XX년 발매" / "20XX년 공개" / "20XX년 출시예정"
+#        — 명시적 출시 표현 (가장 신뢰도 높음)
+#     2) "20XX년" — 일반 연도 표기
+#     3) (선택) 단독 4자리 fallback — 본문에 "년" 없이 "2024" 만 있는 경우
+#   범위: 2010~2030 (사용자 결정 — 너무 옛날 모델 정보·미래 광고 차단)
+_RE_YEAR_RELEASE = re.compile(
+    r"(20[1-3]\d)\s*년\s*(?:출시|발매|공개|런칭|런처|등장|출시\s*예정)"
+)
+_RE_YEAR_GENERIC = re.compile(r"(20[1-3]\d)\s*년")
+_RE_YEAR_STANDALONE = re.compile(r"\b(20[1-3]\d)\b")
 
 
 # 보강 6 — 가벼운 브랜드→공식 도메인 매핑(소문자 키, 부분일치). 정밀
@@ -108,18 +122,44 @@ def parse_screen(text: str) -> Optional[str]:
 
 
 def parse_release_year(text: str) -> Optional[int]:
-    """가장 최근에 가까운 4자리 연도(2015~현재+1) 중 처음 매칭."""
+    """텍스트 → 출시 연도. Phase 5 마지막 보강 1: 패턴 우선순위 적용.
+
+    순서:
+      1) "20XX년 출시/발매/공개/런칭/등장/출시예정" — 명시적 출시 표현
+      2) "20XX년" — 일반 연도 표기
+      3) 단독 "20XX" — fallback (본문에 '년' 없이 4자리만 있는 경우)
+    범위: 2010~2030. 그 밖은 무시(옛날 모델·미래 광고 차단).
+    여러 후보가 있으면 가장 먼저 매칭된 항목(가장 신뢰도 높은 표현부터).
+    """
     if not text:
         return None
-    from datetime import date
 
-    cur = date.today().year
-    for m in _RE_YEAR.finditer(text):
+    def _in_range(y: int) -> bool:
+        return 2010 <= y <= 2030
+
+    # 1) 명시적 출시 표현 우선
+    for m in _RE_YEAR_RELEASE.finditer(text):
         try:
             y = int(m.group(1))
         except ValueError:
             continue
-        if 2015 <= y <= cur + 1:
+        if _in_range(y):
+            return y
+    # 2) 일반 "20XX년" 표기
+    for m in _RE_YEAR_GENERIC.finditer(text):
+        try:
+            y = int(m.group(1))
+        except ValueError:
+            continue
+        if _in_range(y):
+            return y
+    # 3) 단독 4자리 — fallback (제품명·모델명에 연도 박힌 경우 등)
+    for m in _RE_YEAR_STANDALONE.finditer(text):
+        try:
+            y = int(m.group(1))
+        except ValueError:
+            continue
+        if _in_range(y):
             return y
     return None
 
