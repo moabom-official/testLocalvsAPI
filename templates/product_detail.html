@@ -951,7 +951,12 @@
             font-size: 12px; color: #6b7280; text-align: center; padding: 8px;
         }
         .p5-meta { flex: 1 1 auto; min-width: 0; }
-        .p5-name { font-size: 26px; font-weight: 700; margin: 0 0 6px; color: #111; }
+        /* 제품명 — 사용자가 직관적으로 인지하도록 다른 텍스트와 확실한
+           크기/굵기 격차. 스펙 13px / 가격 17px 대비 거의 2배 크기. */
+        .p5-name {
+            font-size: 34px; font-weight: 800; margin: 0 0 8px; color: #0a0a0a;
+            letter-spacing: -0.5px; line-height: 1.15;
+        }
         .p5-spec { font-size: 13px; color: #6b7280; margin: 0 0 14px; }
         .p5-price { font-size: 17px; font-weight: 700; color: #111; margin: 0; }
         .p5-gauge {
