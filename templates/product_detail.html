@@ -964,11 +964,13 @@
         .p5-gauge .ring-fg { fill: none; stroke: #22c55e; stroke-width: 11; stroke-linecap: round; }
         .p5-gauge-score { font-size: 28px; font-weight: 700; color: #111; line-height: 1; }
         .p5-gauge-score small { font-size: 13px; color: #6b7280; font-weight: 500; }
-        .p5-gauge-cons { font-size: 11px; color: #16a34a; margin-top: 4px; font-weight: 600; }
+        /* (보강 4: 아래 등급별 색 변동 정의로 대체) */
 
+        /* 보강 5: 가로 흐름 — 좌(체크) 중(▶ 추천도) 우(본문).
+           좁은 폭에선 우측 본문이 추천도 아래로 자연 줄바꿈. */
         .p5-verdict {
             margin-top: 18px; border-radius: 14px; padding: 14px 16px;
-            display: flex; gap: 14px; align-items: center;
+            display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
         }
         .p5-verdict.green { background: #e8f6ee; }
         .p5-verdict.amber { background: #fff4e0; }
@@ -981,12 +983,34 @@
         .p5-verdict.green .p5-verdict-icon { background: #22c55e; }
         .p5-verdict.amber .p5-verdict-icon { background: #f59e0b; }
         .p5-verdict.red   .p5-verdict-icon { background: #ef4444; }
-        .p5-verdict-body { flex: 1 1 auto; min-width: 0; }
-        .p5-verdict-label { font-weight: 700; font-size: 14px; margin: 0 0 4px; }
+        .p5-verdict-label { font-weight: 700; font-size: 15px; margin: 0;
+            flex: 0 0 auto; white-space: nowrap; }
         .p5-verdict.green .p5-verdict-label { color: #15803d; }
         .p5-verdict.amber .p5-verdict-label { color: #b45309; }
         .p5-verdict.red   .p5-verdict-label { color: #b91c1c; }
-        .p5-verdict-desc { font-size: 13px; color: #374151; margin: 0; }
+        .p5-verdict-desc { font-size: 13.5px; color: #374151; margin: 0;
+            flex: 1 1 220px; min-width: 0; }
+
+        /* 보강 4: 도넛 안쪽 라벨 — 추천도(구매판정) 색 변동 */
+        .p5-gauge-cons { font-size: 11px; font-weight: 600; line-height: 1.2;
+            text-align: center; max-width: 110px; padding: 0 4px;
+            white-space: normal; word-break: keep-all; }
+        .p5-gauge-cons.green { color: #15803d; }
+        .p5-gauge-cons.amber { color: #b45309; }
+        .p5-gauge-cons.red   { color: #b91c1c; }
+
+        /* 보강 2: ④ 패널 헤더 우측 "종합 판정" 버튼 */
+        .integrated-insight-header {
+            display: flex; justify-content: space-between; align-items: center;
+            gap: 12px; margin-bottom: 6px;
+        }
+        .integrated-insight-header h3 { margin: 0; }
+        .p5-reopen-btn {
+            background: #f7f8fa; color: #111; border: 1px solid #e5e7eb;
+            padding: 7px 14px; border-radius: 999px; font-size: 13px;
+            font-weight: 600; cursor: pointer; flex-shrink: 0;
+        }
+        .p5-reopen-btn:hover { background: #eef0f3; }
 
         .p5-grid {
             display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px;
@@ -1141,12 +1165,11 @@
                             <div class="p5-gauge-cons" id="p5GaugeCons"></div>
                         </div>
                     </div>
+                    <!-- 보강 5: 가로 흐름 — 좌(체크) 중(▶ 추천도) 우(본문) -->
                     <div id="p5Verdict" class="p5-verdict" style="display:none">
                         <div class="p5-verdict-icon">✓</div>
-                        <div class="p5-verdict-body">
-                            <p id="p5VerdictLabel" class="p5-verdict-label"></p>
-                            <p id="p5VerdictDesc"  class="p5-verdict-desc"></p>
-                        </div>
+                        <p id="p5VerdictLabel" class="p5-verdict-label"></p>
+                        <p id="p5VerdictDesc"  class="p5-verdict-desc"></p>
                     </div>
                     <div class="p5-grid">
                         <div class="p5-card-pros">
@@ -1170,9 +1193,16 @@
                 </div>
             </div>
 
-            <!-- Integrated insight result panel (hidden until generated) -->
+            <!-- Integrated insight result panel (보강 1: 모달이 먼저 뜨고
+                 닫힌 뒤에만 .show 부여 — runIntegratedInsight 가 더 이상
+                 직접 show 하지 않음. p5Close()가 패널 노출 책임.) -->
             <div id="integratedInsightPanel" class="integrated-insight-panel" aria-hidden="true">
-                <h3>🧩 제품 단위 종합 인사이트</h3>
+                <div class="integrated-insight-header">
+                    <h3>🧩 제품 단위 종합 인사이트</h3>
+                    <!-- 보강 2: 캐시된 popup-summary 로 모달 재진입 -->
+                    <button type="button" id="p5ReopenBtn" class="p5-reopen-btn"
+                            title="종합 판정 팝업 다시 보기">종합 판정</button>
+                </div>
                 <div id="integratedInsightMeta" class="integrated-insight-meta"></div>
                 <div id="integratedInsightBody" class="integrated-insight-body"></div>
                 <div class="integrated-insight-actions">
@@ -1736,14 +1766,25 @@
                 pdfLink.style.display = 'none';
             }
 
-            panel.classList.add('show');
-            panel.setAttribute('aria-hidden', 'false');
-            panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            // 보강 1: ④ 패널은 모달이 닫힌 뒤에 비로소 노출(.show 부여).
+            //   여기선 DOM 만 채워두고 노출하지 않는다 — 모달이 먼저 뜨고,
+            //   닫힐 때 p5Close() 가 _p5RevealPanelOnClose() 로 노출 책임.
+            //   추출/외부 호출 실패면 _p5RevealPanelOnClose() 가 즉시 호출돼
+            //   ④ 패널이 fallback 으로 노출된다(§3-1).
+            p5ShowSummary().catch((e) => {
+                console.warn('[P5] popup skipped:', e);
+                _p5RevealPanelOnClose();
+            });
+        }
 
-            // Phase 5: ④ 보고서 화면이 보이기 전에 모달이 '먼저' 뜬다
-            // (사용자 결정 1). 모달 닫으면 이미 렌더된 패널이 보인다.
-            // 추출/외부 호출 실패는 모달을 띄우지 않고 곧장 ④ 로(§3-C).
-            p5ShowSummary().catch((e) => console.warn('[P5] popup skipped:', e));
+        function _p5RevealPanelOnClose() {
+            const panel = document.getElementById('integratedInsightPanel');
+            if (!panel) return;
+            if (!panel.classList.contains('show')) {
+                panel.classList.add('show');
+                panel.setAttribute('aria-hidden', 'false');
+                panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
         }
 
         function closeIntegratedInsight() {
@@ -1753,18 +1794,29 @@
         }
 
         // ── Phase 5: 최종 판정 팝업 (모달) ─────────────────────────
-        async function p5ShowSummary() {
+        // 보강 2: popup-summary 응답을 메모리에 보관 — 재진입 시 즉시 사용
+        window._p5Summary = null;
+
+        async function p5ShowSummary({ useCache = false } = {}) {
             try {
+                if (useCache && window._p5Summary) {
+                    p5Populate(window._p5Summary);
+                    p5Open();
+                    return;
+                }
                 const r = await fetch('/products/' + PRODUCT_ID + '/popup-summary');
                 if (!r.ok) {
                     console.warn('[P5] summary not available:', r.status);
+                    _p5RevealPanelOnClose();   // 추출 실패 → ④ 패널 곧장
                     return;
                 }
                 const d = await r.json();
+                window._p5Summary = d;          // 보강 2 캐시
                 p5Populate(d);
                 p5Open();
             } catch (e) {
                 console.warn('[P5] fetch failed:', e);
+                _p5RevealPanelOnClose();
             }
         }
 
@@ -1818,10 +1870,19 @@
             arc.setAttribute('stroke-dasharray', C.toFixed(2));
             arc.setAttribute('stroke-dashoffset', (C * (1 - ratio)).toFixed(2));
             // 합의도 라벨
-            const consMap = { '높음': '⊙ 합의도 높음', '중간': '⊙ 합의도 중간',
-                              '낮음': '⊙ 합의도 낮음' };
-            $('p5GaugeCons').textContent = consMap[verdict.consensus] || '';
-            $('p5GaugeCons').style.display = verdict.consensus ? '' : 'none';
+            // 보강 4: 도넛 안쪽 라벨 = "⊙ 구매판정 {추천도}" (등급별 색).
+            //   합의도는 도넛에서 빠짐(목업 의도). 합의도 자체는 백엔드
+            //   응답엔 그대로 유지(다른 화면 활용 여지).
+            const gc = $('p5GaugeCons');
+            gc.classList.remove('green', 'amber', 'red');
+            if (verdict.label && verdict.color) {
+                gc.textContent = '⊙ 구매판정 ' + verdict.label;
+                gc.classList.add(verdict.color);
+                gc.style.display = '';
+            } else {
+                gc.textContent = '';
+                gc.style.display = 'none';
+            }
 
             // 강조 카드(등급별 색·라벨)
             const card = $('p5Verdict');
@@ -1889,6 +1950,8 @@
             ov.classList.remove('show');
             ov.setAttribute('aria-hidden', 'true');
             document.body.style.overflow = '';
+            // 보강 1: 모달 닫힌 뒤 비로소 ④ 패널 노출
+            _p5RevealPanelOnClose();
         }
         // 닫기 3가지(사용자 결정 12): X / ESC / 상세 보고서 보기
         document.addEventListener('DOMContentLoaded', () => {
@@ -1896,6 +1959,11 @@
             if (cb) cb.addEventListener('click', p5Close);
             const db = document.getElementById('p5DetailBtn');
             if (db) db.addEventListener('click', p5Close);
+            // 보강 2: ④ 패널의 "종합 판정" 버튼 — 캐시된 응답으로 모달 재진입
+            const rb = document.getElementById('p5ReopenBtn');
+            if (rb) rb.addEventListener('click', () => {
+                p5ShowSummary({ useCache: true });
+            });
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'Escape') {
                     const ov = document.getElementById('p5Overlay');

@@ -97,7 +97,8 @@ PRODUCT_IMAGE_QUERY_SUFFIX = os.getenv(
 PRODUCT_META_FETCH_ENABLED = os.getenv(
     "PRODUCT_META_FETCH_ENABLED", "1"
 ).strip().lower() not in ("0", "false", "no", "off")
-# 가격·스펙 검색 쿼리 접미사(상수).
+# 가격·스펙 검색 쿼리 접미사(상수). 보강 6 — "공식 출시가" 키워드 추가로
+# 공식 도메인 organic 상위 노출 확률 ↑ (정밀 매핑 없이도).
 PRODUCT_META_QUERY_SUFFIX = os.getenv(
-    "PRODUCT_META_QUERY_SUFFIX", "출시 가격 사양 인치"
+    "PRODUCT_META_QUERY_SUFFIX", "공식 출시가 사양 인치"
 )
