@@ -916,12 +916,113 @@
         @keyframes vc-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 
         /* ── Phase 5: 최종 판정 팝업 모달 (라이트 톤, 목업 그대로) ── */
+        /* feature/similar-products: flex-direction: column 으로 변경 — 모달
+           과 비교 영역(.p5-similar-section)이 위아래로 정렬되도록.
+           기존 시각(모달 단독 노출)도 그대로 — 비교 영역은 .show 토글 전 hidden. */
         .p5-overlay {
             position: fixed; inset: 0; background: rgba(0,0,0,0.55);
-            display: none; align-items: flex-start; justify-content: center;
+            display: none; flex-direction: column;
+            align-items: center; justify-content: flex-start;
             z-index: 9000; overflow-y: auto; padding: 40px 16px;
+            gap: 20px;
         }
         .p5-overlay.show { display: flex; }
+        /* feature/similar-products: 비교 영역 박스 (모달 폭과 동일 카드) */
+        .p5-similar-section {
+            display: none;
+            width: min(820px, 100%);
+            background: #ffffff;
+            border-radius: 18px;
+            padding: 26px 32px;
+            box-shadow: 0 24px 60px rgba(0,0,0,0.18);
+            box-sizing: border-box;
+        }
+        .p5-similar-section.show { display: block; }
+        .p5-similar-title {
+            font-size: 18px; font-weight: 700; color: #111;
+            margin: 0 0 18px; letter-spacing: -0.01em;
+        }
+        .p5-similar-cards {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 14px;
+        }
+        .p5-similar-card {
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 14px;
+            padding: 22px 14px 18px;
+            text-align: center;
+            display: flex; flex-direction: column;
+            align-items: center; gap: 10px;
+            min-height: 196px;
+            cursor: pointer;
+            transition: transform .15s ease, box-shadow .15s ease;
+        }
+        .p5-similar-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 14px rgba(0,0,0,0.08);
+        }
+        .p5-similar-card.empty {
+            cursor: default;
+            background: #f9fafb;
+            border-style: dashed;
+        }
+        .p5-similar-card.empty:hover {
+            transform: none; box-shadow: none;
+        }
+        .p5-similar-card .card-icon {
+            width: 64px; height: 64px;
+            border-radius: 50%;
+            background: #f1f5f9;
+            display: flex; align-items: center; justify-content: center;
+            overflow: hidden;
+        }
+        .p5-similar-card .card-icon img {
+            width: 100%; height: 100%; object-fit: contain;
+        }
+        .p5-similar-card .card-name {
+            font-size: 15px; font-weight: 600; color: #111;
+            line-height: 1.3;
+        }
+        .p5-similar-card .card-reason {
+            font-size: 12px; color: #6b7280;
+            line-height: 1.45; margin-top: 2px;
+            padding: 0 4px;
+        }
+        .p5-similar-card .card-empty-text {
+            font-size: 12px; color: #9ca3af;
+            padding: 0 6px; line-height: 1.4;
+        }
+        @media (max-width: 720px) {
+            .p5-similar-cards { grid-template-columns: 1fr; }
+        }
+        /* feature/similar-products: 백그라운드 진행 표시 + 완료 토스트 */
+        .bg-progress, .bg-toast {
+            position: fixed; right: 20px; bottom: 20px;
+            background: #ffffff; border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            padding: 12px 16px;
+            display: none; align-items: center; gap: 10px;
+            max-width: 340px; z-index: 11000;
+            font-size: 13px;
+        }
+        .bg-progress.show, .bg-toast.show { display: flex; }
+        .bg-progress-text { color: #4b5563; flex: 1; }
+        .bg-progress-spinner { font-size: 16px; }
+        .bg-progress-cancel, .bg-toast-close {
+            background: none; border: none; cursor: pointer;
+            color: #9ca3af; font-size: 16px; padding: 0 4px;
+        }
+        .bg-progress-cancel:hover, .bg-toast-close:hover { color: #6b7280; }
+        .bg-toast-check { color: #22c55e; font-weight: 700; font-size: 16px; }
+        .bg-toast-text { color: #111; flex: 1; }
+        .bg-toast-go {
+            background: #111; color: #fff; border: none;
+            padding: 6px 12px; border-radius: 8px; cursor: pointer;
+            font-size: 12px; white-space: nowrap;
+        }
+        .bg-toast-go:hover { background: #000; }
         .p5-modal {
             background: #fff; color: #111; width: min(820px, 100%);
             border-radius: 18px; box-shadow: 0 24px 60px rgba(0,0,0,0.18);
@@ -1266,9 +1367,23 @@
                         <div id="p5CaveatText"></div>
                     </div>
                     <div class="p5-actions">
-                        <button type="button" class="p5-btn p5-btn-secondary" disabled
-                                title="추후 구현">◇◇ 유사 제품 비교하기</button>
+                        <!-- feature/similar-products: 활성화. 모달 아래 별도 박스 토글. -->
+                        <button type="button" class="p5-btn p5-btn-secondary"
+                                id="p5SimilarBtn"
+                                onclick="toggleSimilarSection()">유사 제품 비교하기</button>
                         <button type="button" class="p5-btn p5-btn-primary" id="p5DetailBtn">상세 보고서 보기 →</button>
+                    </div>
+                </div>
+
+                <!-- feature/similar-products: 유사 제품 비교 영역. 모달과 같은
+                     어두운 backdrop 위에 별도 흰 박스로 모달 *바로 아래*에 위치
+                     (오버레이 flex-direction: column). -->
+                <div id="p5SimilarSection" class="p5-similar-section" aria-hidden="true">
+                    <h3 class="p5-similar-title">유사 제품 항목</h3>
+                    <div class="p5-similar-cards">
+                        <div class="p5-similar-card" id="p5SimilarCard0"></div>
+                        <div class="p5-similar-card" id="p5SimilarCard1"></div>
+                        <div class="p5-similar-card" id="p5SimilarCard2"></div>
                     </div>
                 </div>
             </div>
@@ -2130,9 +2245,261 @@
             ov.classList.remove('show');
             ov.setAttribute('aria-hidden', 'true');
             document.body.style.overflow = '';
+            // feature/similar-products: 모달 닫힘 시 비교 영역도 자동 닫힘.
+            //   window._similarCache 는 *유지* — 모달 다시 열고 "비교하기"
+            //   누르면 캐시로 즉시 표시.
+            const ss = document.getElementById('p5SimilarSection');
+            if (ss) {
+                ss.classList.remove('show');
+                ss.setAttribute('aria-hidden', 'true');
+            }
             // 보강 1: 모달 닫힌 뒤 비로소 ④ 패널 노출
             _p5RevealPanelOnClose();
         }
+
+        // ── feature/similar-products: 유사 제품 비교 영역 + 백그라운드 분석 ──
+        // 메모리 캐시(페이지 세션 동안만). 모달 닫혀도 유지 — 재진입 즉시 표시.
+        window._similarCache = null;     // { mode, cards }
+        window._bgTask = null;           // { task_id, product_id, name, image_url }
+        window._bgPollInterval = null;
+
+        async function toggleSimilarSection() {
+            const section = document.getElementById('p5SimilarSection');
+            if (!section) return;
+            if (section.classList.contains('show')) {
+                // 펼침 → 접힘
+                section.classList.remove('show');
+                section.setAttribute('aria-hidden', 'true');
+                return;
+            }
+            // 접힘 → 펼침
+            section.classList.add('show');
+            section.setAttribute('aria-hidden', 'false');
+
+            if (window._similarCache) {
+                renderSimilarCards(window._similarCache);
+                return;
+            }
+            // 첫 호출 — 로딩 후 fetch
+            renderSimilarLoading();
+            try {
+                const r = await fetch('/products/' + PRODUCT_ID + '/similar');
+                if (!r.ok) throw new Error('fetch failed: ' + r.status);
+                const data = await r.json();
+                window._similarCache = data;
+                renderSimilarCards(data);
+            } catch (e) {
+                console.warn('[similar] fetch failed:', e);
+                renderSimilarError();
+            }
+        }
+
+        function renderSimilarCards(data) {
+            const cards = (data && data.cards) || [null, null, null];
+            for (let i = 0; i < 3; i++) {
+                const card = document.getElementById('p5SimilarCard' + i);
+                if (!card) continue;
+                const item = cards[i];
+                if (item == null) {
+                    card.className = 'p5-similar-card empty';
+                    card.innerHTML = ''
+                        + '<div class="card-icon"></div>'
+                        + '<div class="card-empty-text">비슷한 제품이 모아봄에 더 누적되면 여기 보입니다</div>';
+                    card.onclick = null;
+                } else {
+                    card.className = 'p5-similar-card';
+                    const img = item.image_url || '';
+                    card.innerHTML = ''
+                        + '<div class="card-icon">'
+                        +   (img ? '<img src="' + escapeAttr(img) + '" alt="' + escapeAttr(item.name) + '" onerror="this.style.display=\'none\'"/>' : '')
+                        + '</div>'
+                        + '<div class="card-name">' + escapeHtml(item.name) + '</div>'
+                        + '<div class="card-reason">' + escapeHtml(item.reason || '') + '</div>';
+                    card.onclick = () => onSimilarCardClick(item);
+                }
+            }
+        }
+
+        function renderSimilarLoading() {
+            for (let i = 0; i < 3; i++) {
+                const card = document.getElementById('p5SimilarCard' + i);
+                if (!card) continue;
+                card.className = 'p5-similar-card empty';
+                card.innerHTML = '<div class="card-icon"></div><div class="card-empty-text">불러오는 중...</div>';
+                card.onclick = null;
+            }
+        }
+
+        function renderSimilarError() {
+            for (let i = 0; i < 3; i++) {
+                const card = document.getElementById('p5SimilarCard' + i);
+                if (!card) continue;
+                card.className = 'p5-similar-card empty';
+                card.innerHTML = '<div class="card-icon"></div><div class="card-empty-text">불러오지 못했어요</div>';
+                card.onclick = null;
+            }
+        }
+
+        function onSimilarCardClick(item) {
+            if (item.kind === 'internal' && item.product_id) {
+                window.location.href = '/products/' + item.product_id;
+                return;
+            }
+            // 외부 — 다이얼로그
+            const ok = window.confirm(
+                'MOABOM 을 통해 ' + item.name + '에 대한 핵심 인사이트를 받아보시겠어요?'
+            );
+            if (!ok) return;
+            startExternalAnalysis(item);
+        }
+
+        async function startExternalAnalysis(item) {
+            if (window._bgTask) {
+                alert('다른 제품 분석이 진행 중입니다. 완료 후 다시 시도해주세요.');
+                return;
+            }
+            try {
+                const r = await fetch('/products/' + PRODUCT_ID + '/similar/external-analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: item.name,
+                        brand: item.brand || null,
+                        release_year: item.release_year || null,
+                        category: item.category || null,
+                        image_url: item.image_url || null,
+                    }),
+                });
+                if (r.status === 409) {
+                    alert('다른 제품 분석이 진행 중입니다. 완료 후 다시 시도해주세요.');
+                    return;
+                }
+                if (!r.ok) {
+                    alert('분석을 시작하지 못했어요.');
+                    return;
+                }
+                const data = await r.json();
+                if (!data.is_new) {
+                    // 이미 존재 — 그 페이지로
+                    window.location.href = '/products/' + data.product_id;
+                    return;
+                }
+                window._bgTask = {
+                    task_id: data.background_task_id,
+                    product_id: data.product_id,
+                    name: item.name,
+                    image_url: item.image_url,
+                };
+                showBgProgress();
+                startBgPolling();
+            } catch (e) {
+                console.warn('[bg_task] start failed:', e);
+                alert('분석을 시작하지 못했어요.');
+            }
+        }
+
+        function startBgPolling() {
+            if (window._bgPollInterval) clearInterval(window._bgPollInterval);
+            window._bgPollInterval = setInterval(async () => {
+                if (!window._bgTask) {
+                    clearInterval(window._bgPollInterval);
+                    return;
+                }
+                try {
+                    const r = await fetch('/products/background-task/' + window._bgTask.task_id);
+                    if (r.status === 404) {
+                        // 서버 재시작 등으로 태스크 소멸 — 진행 표시 숨김
+                        clearInterval(window._bgPollInterval);
+                        hideBgProgress();
+                        window._bgTask = null;
+                        return;
+                    }
+                    if (!r.ok) return;
+                    const data = await r.json();
+                    updateBgProgress(data);
+                    if (data.status === 'completed') {
+                        clearInterval(window._bgPollInterval);
+                        showBgToast(window._bgTask);
+                        window._bgTask = null;
+                    } else if (data.status === 'failed' || data.status === 'cancelled') {
+                        clearInterval(window._bgPollInterval);
+                        hideBgProgress();
+                        window._bgTask = null;
+                    }
+                } catch (e) {
+                    // 폴링 실패는 무시 — 다음 회차 재시도
+                }
+            }, 5000);
+        }
+
+        function showBgProgress() {
+            const el = document.getElementById('bgProgress');
+            if (!el) return;
+            el.classList.add('show');
+            el.setAttribute('aria-hidden', 'false');
+            el.querySelector('.bg-progress-text').textContent = window._bgTask.name + ' 분석 중...';
+        }
+
+        function updateBgProgress(data) {
+            const el = document.getElementById('bgProgress');
+            if (!el || !window._bgTask) return;
+            const stageLabel = data.stage === 'selecting_videos' ? '영상 선정 중'
+                            : data.stage === 'generating_insight' ? '보고서 생성 중'
+                            : '준비 중';
+            el.querySelector('.bg-progress-text').textContent =
+                window._bgTask.name + ' — ' + stageLabel;
+        }
+
+        function hideBgProgress() {
+            const el = document.getElementById('bgProgress');
+            if (!el) return;
+            el.classList.remove('show');
+            el.setAttribute('aria-hidden', 'true');
+        }
+
+        function showBgToast(task) {
+            hideBgProgress();
+            const el = document.getElementById('bgToast');
+            if (!el || !task) return;
+            el.classList.add('show');
+            el.setAttribute('aria-hidden', 'false');
+            el.querySelector('.bg-toast-text').textContent = task.name + ' 분석 완료';
+            el.dataset.productId = task.product_id;
+            // 60초 후 자동 사라짐
+            setTimeout(() => hideBgToast(), 60000);
+        }
+
+        function hideBgToast() {
+            const el = document.getElementById('bgToast');
+            if (!el) return;
+            el.classList.remove('show');
+            el.setAttribute('aria-hidden', 'true');
+        }
+
+        function goToBgResult() {
+            const el = document.getElementById('bgToast');
+            if (!el) return;
+            const productId = el.dataset.productId;
+            if (productId) window.location.href = '/products/' + productId;
+        }
+
+        async function cancelBgTask() {
+            if (!window._bgTask) return;
+            if (!confirm('진행 중인 분석을 취소하시겠어요?')) return;
+            try {
+                await fetch('/products/background-task/' + window._bgTask.task_id, {
+                    method: 'DELETE',
+                });
+            } catch (e) {
+                // 백엔드가 실패해도 프론트는 진행 표시 숨김
+            }
+            hideBgProgress();
+            window._bgTask = null;
+            if (window._bgPollInterval) clearInterval(window._bgPollInterval);
+        }
+
+        // escapeAttr — escapeHtml 과 동일 (속성 컨텍스트도 같은 이스케이프로 충분)
+        function escapeAttr(s) { return escapeHtml(s); }
         // 닫기 3가지(사용자 결정 12): X / ESC / 상세 보고서 보기
         document.addEventListener('DOMContentLoaded', () => {
             const cb = document.getElementById('p5CloseBtn');
@@ -3253,5 +3620,18 @@
             });
         });
     </script>
+
+    <!-- feature/similar-products: 백그라운드 자동 분석 진행 표시 + 완료 토스트 -->
+    <div id="bgProgress" class="bg-progress" aria-hidden="true" role="status">
+        <span class="bg-progress-spinner">🔄</span>
+        <span class="bg-progress-text"></span>
+        <button class="bg-progress-cancel" type="button" onclick="cancelBgTask()" title="분석 취소">✕</button>
+    </div>
+    <div id="bgToast" class="bg-toast" aria-hidden="true" role="status">
+        <span class="bg-toast-check">✓</span>
+        <span class="bg-toast-text"></span>
+        <button class="bg-toast-go" type="button" onclick="goToBgResult()">결과 보러 가기</button>
+        <button class="bg-toast-close" type="button" onclick="hideBgToast()" title="닫기">✕</button>
+    </div>
 </body>
 </html>

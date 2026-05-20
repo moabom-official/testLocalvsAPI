@@ -404,3 +404,110 @@ def register_product_routes(app):
             media_type="application/pdf",
             headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
+
+    # ────────────────────────────────────────────────────────────
+    # feature/similar-products — 유사 제품 비교하기 (별도 PR)
+    #   - GET  /products/{id}/similar              내부/외부 모드 카드 3개
+    #   - POST /products/{id}/similar/external-analyze
+    #          외부 카드 [예] → 신규 등록 + 백그라운드 분석 시작
+    #   - GET  /products/background-task/{task_id} 폴링용 상태 조회
+    #   - DELETE /products/background-task/{task_id} 취소
+    # 변경 범위: 라우트 4개만 신규. 기존 라우트·DB 스키마·Agent 무변경.
+    # LLM 호출은 사유 텍스트 생성에만 (모달 안 다른 값은 손대지 않음).
+    # ────────────────────────────────────────────────────────────
+
+    @app.get("/products/{product_id}/similar")
+    async def get_similar_products(product_id: int):
+        """유사 제품 카드 3개. 내부(DB 매칭)·외부(Serper) 모드 자동 분기."""
+        from scripts.popup.similar import build_similar_payload
+
+        product = query_one(
+            "SELECT product_id FROM tech_products WHERE product_id = %s",
+            (product_id,),
+        )
+        if not product:
+            raise HTTPException(status_code=404, detail="Product not found")
+        return await build_similar_payload(product_id)
+
+    @app.post("/products/{product_id}/similar/external-analyze")
+    async def start_external_similar_analysis(product_id: int, data: dict):
+        """외부 카드 [예] 클릭 시 호출. 매칭 시도 → 신규면 백그라운드 분석.
+
+        요청: {name, brand?, release_year?, category?, image_url?}
+        응답:
+          - 이미 존재(매칭) : {product_id, is_new: false, status: "exists"}
+          - 신규 + BG 시작  : {product_id, is_new: true, background_task_id, status: "started"}
+          - 다른 작업 진행중: 409 Conflict
+        """
+        from scripts.popup.background_tasks import is_any_running, start_task
+        from scripts.popup.similar import find_or_create_external_product
+
+        # target 존재 검증 (호출 컨텍스트 유효성)
+        target = query_one(
+            "SELECT product_id FROM tech_products WHERE product_id = %s",
+            (product_id,),
+        )
+        if not target:
+            raise HTTPException(status_code=404, detail="Product not found")
+
+        name = (data.get("name") or "").strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="name is required")
+
+        new_id, is_new = await asyncio.to_thread(
+            find_or_create_external_product,
+            name,
+            (data.get("brand") or "").strip() or None,
+            (data.get("category") or "").strip() or None,
+            (data.get("image_url") or "").strip() or None,
+        )
+
+        if not is_new:
+            return {
+                "product_id": new_id,
+                "is_new": False,
+                "status": "exists",
+            }
+
+        # 신규 — 동시 1개 제약 검사 후 BG 시작
+        if is_any_running():
+            raise HTTPException(
+                status_code=409,
+                detail="다른 제품 분석이 진행 중입니다. 완료 후 다시 시도해주세요.",
+            )
+        task_id = await start_task(new_id, name)
+        if task_id is None:
+            # 동시성 race — 위 검사 직후 다른 호출이 시작했을 가능성
+            raise HTTPException(
+                status_code=409,
+                detail="다른 제품 분석이 진행 중입니다. 완료 후 다시 시도해주세요.",
+            )
+        return {
+            "product_id": new_id,
+            "is_new": True,
+            "background_task_id": task_id,
+            "status": "started",
+        }
+
+    @app.get("/products/background-task/{task_id}")
+    async def get_background_task_status(task_id: str):
+        """프론트 폴링용. 5초 간격 권장. 없는 task_id 는 404."""
+        from scripts.popup.background_tasks import get_task
+
+        info = get_task(task_id)
+        if not info:
+            raise HTTPException(status_code=404, detail="Task not found")
+        return info
+
+    @app.delete("/products/background-task/{task_id}")
+    async def cancel_background_task(task_id: str):
+        """진행 중인 백그라운드 분석 취소 요청. 다음 단계 직전 체크 후 멈춤."""
+        from scripts.popup.background_tasks import get_task, request_cancel
+
+        if not get_task(task_id):
+            raise HTTPException(status_code=404, detail="Task not found")
+        ok = request_cancel(task_id)
+        if not ok:
+            # 이미 종료된 태스크 — 멱등 응답
+            return {"status": "already_finished"}
+        return {"status": "cancel_requested"}
