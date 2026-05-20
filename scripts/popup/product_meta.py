@@ -54,7 +54,9 @@ _BRAND_OFFICIAL_DOMAINS: Dict[str, str] = {
 }
 
 # 캐시 정책 버전 태그. 정책이 바뀌면 v3 등으로 올려 자연 invalidation.
-_POLICY_TAG = "v2"
+# v2 → v3 (보강 9 — 정책 완화: 도메인 후필터 폐기, 일반 검색 최저가).
+# 구 v2 캐시(도메인 매칭 0 으로 가격 None 이던 행)는 자연 invalidation.
+_POLICY_TAG = "v3-loose"
 
 
 def official_domain_for(brand: str) -> Optional[str]:
@@ -218,29 +220,25 @@ def fetch_meta(
     # 스펙(인치·연도) — 전체 결과에서
     screen = parse_screen(text_blob)
     year = parse_release_year(text_blob)
-    # 가격 — 공식 도메인 매칭 항목만(노이즈 차단). 매핑 없거나 매칭 0이면
-    # 가격 None (§7 fallback) — 잘못된 중고/할인가 채택하느니 정보 없음.
-    if domain:
-        official_items = [it for it in items
-                          if domain in (it.get("link") or "").lower()]
-    else:
-        official_items = items   # 매핑 없는 브랜드는 일반 검색 결과 사용
-    if official_items:
-        off_blob = " ".join(
-            f"{i.get('title','')} {i.get('snippet','')}"
-            for i in official_items
-        )
-        prices = parse_prices(off_blob)
-        raw_link = official_items[0]["link"]
-    else:
-        prices = []
-        raw_link = items[0]["link"] if items else None
+    # 보강 9 — 정책 완화: 공식 도메인 후필터 폐기. 일반 검색 전체 결과의
+    # **최저가** 채택 (사용자 표기 "최저 N만 원~" 의도와 일치).
+    # 부작용으로 중고/할인가가 잡힐 수 있지만 — 가격 None 보다 신뢰성 있는
+    # 한 가지 가격 표시가 사용자 의도("가격이 너무 자주 '없음'으로 나오지
+    # 않게"). parse_prices() 가 상식 범위(5만~1500만)로 노이즈 1차 필터.
+    # 공식 도메인 매칭이 있으면 source 의 raw_link 만 거기로(추적/디버그용).
+    prices = parse_prices(text_blob)
     price_raw = min(prices) if prices else None
+    official_matched = [it for it in items
+                        if domain and domain in (it.get("link") or "").lower()]
+    if official_matched:
+        raw_link = official_matched[0]["link"]
+    else:
+        raw_link = items[0]["link"] if items else None
     # 정책 태그 부착 — 캐시 invalidation 용(스키마 무변경, source 컬럼만 사용)
     source = f"{_POLICY_TAG}|{raw_link}" if raw_link else _POLICY_TAG
 
     perf["site"] = domain
-    perf["official_items"] = len(official_items)
+    perf["official_items"] = len(official_matched)
     fields = {
         "price_raw": price_raw,
         "price_display": format_price_display(price_raw),

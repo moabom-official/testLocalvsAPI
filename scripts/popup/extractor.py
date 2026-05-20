@@ -13,18 +13,19 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
-# ── 등급 도출 임계값 (§4-D 옵션 1 — 사용자 결정: 추천도별 색 변동) ──
-# 합의도(낮음/중간/높음) + 종합 점수(0~10)에서 결정론적으로 등급을 도출.
-# 임계값 근거: ④ 점수 매핑(우수=7.5~8.5, 양호=6.0~7.0, 아쉬움=4.0~5.5,
-# 결함=1.0~3.5)을 고려해 7.5 / 5.0 경계로 "추천 / 조건부 / 신중" 3분할.
-_LOW_SCORE_CUT = 5.0       # 미만 → 낮음
-_MID_SCORE_CUT = 7.5       # 미만 → 중간 (또는 합의도=중간)
+# ── 등급 도출 임계값 (사용자 결정 — Phase 5 보강 2/7 갱신) ──
+# 점수만으로 결정론적 매핑. 합의도는 시그니처 호환만 유지(미사용).
+# 임계는 보강 7 의 도넛 색 임계와 동일(7.5 / 4.0 / 1.0) → 도넛 색과
+# 강조 카드 라벨이 같은 점수 기준으로 결정 → 시각 일관성 보장.
+_HIGH_SCORE_CUT = 7.5      # 7.5+ → high "강력 추천"
+_MID_SCORE_CUT = 4.0       # 4.0~7.49 → mid "조건부 추천"
+_LOW_SCORE_CUT = 1.0       # 1.0~3.99 → low "검토 필요"
 
-# 등급 → (라벨, 색)
+# 등급 → (라벨, 색). 워딩은 다른 표현으로 의역 금지(사용자 결정).
 TIER_LABELS = {
-    "high": ("추천", "green"),
+    "high": ("강력 추천", "green"),
     "mid":  ("조건부 추천", "amber"),
-    "low":  ("신중하게 고려하세요", "red"),
+    "low":  ("검토 필요", "red"),
 }
 
 DATA_INSUFFICIENT = "데이터 부족"
@@ -135,40 +136,30 @@ def _strip_oneliner_prefix(text: str) -> str:
 
 # ── §4-D: 추천도 등급 도출 (옵션 1, 규칙 기반) ───────────────────
 
-def derive_tier(score: Optional[str], consensus: Optional[str]) -> Optional[str]:
+def derive_tier(score: Optional[str], consensus: Optional[str] = None) -> Optional[str]:
     """반환 키: 'high'/'mid'/'low' or None(결정 불가).
 
-    규칙(§4-D):
-      - 합의도=낮음 → low
-      - 점수<5.0 → low
-      - 점수<7.5 OR 합의도=중간 → mid
-      - 그 외(점수≥7.5 AND 합의도=높음) → high
-      - 점수 '데이터 부족' → 합의도만으로(높음=high, 중간=mid, 낮음=low)
-      - 둘 다 추출 실패 → None
+    사용자 결정(Phase 5 보강 2): **점수만으로** 결정. 합의도는 시그니처
+    호환을 위해 받기만 하고 사용하지 않음(미래 활용 여지).
+    임계는 보강 7 의 도넛 색 임계와 동일 — 시각 일관성 보장.
+      - 7.5 ≤ s ≤ 10  → high "강력 추천"
+      - 4.0 ≤ s < 7.5 → mid  "조건부 추천"
+      - 1.0 ≤ s < 4.0 → low  "검토 필요"
+      - 점수 추출 실패('데이터 부족' 또는 None)  → None (§7 fallback, 카드 숨김)
     """
-    if consensus == "낮음":
-        return "low"
-
-    score_val: Optional[float] = None
-    if score and score != DATA_INSUFFICIENT:
-        try:
-            score_val = float(score)
-        except ValueError:
-            score_val = None
-
-    if score_val is None:
-        # 점수 결측 → 합의도만
-        if consensus == "높음":
-            return "high"
-        if consensus == "중간":
-            return "mid"
-        return None  # 둘 다 결측
-
-    if score_val < _LOW_SCORE_CUT:
-        return "low"
-    if score_val < _MID_SCORE_CUT or consensus == "중간":
+    if not score or score == DATA_INSUFFICIENT:
+        return None
+    try:
+        s = float(score)
+    except (TypeError, ValueError):
+        return None
+    if s >= _HIGH_SCORE_CUT:
+        return "high"
+    if s >= _MID_SCORE_CUT:
         return "mid"
-    return "high"
+    if s >= _LOW_SCORE_CUT:
+        return "low"
+    return None
 
 
 # ── §4-E: ④ 섹션 합의 장점/단점 추출 ────────────────────────────

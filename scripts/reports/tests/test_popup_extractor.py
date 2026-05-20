@@ -64,8 +64,8 @@ def test_full_extraction_happy_path():
     assert v["score"] == "8.2"
     assert v["consensus"] == "높음"
     assert "카메라 화질" in v["one_liner"]
-    # 점수 8.2 + 합의 높음 → 등급 high → 라벨 "추천" 녹색
-    assert v["tier"] == "high" and v["label"] == "추천" and v["color"] == "green"
+    # 점수 8.2 → 등급 high(≥7.5) → 라벨 "강력 추천" 녹색 (보강 2 갱신)
+    assert v["tier"] == "high" and v["label"] == "강력 추천" and v["color"] == "green"
     # 영상 수
     assert d["videos_n"] == 5
     assert d["comments_n"] == 134  # §4-F ⑤ "분석 댓글 수: 134건"
@@ -100,45 +100,46 @@ def test_one_liner_skips_score_and_consensus_lines():
 # ── §4-D 등급 도출 — 모든 분기 ─────────────────────────────────
 
 
-def test_derive_tier_high():
-    assert derive_tier("8.0", "높음") == "high"
+# 보강 2 갱신: 점수 단일 기준(임계 7.5/4.0/1.0). 합의도 무시.
 
 
-def test_derive_tier_mid_by_score():
-    # 7.5 미만 → mid (합의 높음이어도)
-    assert derive_tier("6.5", "높음") == "mid"
+def test_derive_tier_high_at_threshold_and_above():
+    assert derive_tier("7.5") == "high"
+    assert derive_tier("9.5") == "high"
+    # 합의도가 어떻든 점수가 7.5+ 면 high (consensus 무시)
+    assert derive_tier("8.0", "낮음") == "high"
 
 
-def test_derive_tier_mid_by_consensus():
-    # 합의 중간 → mid (점수 충분해도)
-    assert derive_tier("9.0", "중간") == "mid"
+def test_derive_tier_mid_range():
+    assert derive_tier("4.0") == "mid"   # 경계
+    assert derive_tier("7.49") == "mid"  # 직전
+    assert derive_tier("6.5", "낮음") == "mid"  # consensus 무시
 
 
-def test_derive_tier_low_by_consensus():
-    # 합의 낮음이면 점수 무관 low
-    assert derive_tier("9.5", "낮음") == "low"
+def test_derive_tier_low_range():
+    assert derive_tier("1.0") == "low"   # 경계
+    assert derive_tier("3.99") == "low"  # 직전
+    assert derive_tier("2.5", "높음") == "low"  # consensus 무시
 
 
-def test_derive_tier_low_by_score():
-    assert derive_tier("3.0", "높음") == "low"
+def test_derive_tier_score_missing_returns_none():
+    # 보강 2 갱신: 점수 결측 → None (이전 consensus 폴백 제거)
+    assert derive_tier(None) is None
+    assert derive_tier(DATA_INSUFFICIENT) is None
+    assert derive_tier(DATA_INSUFFICIENT, "높음") is None  # consensus 폴백 없음
 
 
-def test_derive_tier_score_missing_consensus_only():
-    assert derive_tier(DATA_INSUFFICIENT, "높음") == "high"
-    assert derive_tier(DATA_INSUFFICIENT, "중간") == "mid"
-    assert derive_tier(DATA_INSUFFICIENT, "낮음") == "low"
-
-
-def test_derive_tier_both_missing_returns_none():
-    assert derive_tier(None, None) is None
-    assert derive_tier(DATA_INSUFFICIENT, None) is None
+def test_derive_tier_below_low_returns_none():
+    # 1.0 미만(비정상) → None (§7 fallback)
+    assert derive_tier("0.5") is None
+    assert derive_tier("0") is None
 
 
 def test_tier_labels_match_user_spec():
-    # 사용자 결정 — 라벨 텍스트 변경 금지
-    assert TIER_LABELS["high"][0] == "추천"
+    # 사용자 결정(보강 2 갱신) — 라벨 텍스트 변경 금지
+    assert TIER_LABELS["high"][0] == "강력 추천"
     assert TIER_LABELS["mid"][0] == "조건부 추천"
-    assert TIER_LABELS["low"][0] == "신중하게 고려하세요"
+    assert TIER_LABELS["low"][0] == "검토 필요"
 
 
 # ── §4-A: "데이터 부족 / 10" 케이스 ─────────────────────────────
@@ -152,8 +153,8 @@ def test_score_data_insufficient():
 """
     d = extract_popup_data(md)
     assert d["verdict"]["score"] == "데이터 부족"
-    # 점수 결측 + 합의 중간 → mid
-    assert d["verdict"]["tier"] == "mid"
+    # 보강 2 갱신: 점수 결측 → tier=None (consensus 폴백 제거)
+    assert d["verdict"]["tier"] is None
 
 
 # ── §4-E: "- 데이터 부족" 한 줄만 / 헤딩 누락 ──────────────────

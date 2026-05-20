@@ -975,16 +975,21 @@
             font-size: 12px; color: #6b7280; text-align: center; padding: 8px;
         }
         .p5-meta { flex: 1 1 auto; min-width: 0; }
-        /* 보강 1: 제품명 압도적 강조. 한 줄 유지(nowrap+ellipsis+min-width:0
-           부모) — 긴 이름도 두 줄로 떨어지지 않고 끝이 잘림(…). */
+        /* 보강 1: 제품명 압도적 강조. 강한 선택자(.p5-modal h2.p5-name)로
+           UA/상속/잠재 충돌 차단. 한 줄 유지(nowrap+ellipsis+부모 min-width:0).
+           가격 ×2 이상, 강조 카드 라벨 ×1.8 이상의 시각 위계 보장. */
+        .p5-modal h2.p5-name,
         .p5-name {
-            font-size: 40px; font-weight: 800; margin: 0 0 8px; color: #0a0a0a;
-            letter-spacing: -0.7px; line-height: 1.1;
+            font-size: 42px; font-weight: 800; margin: 0 0 10px; color: #0a0a0a;
+            letter-spacing: -0.8px; line-height: 1.08;
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
             max-width: 100%;
         }
-        .p5-spec { font-size: 13px; color: #6b7280; margin: 0 0 14px; }
-        .p5-price { font-size: 17px; font-weight: 700; color: #111; margin: 0; }
+        /* 보강 1 위계 — 제품명 42px / 가격 20px / 스펙 13.5px(옅음).
+           제품명 ≥ 가격×2, 제품명 ≥ 라벨(20px)×1.8 보장. */
+        .p5-spec { font-size: 13.5px; color: #9ca3af; margin: 0 0 14px;
+            font-weight: 400; }
+        .p5-price { font-size: 20px; font-weight: 700; color: #111; margin: 0; }
         /* 보강 8: 도넛 단독 영역에서 큰 크기로(권장 220~260px) */
         .p5-gauge {
             flex: 0 0 230px; width: 230px; height: 230px; position: relative;
@@ -1070,10 +1075,11 @@
             display: flex; align-items: center; gap: 6px; }
         .p5-card-pros .p5-card-title { color: #16a34a; }
         .p5-card-cons .p5-card-title { color: #dc2626; }
+        /* 보강 10: 장단점 항목 텍스트·아이콘 크기 키움 (빈 공간 줄여 직관성 ↑) */
         .p5-item { display: flex; justify-content: space-between; align-items: center;
-            padding: 5px 0; font-size: 13.5px; color: #1f2937; }
-        .p5-item .p5-bullet { display: flex; align-items: center; gap: 6px; flex: 1 1 auto; min-width: 0; }
-        .p5-item .p5-bullet .p5-icon { width: 16px; flex: 0 0 16px; text-align: center; }
+            padding: 8px 0; font-size: 16.5px; color: #1f2937; line-height: 1.35; }
+        .p5-item .p5-bullet { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; }
+        .p5-item .p5-bullet .p5-icon { width: 18px; flex: 0 0 18px; text-align: center; font-size: 17px; }
         .p5-card-pros .p5-icon { color: #16a34a; }
         .p5-card-cons .p5-icon { color: #dc2626; }
         /* 보강 5: UI 숨김(데이터는 응답 JSON 의 n/total 필드로 그대로 유지) */
@@ -1753,14 +1759,16 @@
             }, 500);
         }
 
-        // 보강 7: 점수 → 도넛 색 공유 헬퍼 (사용자 결정 임계: 8/5/1).
+        // 보강 7: 점수 → 도넛 색 공유 헬퍼 (사용자 결정, 임계 갱신 7.5/4.0/1.0).
         //   양쪽 도넛(④ 보고서·팝업)이 이 함수를 호출 → 임계·hex 한 곳에서.
+        //   보강 2 의 derive_tier 임계와 정확히 동일 → 라벨 등급과 도넛 색이
+        //   같은 점수 기준으로 결정되어 시각 일관성.
         function scoreToColor(score) {
             const s = parseFloat(score);
             if (!isFinite(s)) return '#ccc';   // 데이터 부족
-            if (s >= 8.0)  return '#22c55e';   // 8.0~10.0 → 녹
-            if (s >= 5.0)  return '#f5a623';   // 5.0~7.99 → 주황
-            if (s >= 1.0)  return '#e35d6a';   // 1.0~4.99 → 빨강
+            if (s >= 7.5)  return '#22c55e';   // 7.5~10.0 → 녹
+            if (s >= 4.0)  return '#f5a623';   // 4.0~7.49 → 주황
+            if (s >= 1.0)  return '#e35d6a';   // 1.0~3.99 → 빨강
             return '#ccc';
         }
 

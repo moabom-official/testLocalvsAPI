@@ -62,8 +62,8 @@ def test_fetch_meta_combines_fields_from_search():
     assert fields["screen_size"] == "6.7인치"
     assert fields["release_year"] == 2026
     assert fields["price_display"] == "최저 129만 원~"
-    # 보강 6: 정책 버전 태그가 source 앞에 부착 (캐시 invalidation 용)
-    assert fields["source"].startswith("v2|") and fields["source"].endswith("https://x/1")
+    # 보강 9: 캐시 정책 태그 v2 → v3-loose
+    assert fields["source"].startswith("v3-loose|") and fields["source"].endswith("https://x/1")
     assert perf.get("ms") == 1.0
 
 
@@ -89,19 +89,21 @@ def test_official_domain_for_light_mapping():
     assert official_domain_for("") is None
 
 
-def test_fetch_meta_price_only_from_official_items_for_mapped_brand():
-    # 보강 6 옵션 (b): site: 쿼리 한정 X, 결과 후필터. 가격은 공식 도메인
-    # 매칭 항목에서만 파싱 — 중고/할인가(타 도메인) 차단.
+def test_fetch_meta_takes_lowest_price_from_all_results():
+    # 보강 9: 도메인 후필터 폐기. 전체 결과의 **최저가** 채택("최저 N만 원~"
+    # 표기 의도와 일치). source 의 raw_link 는 공식 매칭이 있으면 그쪽으로.
     def fake_search(q):
         return [
-            {"title": "쇼핑몰 중고", "snippet": "최저 50만 원~", "link": "https://kt-mall.co.kr/p"},
+            {"title": "쇼핑몰 할인", "snippet": "최저 50만 원~", "link": "https://kt-mall.co.kr/p"},
             {"title": "Apple 공식", "snippet": "최저 129만 원~", "link": "https://apple.com/iphone"},
             {"title": "스펙", "snippet": "6.1인치 2023년 출시", "link": "https://news.x.com/p"},
         ], {}
 
     fields, perf = fetch_meta("아이폰15", "Apple", search_fn=fake_search, query_suffix="x")
-    # 가격은 공식 도메인 항목(129만원)만, 쇼핑몰 50만원은 차단
-    assert fields["price_display"] == "최저 129만 원~"
+    # 보강 9: 전체 결과 최저가 = 50만 (이전엔 공식만 봐서 129만이었음)
+    assert fields["price_display"] == "최저 50만 원~"
+    # source 의 raw_link 는 공식 매칭(추적용) 이 있으면 거기로
+    assert "apple.com/iphone" in fields["source"]
     assert perf.get("site") == "apple.com"
     assert perf.get("official_items") == 1
     # 스펙(인치·연도)은 전체 결과에서
@@ -109,16 +111,17 @@ def test_fetch_meta_price_only_from_official_items_for_mapped_brand():
     assert fields["release_year"] == 2023
 
 
-def test_fetch_meta_price_none_when_no_official_match():
-    # 매핑된 브랜드인데 공식 도메인 매칭 0건 → 가격 None (잘못된 가격
-    # 채택하지 않음, §7 fallback). 스펙은 가능한 만큼 파싱.
+def test_fetch_meta_price_taken_even_without_official_match():
+    # 보강 9: 매핑된 브랜드인데 공식 도메인 매칭 0건이어도 — 일반 결과에서
+    # 가격 채택(이전 None → 표시로 완화). 잘못된 가격이 빈 값보다 낫다는
+    # 사용자 의도(상식 범위는 parse_prices 가 5만~1500만 1차 필터링).
     def fake_search(q):
         return [{"title": "쇼핑몰", "snippet": "최저 99만 원~ 6.7인치",
                  "link": "https://kt-mall.co.kr/p"}], {}
 
     fields, perf = fetch_meta("아이폰15", "Apple", search_fn=fake_search, query_suffix="x")
-    assert fields["price_display"] is None     # 공식 매칭 0 → 가격 X
-    assert fields["screen_size"] == "6.7인치"   # 스펙은 전체에서 OK
+    assert fields["price_display"] == "최저 99만 원~"
+    assert fields["screen_size"] == "6.7인치"
     assert perf.get("official_items") == 0
 
 
