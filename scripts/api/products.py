@@ -404,3 +404,38 @@ def register_product_routes(app):
             media_type="application/pdf",
             headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
+
+    # ────────────────────────────────────────────────────────────
+    # feature/similar-products — 유사 제품 비교하기 (축소판)
+    #   - GET /products/{id}/similar               혼합 모드(내부+외부) 카드 3개
+    #   - GET /products/{id}/has-integrated-report 카드 클릭 분기용 보고서 보유 여부
+    # 변경 범위: 라우트 2개만. 기존 라우트·DB 스키마·Agent 무변경.
+    # 직전 보강(external-analyze + background-task + 자동 모달 트리거) 는
+    # 사용자 명세 변경에 따라 *물리적 삭제* — 카드 클릭은 같은 페이지 안에서
+    # 세 번째 박스(최종 팝업/안내) 토글로 처리.
+    # ────────────────────────────────────────────────────────────
+
+    @app.get("/products/{product_id}/similar")
+    async def get_similar_products(product_id: int):
+        """유사 제품 카드 3개. DB 매칭 우선, 부족분 Serper 검색으로 보충."""
+        from scripts.popup.similar import build_similar_payload
+
+        product = query_one(
+            "SELECT product_id FROM tech_products WHERE product_id = %s",
+            (product_id,),
+        )
+        if not product:
+            raise HTTPException(status_code=404, detail="Product not found")
+        return await build_similar_payload(product_id)
+
+    @app.get("/products/{product_id}/has-integrated-report")
+    async def has_integrated_report(product_id: int):
+        """카드 클릭 분기용 — 종합 인사이트 보고서 보유 여부.
+        있으면 다이얼로그 → 세 번째 박스에 유사 제품 최종 팝업.
+        없으면 안내 박스로 'MOABOM 을 통해 확인해보세요' 노출."""
+        row = query_one(
+            "SELECT EXISTS (SELECT 1 FROM product_integrated_reports "
+            "WHERE product_id = %s) AS has_report",
+            (product_id,),
+        )
+        return {"has_report": bool(row and row.get("has_report"))}
