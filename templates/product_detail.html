@@ -1607,7 +1607,11 @@
                 .then(d => {
                     const dyn = d && d.dynamic_tip;
                     if (dyn && typeof dyn === 'string') {
-                        window._tipPool.push(dyn);
+                        // ★ push (115초 후 노출) → 풀 앞쪽 3~7번째 splice.
+                        //   영상 선정 로딩 15~35초 사이에 거의 항상 노출됨.
+                        //   3 미만은 슬라이드 진행 중인 ctx.index 와 충돌 가능.
+                        const insertAt = 3 + Math.floor(Math.random() * 5);
+                        window._tipPool.splice(insertAt, 0, dyn);
                     }
                 })
                 .catch(() => { /* 조용히 무시 — 정적 23개로 충분 */ });
