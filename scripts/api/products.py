@@ -439,3 +439,24 @@ def register_product_routes(app):
             (product_id,),
         )
         return {"has_report": bool(row and row.get("has_report"))}
+
+    # ────────────────────────────────────────────────────────────
+    # feature/loading-tips — 로딩 화면 TIP 슬라이드
+    #   - GET /loading-tips  정적 문장 23개 + 동적 인기 제품 한 줄 (5분 캐시)
+    # 영상 선정 / 종합 인사이트 두 로딩 카드 하단 TIP 박스에서 5초마다 회전.
+    # 보조 기능 — 어떤 실패도 사용자 경험을 죽이지 않음 (DB 실패 → 정적만 반환).
+    # ────────────────────────────────────────────────────────────
+
+    @app.get("/loading-tips")
+    async def get_loading_tips():
+        """로딩 화면 TIP 슬라이드용 문구 풀."""
+        from scripts.api._loading_tips import (
+            STATIC_TIPS,
+            get_popular_products_tip,
+        )
+
+        tips = list(STATIC_TIPS)
+        pop = get_popular_products_tip()
+        if pop:
+            tips.append(pop)
+        return {"tips": tips}
