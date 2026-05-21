@@ -449,14 +449,10 @@ def register_product_routes(app):
 
     @app.get("/loading-tips")
     async def get_loading_tips():
-        """로딩 화면 TIP 슬라이드용 문구 풀."""
-        from scripts.api._loading_tips import (
-            STATIC_TIPS,
-            get_popular_products_tip,
-        )
+        """로딩 화면 TIP 슬라이드의 *동적 인기 제품 한 줄*만 반환.
 
-        tips = list(STATIC_TIPS)
-        pop = get_popular_products_tip()
-        if pop:
-            tips.append(pop)
-        return {"tips": tips}
+        정적 풀(23개)은 프론트(JS)가 보유 — fetch 가 실패해도 100% 동작.
+        fetch 성공 시 JS 가 동적 한 줄을 풀에 push.
+        """
+        from scripts.api._loading_tips import get_popular_products_tip
+        return {"dynamic_tip": get_popular_products_tip()}

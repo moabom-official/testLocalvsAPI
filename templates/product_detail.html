@@ -1560,43 +1560,79 @@
         }
 
         // ── feature/loading-tips: 로딩 카드 하단 TIP 슬라이드 (5초 간격) ──
-        // 페이지 진입 후 1회 fetch + 셔플 → 캐시. 두 로딩 모두 같은 풀 공유.
-        window._tipPool = window._tipPool || [];
-        window._tipCtx  = window._tipCtx  || {};   // textElId → { index, interval }
+        // ★ 후속 보강 — 정적 풀 23개를 JS 가 *진실의 원천*으로 보유.
+        //   fetch 가 실패해도 빈 박스 없이 100% 동작. fetch 성공 시 동적
+        //   한 줄(인기 제품)만 풀에 push. 정적 풀 수정 시 이 배열만 수정 —
+        //   백엔드(_loading_tips.py)에는 정적 풀 없음.
+        window._tipPool = window._tipPool || [
+            // 어원·정체성
+            "MOABOM은 '모아서 봄' — 흩어진 리뷰를 한 곳에 모아 보여드려요.",
+            "수많은 리뷰어의 의견을 *모아* 한 번에 *봄* — MOABOM의 이름이 담은 뜻이에요.",
+            "유튜브 리뷰 정보를 *모아*서 *보는* 서비스, MOABOM입니다.",
+            "리뷰 영상의 핵심을 한눈에 — 그것이 MOABOM의 모토예요.",
+            // 차별점·가치
+            "MOABOM은 한 번에 수십 개 리뷰 영상을 분석합니다.",
+            "리뷰어 자막과 시청자 댓글을 함께 비교해 진짜 평가를 보여드려요.",
+            "한 명의 리뷰어보다 여러 리뷰어의 합의가 더 신뢰할 수 있어요.",
+            "MOABOM은 리뷰어와 시청자, 양쪽 시선을 모두 담아 비교해드립니다.",
+            "광고와 진짜 후기를 구분하는 AI 분석이 MOABOM의 핵심이에요.",
+            "여러 영상을 종합하면 한 채널의 편향에서 자유로워질 수 있어요.",
+            // 사용 팁
+            "분석할 영상이 많을수록 보고서의 신뢰성이 높아져요.",
+            "댓글에서 반복되는 표현은 실제 사용자 인식의 핵심일 가능성이 높아요.",
+            "장점·단점은 빈도수까지 함께 보면 더 정확한 판단이 가능해요.",
+            "리뷰어 의견과 댓글의 합의가 일치하면 그 정보는 더 신뢰할 수 있어요.",
+            "유사 제품 비교하기로 다른 제품과 한 번에 비교해보세요.",
+            "종합 인사이트는 영상 2개 이상에서 신뢰성이 높아져요.",
+            // 친근한 메시지
+            "잠시만 기다려주세요. 곧 결과를 보여드릴게요.",
+            "수십 개의 리뷰를 꼼꼼히 모으는 중이에요.",
+            "리뷰어들의 진짜 평가를 분석하는 중입니다.",
+            "유튜브의 수많은 의견을 정리하는 중이에요. 거의 다 됐어요.",
+            // 재미·인사이트
+            "리뷰 영상 1개의 자막은 평균 1만 자 정도예요. MOABOM이 한 번에 처리합니다.",
+            "테크 리뷰는 짧게는 5분, 길게는 30분. MOABOM이 핵심만 뽑아드려요.",
+            "댓글은 시청자의 직접적인 목소리예요. MOABOM은 그것도 빠뜨리지 않아요.",
+        ];
+        window._tipCtx = window._tipCtx || {};   // textElId → { index, interval }
+        window._tipShuffled = false;             // Fisher-Yates 1회만 보장
 
-        async function _ensureTipPool() {
-            if (window._tipPool.length > 0) return;
-            try {
-                const r = await fetch('/loading-tips');
-                if (!r.ok) throw new Error('fetch failed');
-                const d = await r.json();
-                const list = Array.isArray(d.tips) ? d.tips.slice() : [];
-                // Fisher-Yates 셔플
-                for (let i = list.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [list[i], list[j]] = [list[j], list[i]];
-                }
-                window._tipPool = list;
-            } catch (e) {
-                // fetch 실패 — 최소 폴백 풀 (사용자가 빈 박스 보지 않게)
-                window._tipPool = [
-                    "MOABOM은 '모아서 봄' — 흩어진 리뷰를 한 곳에 모아 보여드려요.",
-                    "잠시만 기다려주세요. 곧 결과를 보여드릴게요.",
-                    "수십 개의 리뷰를 꼼꼼히 모으는 중이에요.",
-                ];
-            }
+        // 동적 인기 제품 한 줄을 *백그라운드* fetch → 풀에 push. await 안 함.
+        // 첫 시도에서도 정적 풀이 *항상 있으므로* 빈 박스 0건.
+        function _loadDynamicTip() {
+            if (window._tipDynamicLoaded) return;
+            window._tipDynamicLoaded = true;     // 중복 호출 차단
+            fetch('/loading-tips')
+                .then(r => r.ok ? r.json() : null)
+                .then(d => {
+                    const dyn = d && d.dynamic_tip;
+                    if (dyn && typeof dyn === 'string') {
+                        window._tipPool.push(dyn);
+                    }
+                })
+                .catch(() => { /* 조용히 무시 — 정적 23개로 충분 */ });
         }
+        // 페이지 진입 시 백그라운드 로딩
+        document.addEventListener('DOMContentLoaded', _loadDynamicTip);
 
-        async function startTipRotation(textElId) {
+        function startTipRotation(textElId) {
             const el = document.getElementById(textElId);
             if (!el) return;
-            await _ensureTipPool();
-            if (window._tipPool.length === 0) return;
 
-            // 재시작 안전 — 기존 interval 정리
+            // 첫 호출 시에만 Fisher-Yates 셔플 (페이지 동안 같은 순서 유지)
+            if (!window._tipShuffled) {
+                const arr = window._tipPool;
+                for (let i = arr.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [arr[i], arr[j]] = [arr[j], arr[i]];
+                }
+                window._tipShuffled = true;
+            }
+
+            // 재시작 안전
             stopTipRotation(textElId);
 
-            // 첫 문장 즉시 표시 (슬라이드 없이)
+            // 정적 풀은 *항상 있음* — 첫 문장 즉시 표시 (슬라이드 없이)
             const ctx = { index: 0, interval: null };
             el.classList.remove('slide-out', 'slide-in-start');
             el.textContent = window._tipPool[0];
