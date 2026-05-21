@@ -2514,7 +2514,6 @@
                 : '';
             const gaugeConsCls = verdict.color ? ' ' + verdict.color : '';
             const scoreLabel = isFinite(scoreNum) ? scoreNum.toFixed(1) + '<small>/10</small>' : '—<small>/10</small>';
-            const detailHref = product.product_id ? '/products/' + product.product_id : '#';
 
             return (
                 (metaLine ? '<div class="p5-meta-line">' + escapeHtml(metaLine) + '</div>' : '')
@@ -2553,12 +2552,6 @@
                 +   '</div>'
                 + '</div>'
                 + caveatHtml
-                // Q1 — "유사 제품 비교하기" 버튼 제외. 상세 보기 버튼만 (anchor).
-                //   CSS 의 `.p5-similar-popup .p5-btn-secondary { display: none !important; }`
-                //   가 추가 안전망(혹시 다른 곳에서 비교 버튼 끼어들어도 차단).
-                + '<div class="p5-actions">'
-                +   '<a class="p5-btn p5-btn-primary" href="' + escapeAttr(detailHref) + '">상세 보고서 보기 →</a>'
-                + '</div>'
             );
         }
 
