@@ -115,9 +115,9 @@ def find_similar_internal(target_id: int) -> List[Dict[str, Any]]:
     # tech_products.category 는 NULL 케이스 다수 — 정규화 비교(LOWER+TRIM).
     # product_meta_cache 와 LEFT JOIN 으로 release_year 가져옴.
     # 1차: 카테고리 직접 일치 (대소문자·공백 정규화)
-    # ★ 후속 보강: product_integrated_reports 에 보고서 1개 이상 있는
-    #   "완성된 제품" 만 추천 (사용자 Q2=a 결정). 분석 영상 0개 빈 페이지로
-    #   넘어가는 케이스 차단. EXISTS — INNER JOIN+DISTINCT 보다 단순/성능 양호.
+    # ★ 축소판 명세 §③: 매칭 조건은 카테고리 + 연도 ±2 *둘 뿐*. 직전 EXISTS
+    #   조건(보고서 보유 필터)은 *완전 제거* — 보고서 보유 여부는 카드 클릭
+    #   시점에 has-integrated-report 로 분기 처리 (분기 ①/②).
     rows = query_all(
         """
         SELECT tp.product_id, tp.name, tp.brand, tp.category, tp.image_url,
@@ -128,17 +128,12 @@ def find_similar_internal(target_id: int) -> List[Dict[str, Any]]:
            AND pmc.release_year IS NOT NULL
            AND pmc.release_year BETWEEN %s AND %s
            AND LOWER(TRIM(COALESCE(tp.category,''))) = LOWER(TRIM(%s))
-           AND EXISTS (
-               SELECT 1 FROM product_integrated_reports pir
-                WHERE pir.product_id = tp.product_id
-           )
         """,
         (target_id, target_year - 2, target_year + 2, target_cat),
     ) or []
 
     # 2차 (1차에 후보 부족): 제품명 기반 카테고리 추론까지 포함해 보강
-    # ★ 후속 보강: 동일하게 EXISTS 조건 적용 — 한쪽만 적용하면 fallback 에서
-    #   미완 제품이 다시 새어 들어옴.
+    # EXISTS 조건 미적용 — 1단계와 정책 일치.
     if len(rows) < 3:
         extra = query_all(
             """
@@ -149,10 +144,6 @@ def find_similar_internal(target_id: int) -> List[Dict[str, Any]]:
              WHERE tp.product_id <> %s
                AND pmc.release_year IS NOT NULL
                AND pmc.release_year BETWEEN %s AND %s
-               AND EXISTS (
-                   SELECT 1 FROM product_integrated_reports pir
-                    WHERE pir.product_id = tp.product_id
-               )
             """,
             (target_id, target_year - 2, target_year + 2),
         ) or []
@@ -285,23 +276,35 @@ def _extract_external_candidates(
 
 def find_similar_external(
     target_category: str,
-    target_year: int,
+    target_year: Optional[int],
     target_name: str,
     *,
+    exclude_names: Optional[set] = None,
     take: int = 3,
 ) -> List[Dict[str, str]]:
-    """Serper 웹 검색 → 동일 카테고리·동시기 후보 명사구 추출.
+    """Serper 웹 검색 → 동일 카테고리(+가능하면 동시기) 후보 명사구.
 
-    검색 쿼리는 카테고리·연도 기반 일반 추천. 실패·키 부재 시 빈 리스트.
-    target 자신은 정규화 매칭으로 제외.
+    ★ 축소판 명세 §⑤ 매칭 0개 차단: target_year 가 None 이어도 카테고리만
+      으로 검색 수행. 결과 품질은 약간 떨어질 수 있지만 매칭 0개보다 낫다.
+    target 자신과 호출부가 지정한 exclude_names 들은 결과에서 제외.
+    실패·키 부재 시 빈 리스트.
     """
     from scripts.popup.product_meta import serper_web_search
 
-    queries = [
-        f"{target_category} {target_year} 추천",
-        f"{target_category} {target_year} 비교",
-    ]
-    exclude = {normalize_product_name(target_name)}
+    if target_year:
+        queries = [
+            f"{target_category} {target_year} 추천",
+            f"{target_category} {target_year} 비교",
+        ]
+    else:
+        queries = [
+            f"{target_category} 추천 인기",
+            f"{target_category} 비교",
+        ]
+
+    exclude: set = {normalize_product_name(target_name)}
+    if exclude_names:
+        exclude |= {normalize_product_name(n) for n in exclude_names if n}
 
     aggregated: List[Dict[str, Any]] = []
     for q in queries:
@@ -314,6 +317,31 @@ def find_similar_external(
             break
 
     return _extract_external_candidates(aggregated, exclude, take=take)
+
+
+def _lookup_existing_product_id(name: str, category: str) -> Optional[int]:
+    """외부 검색 결과 이름·카테고리가 tech_products 에 이미 있으면 그 id.
+
+    카드 클릭 시 has-integrated-report 분기에 사용. 정규화 비교 — 한·영 변형
+    까지는 못 잡음(Q9 결정 그대로). 카테고리는 비어있거나 같으면 일치 인정.
+    """
+    if not (name and name.strip()):
+        return None
+    from scripts.database.queries import query_all
+
+    rows = query_all(
+        "SELECT product_id, name, category FROM tech_products"
+    ) or []
+    target_norm = normalize_product_name(name)
+    target_cat = (category or "").strip().lower()
+    for r in rows:
+        rn = normalize_product_name(r.get("name") or "")
+        if rn != target_norm:
+            continue
+        rcat = (r.get("category") or "").strip().lower()
+        if not rcat or not target_cat or rcat == target_cat:
+            return int(r["product_id"])
+    return None
 
 
 # ──────────────────────────────────────────────────────────────
@@ -568,14 +596,18 @@ def build_reason_external(
 
 
 async def build_similar_payload(target_id: int) -> Dict[str, Any]:
-    """GET /products/{target_id}/similar 응답 dict 생성.
+    """GET /products/{target_id}/similar 응답 dict 생성 (축소판: 혼합 모드).
 
-    반환 형식:
-      {"mode": "internal"|"external", "cards": [card|null, card|null, card|null]}
+    ★ 명세 §②: DB 우선 + 부족분 외부 검색 + *반드시 3개*. 부족분은 null.
+    ★ 명세 §⑤: 매칭 0개 차단 — target_year=None 이어도 외부 검색은 카테고리
+      만으로 시도. 그래도 안 잡힌 자리만 null.
+
+    응답:
+      {"cards": [card|null, card|null, card|null]}
     각 card:
-      {kind, product_id, name, image_url, reason, brand, release_year}
-    내부 모드에서 부족하면 빈 슬롯 null. 외부 모드는 가능하면 3개, 못 채우면
-    채운 만큼 + null.
+      {kind: "internal"|"external", product_id: int|null, name, image_url,
+       reason, brand, release_year}
+    (이전의 "mode" top-level 필드는 제거 — 혼합이라 의미 없음. 각 카드 kind 로 분기.)
     """
     from scripts.database.queries import query_one
     from scripts.reports.product_integrated_insight import (
@@ -588,7 +620,7 @@ async def build_similar_payload(target_id: int) -> Dict[str, Any]:
         (target_id,),
     )
     if not target:
-        return {"mode": "internal", "cards": [None, None, None]}
+        return {"cards": [None, None, None]}
 
     target_year = _resolve_release_year(target_id)
     target_cat = _resolve_category(target)
@@ -599,117 +631,67 @@ async def build_similar_payload(target_id: int) -> Dict[str, Any]:
         (target_latest or {}).get("report_text")
     )
 
-    # 2) 내부 후보 시도
-    internal_rows = []
+    # 2) DB 내부 매칭 (카테고리·연도 둘 다 있어야 시도)
+    internal_rows: List[Dict[str, Any]] = []
     if target_cat and target_year:
-        internal_rows = find_similar_internal(target_id)
+        internal_rows = find_similar_internal(target_id)[:3]
 
-    if internal_rows:
-        # 내부 모드 — 각 후보의 ④ 보고서까지 끌어와 LLM 사유 생성
-        cards: List[Optional[Dict[str, Any]]] = []
-        for r in internal_rows:
-            sid = r["product_id"]
-            slatest = get_latest_product_integrated_report(sid)
-            sreport = _extract_report_essentials(
-                (slatest or {}).get("report_text")
-            )
-            reason = build_reason_internal(
-                target, target_year or 0, target_report,
-                r, sreport,
-            )
-            cards.append({
-                "kind": "internal",
-                "product_id": sid,
-                "name": r.get("name"),
-                "image_url": (r.get("image_url") or "").strip() or _PLACEHOLDER_IMAGE,
-                "reason": reason,
-                "brand": r.get("brand"),
-                "release_year": r.get("release_year"),
-            })
-        # 부족분 null 채움 (3장 슬롯 유지)
-        while len(cards) < 3:
-            cards.append(None)
-        return {"mode": "internal", "cards": cards[:3]}
-
-    # 3) 외부 모드 — Serper 검색 + 이미지 병렬 + LLM 사유
-    if not target_cat or not target_year:
-        # 카테고리·연도 둘 다 없으면 검색 자체가 무의미
-        return {"mode": "external", "cards": [None, None, None]}
-
-    candidates = find_similar_external(
-        target_cat, target_year, target.get("name") or "",
-        take=3,
-    )
-    if not candidates:
-        return {"mode": "external", "cards": [None, None, None]}
-
-    # 이미지 병렬 fetch
-    images = await fetch_external_images(candidates, timeout_sec=10.0)
-
-    cards = []
-    for c, img in zip(candidates, images):
-        # 외부 후보의 release_year 는 검색 텍스트에서 추정. 단순화: target_year
-        # 를 그대로 사용(±2 동시기). 부정확하지만 사유 LLM 의 입력 메타로만.
-        candidate_meta = {
-            "name": c["name"],
-            "brand": c.get("brand"),
-            "release_year": target_year,
-        }
-        reason = build_reason_external(
-            target, target_year, target_report, candidate_meta
+    cards: List[Optional[Dict[str, Any]]] = []
+    # 2-A) 내부 카드 — LLM 사유 + 이미지는 DB image_url 우선
+    for r in internal_rows:
+        sid = r["product_id"]
+        slatest = get_latest_product_integrated_report(sid)
+        sreport = _extract_report_essentials(
+            (slatest or {}).get("report_text")
+        )
+        reason = build_reason_internal(
+            target, target_year or 0, target_report, r, sreport,
         )
         cards.append({
-            "kind": "external",
-            "product_id": None,
-            "name": c["name"],
-            "image_url": img,
+            "kind": "internal",
+            "product_id": sid,
+            "name": r.get("name"),
+            "image_url": (r.get("image_url") or "").strip() or _PLACEHOLDER_IMAGE,
             "reason": reason,
-            "brand": c.get("brand"),
-            "release_year": target_year,
+            "brand": r.get("brand"),
+            "release_year": r.get("release_year"),
         })
+
+    # 3) 부족분 외부 검색 — target_year 없어도 카테고리만으로 시도(§⑤).
+    needed = 3 - len(cards)
+    if needed > 0 and target_cat:
+        exclude = {r.get("name") for r in internal_rows if r.get("name")}
+        candidates = find_similar_external(
+            target_cat, target_year, target.get("name") or "",
+            exclude_names=exclude,
+            take=needed,
+        )
+        if candidates:
+            images = await fetch_external_images(candidates, timeout_sec=10.0)
+            for c, img in zip(candidates, images):
+                # tech_products 에 이미 있는 동일 정규화 이름이면 product_id
+                # 채움 → 카드 클릭 시 has-integrated-report 분기 가능 (분기 ①).
+                # 없으면 None — 클릭 시 무조건 분기 ② (안내 박스).
+                ext_pid = _lookup_existing_product_id(c["name"], target_cat)
+                candidate_meta = {
+                    "name": c["name"],
+                    "brand": c.get("brand"),
+                    "release_year": target_year,   # 추정값, 사유 LLM 메타용
+                }
+                reason = build_reason_external(
+                    target, target_year or 0, target_report, candidate_meta
+                )
+                cards.append({
+                    "kind": "external",
+                    "product_id": ext_pid,        # 매칭되면 int, 없으면 None
+                    "name": c["name"],
+                    "image_url": img,
+                    "reason": reason,
+                    "brand": c.get("brand"),
+                    "release_year": target_year,
+                })
+
+    # 4) 최종 — 항상 길이 3. 부족분 null 슬롯.
     while len(cards) < 3:
         cards.append(None)
-    return {"mode": "external", "cards": cards[:3]}
-
-
-# ──────────────────────────────────────────────────────────────
-# 외부 분석 등록 — 기존 제품 매칭 또는 신규 행 추가
-# ──────────────────────────────────────────────────────────────
-
-
-def find_or_create_external_product(
-    name: str,
-    brand: Optional[str] = None,
-    category: Optional[str] = None,
-    image_url: Optional[str] = None,
-) -> Tuple[int, bool]:
-    """외부 카드 [예] 시 호출. 기존 tech_products 매칭 시도 → 없으면 신규.
-
-    반환: (product_id, is_new). 정규화 매칭 — 공백·기호 무시 + 소문자.
-    """
-    from scripts.database.queries import execute_insert, query_all
-
-    if not (name and name.strip()):
-        raise ValueError("name is required")
-
-    norm_target = normalize_product_name(name)
-    # 같은 카테고리 안에서 정규화 매칭 — DB 안에 동일 정규화 이름 있는지 검색
-    rows = query_all(
-        "SELECT product_id, name, category FROM tech_products"
-    ) or []
-    for r in rows:
-        rn = normalize_product_name(r.get("name") or "")
-        if rn and rn == norm_target:
-            # 카테고리 정합성 — 비어있거나 같으면 동일 제품으로 인정
-            rcat = (r.get("category") or "").strip().lower()
-            tcat = (category or "").strip().lower()
-            if not rcat or not tcat or rcat == tcat:
-                return int(r["product_id"]), False
-
-    # 신규 행 추가
-    new_id = execute_insert(
-        "INSERT INTO tech_products (name, brand, category, image_url) "
-        "VALUES (%s, %s, %s, %s) RETURNING product_id",
-        (name.strip(), (brand or None), (category or None), (image_url or None)),
-    )
-    return int(new_id), True
+    return {"cards": cards[:3]}

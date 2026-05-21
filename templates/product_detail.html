@@ -997,32 +997,37 @@
         @media (max-width: 720px) {
             .p5-similar-cards { grid-template-columns: 1fr; }
         }
-        /* feature/similar-products: 백그라운드 진행 표시 + 완료 토스트 */
-        .bg-progress, .bg-toast {
-            position: fixed; right: 20px; bottom: 20px;
-            background: #ffffff; border-radius: 12px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
-            padding: 12px 16px;
-            display: none; align-items: center; gap: 10px;
-            max-width: 340px; z-index: 11000;
-            font-size: 13px;
+        /* feature/similar-products (축소판): 카드 클릭 → 세 번째 박스 두 종류.
+           ① 최종 팝업 박스 — 유사 제품의 popup-summary 시각.
+           ② 안내 박스 — DB 보고서 없을 때 "MOABOM 으로 확인" 문구.
+           둘은 상호 배타적(showSimilarPopupBox/showSimilarHintBox 가 다른 쪽 닫음). */
+        .p5-similar-popup, .p5-similar-hint {
+            display: none;
+            width: min(820px, 100%);
+            background: #ffffff;
+            border-radius: 18px;
+            box-shadow: 0 24px 60px rgba(0,0,0,0.18);
+            position: relative;
+            box-sizing: border-box;
         }
-        .bg-progress.show, .bg-toast.show { display: flex; }
-        .bg-progress-text { color: #4b5563; flex: 1; }
-        .bg-progress-spinner { font-size: 16px; }
-        .bg-progress-cancel, .bg-toast-close {
-            background: none; border: none; cursor: pointer;
-            color: #9ca3af; font-size: 16px; padding: 0 4px;
+        .p5-similar-popup.show, .p5-similar-hint.show { display: block; }
+        .p5-similar-popup { padding: 22px 28px 24px; }
+        .p5-similar-hint  { padding: 22px 28px; text-align: center; border-radius: 14px;
+                            box-shadow: 0 16px 40px rgba(0,0,0,0.12); }
+        .p5-similar-popup-close,
+        .p5-similar-hint-close {
+            position: absolute; top: 14px; right: 14px;
+            width: 32px; height: 32px; border-radius: 50%;
+            border: 1px solid #e5e7eb; background: #f7f8fa;
+            color: #374151; font-size: 16px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            line-height: 1;
         }
-        .bg-progress-cancel:hover, .bg-toast-close:hover { color: #6b7280; }
-        .bg-toast-check { color: #22c55e; font-weight: 700; font-size: 16px; }
-        .bg-toast-text { color: #111; flex: 1; }
-        .bg-toast-go {
-            background: #111; color: #fff; border: none;
-            padding: 6px 12px; border-radius: 8px; cursor: pointer;
-            font-size: 12px; white-space: nowrap;
-        }
-        .bg-toast-go:hover { background: #000; }
+        .p5-similar-popup-close:hover,
+        .p5-similar-hint-close:hover { background: #eef0f3; }
+        .p5-similar-hint-text { font-size: 14px; color: #4b5563; line-height: 1.55; padding: 4px 24px 0; }
+        /* 세 번째 박스 안의 "유사 제품 비교하기" 버튼은 *항상* 숨김 — 무한 중첩 방지(Q1). */
+        .p5-similar-popup .p5-btn-secondary { display: none !important; }
         .p5-modal {
             background: #fff; color: #111; width: min(820px, 100%);
             border-radius: 18px; box-shadow: 0 24px 60px rgba(0,0,0,0.18);
@@ -1385,6 +1390,20 @@
                         <div class="p5-similar-card" id="p5SimilarCard1"></div>
                         <div class="p5-similar-card" id="p5SimilarCard2"></div>
                     </div>
+                </div>
+
+                <!-- feature/similar-products (축소판): 세 번째 박스 — 두 종류
+                     상호 배타적. 분기 ① 최종 팝업 박스 / 분기 ② 안내 박스.
+                     showSimilarPopupBox / showSimilarHintBox 가 토글. -->
+                <div id="p5SimilarPopup" class="p5-similar-popup" aria-hidden="true">
+                    <button class="p5-similar-popup-close" type="button"
+                            onclick="hideSimilarPopupBox()" aria-label="닫기">×</button>
+                    <div id="p5SimilarPopupBody"></div>
+                </div>
+                <div id="p5SimilarHint" class="p5-similar-hint" aria-hidden="true">
+                    <button class="p5-similar-hint-close" type="button"
+                            onclick="hideSimilarHintBox()" aria-label="닫기">×</button>
+                    <div class="p5-similar-hint-text"></div>
                 </div>
             </div>
 
@@ -2253,15 +2272,18 @@
                 ss.classList.remove('show');
                 ss.setAttribute('aria-hidden', 'true');
             }
+            // 축소판 명세 Q3: 모달 닫힘 시 세 번째 박스 두 종류 모두 자동 정리.
+            if (typeof hideSimilarPopupBox === 'function') hideSimilarPopupBox();
+            if (typeof hideSimilarHintBox  === 'function') hideSimilarHintBox();
             // 보강 1: 모달 닫힌 뒤 비로소 ④ 패널 노출
             _p5RevealPanelOnClose();
         }
 
-        // ── feature/similar-products: 유사 제품 비교 영역 + 백그라운드 분석 ──
+        // ── feature/similar-products (축소판): 비교 영역 + 세 번째 박스 ──
         // 메모리 캐시(페이지 세션 동안만). 모달 닫혀도 유지 — 재진입 즉시 표시.
-        window._similarCache = null;     // { mode, cards }
-        window._bgTask = null;           // { task_id, product_id, name, image_url }
-        window._bgPollInterval = null;
+        window._similarCache = null;       // { cards: [...] }
+        // 카드별 has_report + popupData 캐시 — Q4 (같은 카드 재클릭 즉시).
+        window._similarCardCache = {};     // { [product_id]: { hasReport, popupData } }
 
         async function toggleSimilarSection() {
             const section = document.getElementById('p5SimilarSection');
@@ -2340,206 +2362,208 @@
             }
         }
 
-        function onSimilarCardClick(item) {
-            if (item.kind === 'internal' && item.product_id) {
-                // ★ 후속 보강: ?auto_insight=1 부여 → 새 페이지 진입 직후 자동
-                //   인사이트 모달 표시. 영상 리스트 화면이 사용자에게 보이지
-                //   않도록 — _handleAutoInsightOnLoad 가 받아 _enterInsightMode
-                //   + runIntegratedInsight 호출.
-                window.location.href = '/products/' + item.product_id + '?auto_insight=1';
+        // ★ 축소판 명세 §④: 카드 클릭 분기.
+        //   ① product_id 있고 보고서 있음 → 다이얼로그 → 세 번째 박스에 최종 팝업.
+        //   ② product_id 없거나(외부 매칭 없음) 보고서 없음 → 안내 박스.
+        async function onSimilarCardClick(item) {
+            // product_id 없는 외부 카드 → 무조건 분기 ②
+            if (!item.product_id) {
+                showSimilarHintBox(item.name);
                 return;
             }
-            // 외부 — 다이얼로그
-            const ok = window.confirm(
-                'MOABOM 을 통해 ' + item.name + '에 대한 핵심 인사이트를 받아보시겠어요?'
-            );
-            if (!ok) return;
-            startExternalAnalysis(item);
-        }
-
-        async function startExternalAnalysis(item) {
-            if (window._bgTask) {
-                alert('다른 제품 분석이 진행 중입니다. 완료 후 다시 시도해주세요.');
-                return;
-            }
-            try {
-                const r = await fetch('/products/' + PRODUCT_ID + '/similar/external-analyze', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        name: item.name,
-                        brand: item.brand || null,
-                        release_year: item.release_year || null,
-                        category: item.category || null,
-                        image_url: item.image_url || null,
-                    }),
-                });
-                if (r.status === 409) {
-                    alert('다른 제품 분석이 진행 중입니다. 완료 후 다시 시도해주세요.');
-                    return;
-                }
-                if (!r.ok) {
-                    alert('분석을 시작하지 못했어요.');
-                    return;
-                }
-                const data = await r.json();
-                if (!data.is_new) {
-                    // 이미 존재 — 그 페이지로
-                    window.location.href = '/products/' + data.product_id;
-                    return;
-                }
-                window._bgTask = {
-                    task_id: data.background_task_id,
-                    product_id: data.product_id,
-                    name: item.name,
-                    image_url: item.image_url,
-                };
-                showBgProgress();
-                startBgPolling();
-            } catch (e) {
-                console.warn('[bg_task] start failed:', e);
-                alert('분석을 시작하지 못했어요.');
-            }
-        }
-
-        function startBgPolling() {
-            if (window._bgPollInterval) clearInterval(window._bgPollInterval);
-            window._bgPollInterval = setInterval(async () => {
-                if (!window._bgTask) {
-                    clearInterval(window._bgPollInterval);
-                    return;
-                }
+            const cacheKey = String(item.product_id);
+            let cache = window._similarCardCache[cacheKey];
+            if (!cache) {
+                let hasReport = false;
                 try {
-                    const r = await fetch('/products/background-task/' + window._bgTask.task_id);
-                    if (r.status === 404) {
-                        // 서버 재시작 등으로 태스크 소멸 — 진행 표시 숨김
-                        clearInterval(window._bgPollInterval);
-                        hideBgProgress();
-                        window._bgTask = null;
-                        return;
+                    const r = await fetch('/products/' + item.product_id + '/has-integrated-report');
+                    if (r.ok) {
+                        const d = await r.json();
+                        hasReport = !!d.has_report;
                     }
-                    if (!r.ok) return;
-                    const data = await r.json();
-                    updateBgProgress(data);
-                    if (data.status === 'completed') {
-                        clearInterval(window._bgPollInterval);
-                        showBgToast(window._bgTask);
-                        window._bgTask = null;
-                    } else if (data.status === 'failed' || data.status === 'cancelled') {
-                        clearInterval(window._bgPollInterval);
-                        hideBgProgress();
-                        window._bgTask = null;
-                    }
-                } catch (e) {
-                    // 폴링 실패는 무시 — 다음 회차 재시도
-                }
-            }, 5000);
-        }
-
-        function showBgProgress() {
-            const el = document.getElementById('bgProgress');
-            if (!el) return;
-            el.classList.add('show');
-            el.setAttribute('aria-hidden', 'false');
-            el.querySelector('.bg-progress-text').textContent = window._bgTask.name + ' 분석 중...';
-        }
-
-        function updateBgProgress(data) {
-            const el = document.getElementById('bgProgress');
-            if (!el || !window._bgTask) return;
-            const stageLabel = data.stage === 'selecting_videos' ? '영상 선정 중'
-                            : data.stage === 'generating_insight' ? '보고서 생성 중'
-                            : '준비 중';
-            el.querySelector('.bg-progress-text').textContent =
-                window._bgTask.name + ' — ' + stageLabel;
-        }
-
-        function hideBgProgress() {
-            const el = document.getElementById('bgProgress');
-            if (!el) return;
-            el.classList.remove('show');
-            el.setAttribute('aria-hidden', 'true');
-        }
-
-        function showBgToast(task) {
-            hideBgProgress();
-            const el = document.getElementById('bgToast');
-            if (!el || !task) return;
-            el.classList.add('show');
-            el.setAttribute('aria-hidden', 'false');
-            el.querySelector('.bg-toast-text').textContent = task.name + ' 분석 완료';
-            el.dataset.productId = task.product_id;
-            // 60초 후 자동 사라짐
-            setTimeout(() => hideBgToast(), 60000);
-        }
-
-        function hideBgToast() {
-            const el = document.getElementById('bgToast');
-            if (!el) return;
-            el.classList.remove('show');
-            el.setAttribute('aria-hidden', 'true');
-        }
-
-        function goToBgResult() {
-            const el = document.getElementById('bgToast');
-            if (!el) return;
-            const productId = el.dataset.productId;
-            // ★ 후속 보강: 외부 카드 → BG 분석 → 토스트 [결과 보러 가기] 도
-            //   ?auto_insight=1 부여 — 새 페이지 진입 직후 자동 모달.
-            if (productId) window.location.href = '/products/' + productId + '?auto_insight=1';
-        }
-
-        async function cancelBgTask() {
-            if (!window._bgTask) return;
-            if (!confirm('진행 중인 분석을 취소하시겠어요?')) return;
-            try {
-                await fetch('/products/background-task/' + window._bgTask.task_id, {
-                    method: 'DELETE',
-                });
-            } catch (e) {
-                // 백엔드가 실패해도 프론트는 진행 표시 숨김
+                } catch (e) { /* 실패 → 보고서 없음으로 폴백 */ }
+                cache = { hasReport: hasReport, popupData: null };
+                window._similarCardCache[cacheKey] = cache;
             }
-            hideBgProgress();
-            window._bgTask = null;
-            if (window._bgPollInterval) clearInterval(window._bgPollInterval);
+
+            if (cache.hasReport) {
+                // 분기 ① — 확인 다이얼로그 → 세 번째 박스 (Q4 캐시 hit 시 즉시)
+                const ok = window.confirm(
+                    '선택하신 ' + item.name + '의 종합 인사이트를 확인하시겠어요?'
+                );
+                if (!ok) return;
+                await showSimilarPopupBox(item, cache);
+            } else {
+                // 분기 ② — 안내 박스
+                showSimilarHintBox(item.name);
+            }
+        }
+
+        async function showSimilarPopupBox(item, cache) {
+            const box = document.getElementById('p5SimilarPopup');
+            const body = document.getElementById('p5SimilarPopupBody');
+            if (!box || !body) return;
+            hideSimilarHintBox();   // Q2 박스 교체 — 안내 닫고 팝업 보이기
+
+            if (cache && cache.popupData) {
+                body.innerHTML = renderSimilarPopupHtml(cache.popupData);
+                box.classList.add('show');
+                box.setAttribute('aria-hidden', 'false');
+                box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                return;
+            }
+            // 로딩 placeholder
+            body.innerHTML = '<div style="padding:24px;text-align:center;color:#6b7280;font-size:13px;">불러오는 중...</div>';
+            box.classList.add('show');
+            box.setAttribute('aria-hidden', 'false');
+
+            try {
+                const r = await fetch('/products/' + item.product_id + '/popup-summary');
+                if (!r.ok) throw new Error('popup-summary failed');
+                const data = await r.json();
+                if (cache) cache.popupData = data;
+                body.innerHTML = renderSimilarPopupHtml(data);
+                box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } catch (e) {
+                // 실패 — 안내 박스로 폴백 (Q2 박스 교체)
+                hideSimilarPopupBox();
+                showSimilarHintBox(item.name);
+            }
+        }
+
+        function showSimilarHintBox(name) {
+            hideSimilarPopupBox();    // Q2 박스 교체 — 팝업 닫고 안내 보이기
+            const box = document.getElementById('p5SimilarHint');
+            if (!box) return;
+            const text = box.querySelector('.p5-similar-hint-text');
+            text.textContent = '선택하신 ' + name
+                + ' 에 대한 핵심 인사이트를 MOABOM을 통해 확인해보세요 !';
+            box.classList.add('show');
+            box.setAttribute('aria-hidden', 'false');
+            box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function hideSimilarPopupBox() {
+            const box = document.getElementById('p5SimilarPopup');
+            if (!box) return;
+            box.classList.remove('show');
+            box.setAttribute('aria-hidden', 'true');
+            const body = document.getElementById('p5SimilarPopupBody');
+            if (body) body.innerHTML = '';
+        }
+
+        function hideSimilarHintBox() {
+            const box = document.getElementById('p5SimilarHint');
+            if (!box) return;
+            box.classList.remove('show');
+            box.setAttribute('aria-hidden', 'true');
+        }
+
+        // 유사 제품의 최종 팝업 시각을 HTML 문자열로 렌더. p5Populate 는 fixed
+        // ID 들(p5Name/p5GaugeArc/...)을 직접 손대므로 그대로 재사용 불가 —
+        // 같은 .p5-* CSS 클래스를 사용해 *동일 시각*을 만든다.
+        // ★ "유사 제품 비교하기" 버튼은 *항상* 제외 (Q1 무한 중첩 방지).
+        function renderSimilarPopupHtml(d) {
+            const verdict = d.verdict || {};
+            const product = d.product || {};
+            const meta = d.meta || {};
+            const scoreStr = verdict.score;
+            let scoreNum = NaN;
+            if (scoreStr && scoreStr !== '데이터 부족') scoreNum = parseFloat(scoreStr);
+            const C = 2 * Math.PI * 50;
+            const ratio = isFinite(scoreNum) ? Math.max(0, Math.min(1, scoreNum / 10)) : 0;
+            const dashOffset = (C * (1 - ratio)).toFixed(2);
+            const stroke = (typeof scoreToColor === 'function')
+                ? scoreToColor(scoreNum) : '#22c55e';
+            const metaParts = [];
+            if (meta.videos)   metaParts.push('리뷰 영상 ' + meta.videos + '개');
+            if (meta.comments) metaParts.push('핵심 댓글 ' + meta.comments + '개');
+            const metaLine = metaParts.length ? metaParts.join(' · ') + ' 분석 기준' : '';
+            const imgHtml = product.image_url
+                ? '<img src="' + escapeAttr(product.image_url) + '" alt="' + escapeAttr(product.name || '') + '"/>'
+                : '<div class="p5-image-fallback">이미지를 가져올 수 없습니다</div>';
+
+            let verdictHtml = '';
+            if (verdict.color && verdict.label) {
+                const mainTxt = (verdict.one_liner_main || verdict.one_liner || '').trim();
+                const subTxt = (verdict.one_liner_sub || '').trim();
+                verdictHtml = '<div class="p5-verdict ' + verdict.color + '" style="display:flex">'
+                    + '<div class="p5-verdict-icon">✓</div>'
+                    + '<p class="p5-verdict-label">▸ ' + escapeHtml(verdict.label) + '</p>'
+                    + '<p class="p5-verdict-desc">'
+                    +   (mainTxt ? '<span class="p5-verdict-desc-main">' + escapeHtml(mainTxt) + '</span>' : '')
+                    +   (subTxt  ? '<span class="p5-verdict-desc-sub">'  + escapeHtml(subTxt)  + '</span>' : '')
+                    + '</p>'
+                    + '</div>';
+            }
+
+            function renderItems(items, icon) {
+                if (!items || !items.length) return '<div class="p5-item muted">데이터 부족</div>';
+                return items.map(it => {
+                    const freq = (it.n != null && it.total != null) ? (it.n + '/' + it.total) : '';
+                    return '<div class="p5-item">'
+                        + '<div class="p5-bullet"><span class="p5-icon">' + icon + '</span><span>'
+                        +   escapeHtml(it.label || '') + '</span></div>'
+                        + '<span class="p5-freq">' + freq + '</span>'
+                        + '</div>';
+                }).join('');
+            }
+
+            const caveatHtml = d.caveat
+                ? '<div class="p5-caveat" style="display:flex"><div class="p5-caveat-i">i</div><div>' + escapeHtml(d.caveat) + '</div></div>'
+                : '';
+            const gaugeConsCls = verdict.color ? ' ' + verdict.color : '';
+            const scoreLabel = isFinite(scoreNum) ? scoreNum.toFixed(1) + '<small>/10</small>' : '—<small>/10</small>';
+            const detailHref = product.product_id ? '/products/' + product.product_id : '#';
+
+            return (
+                (metaLine ? '<div class="p5-meta-line">' + escapeHtml(metaLine) + '</div>' : '')
+                + '<div class="p5-modal-top">'
+                +   '<div class="p5-product-info">'
+                +     '<div class="p5-image-box">' + imgHtml + '</div>'
+                +     '<div class="p5-meta">'
+                +       '<h2 class="p5-name">' + escapeHtml(product.name || '') + '</h2>'
+                +       (d.spec_display ? '<p class="p5-spec">' + escapeHtml(d.spec_display) + '</p>' : '')
+                +       '<p class="p5-price">' + escapeHtml(d.price_display || '가격 정보 없음') + '</p>'
+                +     '</div>'
+                +   '</div>'
+                +   verdictHtml
+                +   '<div class="p5-gauge-area">'
+                +     '<div class="p5-gauge">'
+                +       '<svg viewBox="0 0 120 120">'
+                +         '<circle class="ring-bg" cx="60" cy="60" r="50"></circle>'
+                +         '<circle class="ring-fg" cx="60" cy="60" r="50" '
+                +           'stroke-dasharray="' + C.toFixed(2) + '" '
+                +           'stroke-dashoffset="' + dashOffset + '" '
+                +           'style="stroke: ' + stroke + '"></circle>'
+                +       '</svg>'
+                +       '<div class="p5-gauge-score">' + scoreLabel + '</div>'
+                +       '<div class="p5-gauge-cons' + gaugeConsCls + '">⊙ 구매판정</div>'
+                +     '</div>'
+                +   '</div>'
+                + '</div>'
+                + '<div class="p5-grid">'
+                +   '<div class="p5-card-pros">'
+                +     '<p class="p5-card-title">👍 확실한 장점</p>'
+                +     '<div>' + renderItems(d.pros, '✓') + '</div>'
+                +   '</div>'
+                +   '<div class="p5-card-cons">'
+                +     '<p class="p5-card-title">⚠ 확실한 단점</p>'
+                +     '<div>' + renderItems(d.cons, '⊖') + '</div>'
+                +   '</div>'
+                + '</div>'
+                + caveatHtml
+                // Q1 — "유사 제품 비교하기" 버튼 제외. 상세 보기 버튼만 (anchor).
+                //   CSS 의 `.p5-similar-popup .p5-btn-secondary { display: none !important; }`
+                //   가 추가 안전망(혹시 다른 곳에서 비교 버튼 끼어들어도 차단).
+                + '<div class="p5-actions">'
+                +   '<a class="p5-btn p5-btn-primary" href="' + escapeAttr(detailHref) + '">상세 보고서 보기 →</a>'
+                + '</div>'
+            );
         }
 
         // escapeAttr — escapeHtml 과 동일 (속성 컨텍스트도 같은 이스케이프로 충분)
         function escapeAttr(s) { return escapeHtml(s); }
-
-        // ── feature/similar-products 후속 보강: ?auto_insight=1 자동 모달 ──
-        //   유사 카드 클릭 / 외부 BG 토스트 [결과 보러 가기] 로 진입 시 영상
-        //   리스트 화면을 보여주지 않고 곧장 인사이트 모달. 직접 URL 진입은
-        //   파라미터 없으므로 발동 안 함(시나리오 ③ 회귀 0).
-        function _triggerAutoInsight() {
-            // 1) 인사이트 모드 즉시 진입 — 영상 섹션 숨김 + 뒤로가기 라벨 토글
-            if (typeof _enterInsightMode === 'function') {
-                _enterInsightMode();
-            }
-            // 2) 종합 인사이트 자동 호출 — 사용자 클릭과 동일한 흐름
-            //    (캐시 분기·로딩 진행 바·모달 우선 표시 모두 그대로)
-            if (typeof runIntegratedInsight === 'function') {
-                runIntegratedInsight();
-            }
-        }
-        (function _handleAutoInsightOnLoad() {
-            try {
-                const url = new URL(window.location.href);
-                if (url.searchParams.get('auto_insight') !== '1') return;
-                // URL 정리 (한 번만 실행 — 새로고침 안전, 시나리오 ④)
-                url.searchParams.delete('auto_insight');
-                history.replaceState(null, '', url.toString());
-
-                if (document.readyState === 'loading') {
-                    document.addEventListener('DOMContentLoaded', _triggerAutoInsight);
-                } else {
-                    _triggerAutoInsight();
-                }
-            } catch (e) {
-                // URL 파싱·history 호환 실패는 무시 — 사용자가 수동으로 클릭 가능
-                console.warn('[auto_insight] handler skipped:', e);
-            }
-        })();
         // 닫기 3가지(사용자 결정 12): X / ESC / 상세 보고서 보기
         document.addEventListener('DOMContentLoaded', () => {
             const cb = document.getElementById('p5CloseBtn');
@@ -3661,17 +3685,5 @@
         });
     </script>
 
-    <!-- feature/similar-products: 백그라운드 자동 분석 진행 표시 + 완료 토스트 -->
-    <div id="bgProgress" class="bg-progress" aria-hidden="true" role="status">
-        <span class="bg-progress-spinner">🔄</span>
-        <span class="bg-progress-text"></span>
-        <button class="bg-progress-cancel" type="button" onclick="cancelBgTask()" title="분석 취소">✕</button>
-    </div>
-    <div id="bgToast" class="bg-toast" aria-hidden="true" role="status">
-        <span class="bg-toast-check">✓</span>
-        <span class="bg-toast-text"></span>
-        <button class="bg-toast-go" type="button" onclick="goToBgResult()">결과 보러 가기</button>
-        <button class="bg-toast-close" type="button" onclick="hideBgToast()" title="닫기">✕</button>
-    </div>
 </body>
 </html>
