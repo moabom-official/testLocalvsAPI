@@ -7,8 +7,9 @@
 """
 from __future__ import annotations
 
+import re
 from time import time
-from typing import Optional
+from typing import Dict, Optional, Tuple
 
 # ── 동적 인기 제품 한 줄 (5분 메모리 캐시) ──────────────────────
 _POPULAR_CACHE: dict = {"value": None, "ts": 0.0}
@@ -40,10 +41,30 @@ def get_popular_products_tip() -> Optional[str]:
                AND ue.ts >= NOW() - INTERVAL '7 days'
              GROUP BY tp.name
              ORDER BY hits DESC
-             LIMIT 3
+             LIMIT 10
             """
         )
-        names = [r["name"] for r in (rows or []) if r.get("name")]
+        # ★ 정규화 중복 제거 — 운영 DB 의 "아이폰17" 과 "아이폰 17" 처럼
+        #   공백/대소문자만 다른 행이 갈라져 표시되는 문제 해소.
+        #   첫 등장 이름이 대표(= ORDER BY hits DESC 라 hits 가 더 많음).
+        #   누적 hits 로 재정렬해 상위 3개 채택. LIMIT 10 까지 후보 확장.
+        seen: Dict[str, Tuple[str, int]] = {}
+        for r in rows or []:
+            name = r.get("name")
+            if not name:
+                continue
+            try:
+                hits = int(r.get("hits") or 0)   # psycopg2 가 Decimal 반환 대비
+            except (TypeError, ValueError):
+                hits = 0
+            key = re.sub(r"\s+", "", str(name)).lower()
+            if key in seen:
+                rep_name, prev_hits = seen[key]
+                seen[key] = (rep_name, prev_hits + hits)
+            else:
+                seen[key] = (name, hits)
+        top = sorted(seen.values(), key=lambda x: -x[1])[:3]
+        names = [n for n, _ in top]
         if names:
             joined = ", ".join(names)
             tip = f"최근 MOABOM에서 많이 찾아본 제품: {joined}"
