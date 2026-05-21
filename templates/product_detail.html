@@ -880,6 +880,49 @@
             .sel-overlay-card { min-width: 0; width: calc(100vw - 32px); padding: 24px; }
         }
 
+        /* ── feature/loading-tips: 로딩 카드 하단 TIP 박스 (5초 슬라이드 회전) ── */
+        .sel-tip-box {
+            margin-top: 20px;
+            background: var(--primary-soft);
+            border-radius: 12px;
+            padding: 12px 16px;
+            text-align: left;
+        }
+        .sel-tip-label {
+            display: inline-block;
+            background: var(--primary);
+            color: #fff;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 3px 9px;
+            border-radius: 999px;
+            margin-bottom: 8px;
+            letter-spacing: 0.4px;
+        }
+        .sel-tip-slider {
+            overflow: hidden;
+            position: relative;
+            min-height: 1.6em;
+        }
+        .sel-tip-text {
+            font-size: 13px;
+            line-height: 1.5;
+            color: var(--text);
+            transition: transform 0.4s ease, opacity 0.4s ease;
+            will-change: transform, opacity;
+        }
+        /* Slide up: 현재 텍스트는 위로 페이드아웃 */
+        .sel-tip-text.slide-out {
+            transform: translateY(-12px);
+            opacity: 0;
+        }
+        /* 새 텍스트 시작 위치 — 아래에서 진입. transition 잠시 끔. */
+        .sel-tip-text.slide-in-start {
+            transform: translateY(12px);
+            opacity: 0;
+            transition: none;
+        }
+
         /* ── Per-card inline progress bar + badge ──────────── */
         .video-card .vc-progress {
             position: absolute; top: 0; left: 0; right: 0; height: 3px;
@@ -1440,6 +1483,13 @@
             <div class="sel-step" data-step="1"><span class="icon">1</span><span>YouTube 후보 영상 수집</span></div>
             <div class="sel-step" data-step="2"><span class="icon">2</span><span>AI 영상 선정 + 다양성 평가</span></div>
             <div class="sel-step" data-step="3"><span class="icon">3</span><span>댓글 수집 및 감성 분석</span></div>
+            <!-- feature/loading-tips: 영상 선정 로딩의 TIP 박스 — 5초 슬라이드 회전 -->
+            <div class="sel-tip-box" id="selTipBox">
+                <span class="sel-tip-label">TIP</span>
+                <div class="sel-tip-slider">
+                    <div class="sel-tip-text" id="selTipText"></div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -1456,6 +1506,13 @@
             </div>
             <div class="sel-step" data-pir-step="1"><span class="icon">1</span><span>영상별 자막 수집 및 자막 기반 보고서 생성</span></div>
             <div class="sel-step" data-pir-step="2"><span class="icon">2</span><span>7섹션 통합 인사이트 보고서 합성</span></div>
+            <!-- feature/loading-tips: 종합 인사이트 로딩의 TIP 박스 — 5초 슬라이드 회전 -->
+            <div class="sel-tip-box" id="pirTipBox">
+                <span class="sel-tip-label">TIP</span>
+                <div class="sel-tip-slider">
+                    <div class="sel-tip-text" id="pirTipText"></div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -1502,6 +1559,115 @@
             document.getElementById('selectConfig').classList.toggle('show');
         }
 
+        // ── feature/loading-tips: 로딩 카드 하단 TIP 슬라이드 (5초 간격) ──
+        // ★ 후속 보강 — 정적 풀 23개를 JS 가 *진실의 원천*으로 보유.
+        //   fetch 가 실패해도 빈 박스 없이 100% 동작. fetch 성공 시 동적
+        //   한 줄(인기 제품)만 풀에 push. 정적 풀 수정 시 이 배열만 수정 —
+        //   백엔드(_loading_tips.py)에는 정적 풀 없음.
+        window._tipPool = window._tipPool || [
+            // 어원·정체성
+            "MOABOM은 '모아서 봄' — 흩어진 리뷰를 한 곳에 모아 보여드려요.",
+            "수많은 리뷰어의 의견을 *모아* 한 번에 *봄* — MOABOM의 이름이 담은 뜻이에요.",
+            "유튜브 리뷰 정보를 *모아*서 *보는* 서비스, MOABOM입니다.",
+            "리뷰 영상의 핵심을 한눈에 — 그것이 MOABOM의 모토예요.",
+            // 차별점·가치
+            "MOABOM은 한 번에 수십 개 리뷰 영상을 분석합니다.",
+            "리뷰어 자막과 시청자 댓글을 함께 비교해 진짜 평가를 보여드려요.",
+            "한 명의 리뷰어보다 여러 리뷰어의 합의가 더 신뢰할 수 있어요.",
+            "MOABOM은 리뷰어와 시청자, 양쪽 시선을 모두 담아 비교해드립니다.",
+            "광고와 진짜 후기를 구분하는 AI 분석이 MOABOM의 핵심이에요.",
+            "여러 영상을 종합하면 한 채널의 편향에서 자유로워질 수 있어요.",
+            // 사용 팁
+            "분석할 영상이 많을수록 보고서의 신뢰성이 높아져요.",
+            "댓글에서 반복되는 표현은 실제 사용자 인식의 핵심일 가능성이 높아요.",
+            "장점·단점은 빈도수까지 함께 보면 더 정확한 판단이 가능해요.",
+            "리뷰어 의견과 댓글의 합의가 일치하면 그 정보는 더 신뢰할 수 있어요.",
+            "유사 제품 비교하기로 다른 제품과 한 번에 비교해보세요.",
+            "종합 인사이트는 영상 2개 이상에서 신뢰성이 높아져요.",
+            // 친근한 메시지
+            "잠시만 기다려주세요. 곧 결과를 보여드릴게요.",
+            "수십 개의 리뷰를 꼼꼼히 모으는 중이에요.",
+            "리뷰어들의 진짜 평가를 분석하는 중입니다.",
+            "유튜브의 수많은 의견을 정리하는 중이에요. 거의 다 됐어요.",
+            // 재미·인사이트
+            "리뷰 영상 1개의 자막은 평균 1만 자 정도예요. MOABOM이 한 번에 처리합니다.",
+            "테크 리뷰는 짧게는 5분, 길게는 30분. MOABOM이 핵심만 뽑아드려요.",
+            "댓글은 시청자의 직접적인 목소리예요. MOABOM은 그것도 빠뜨리지 않아요.",
+        ];
+        window._tipCtx = window._tipCtx || {};   // textElId → { index, interval }
+        window._tipShuffled = false;             // Fisher-Yates 1회만 보장
+
+        // 동적 인기 제품 한 줄을 *백그라운드* fetch → 풀에 push. await 안 함.
+        // 첫 시도에서도 정적 풀이 *항상 있으므로* 빈 박스 0건.
+        function _loadDynamicTip() {
+            if (window._tipDynamicLoaded) return;
+            window._tipDynamicLoaded = true;     // 중복 호출 차단
+            fetch('/loading-tips')
+                .then(r => r.ok ? r.json() : null)
+                .then(d => {
+                    const dyn = d && d.dynamic_tip;
+                    if (dyn && typeof dyn === 'string') {
+                        window._tipPool.push(dyn);
+                    }
+                })
+                .catch(() => { /* 조용히 무시 — 정적 23개로 충분 */ });
+        }
+        // 페이지 진입 시 백그라운드 로딩
+        document.addEventListener('DOMContentLoaded', _loadDynamicTip);
+
+        function startTipRotation(textElId) {
+            const el = document.getElementById(textElId);
+            if (!el) return;
+
+            // 첫 호출 시에만 Fisher-Yates 셔플 (페이지 동안 같은 순서 유지)
+            if (!window._tipShuffled) {
+                const arr = window._tipPool;
+                for (let i = arr.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [arr[i], arr[j]] = [arr[j], arr[i]];
+                }
+                window._tipShuffled = true;
+            }
+
+            // 재시작 안전
+            stopTipRotation(textElId);
+
+            // 정적 풀은 *항상 있음* — 첫 문장 즉시 표시 (슬라이드 없이)
+            const ctx = { index: 0, interval: null };
+            el.classList.remove('slide-out', 'slide-in-start');
+            el.textContent = window._tipPool[0];
+
+            ctx.interval = setInterval(() => {
+                ctx.index = (ctx.index + 1) % window._tipPool.length;
+                _slideToNext(el, window._tipPool[ctx.index]);
+            }, 5000);
+            window._tipCtx[textElId] = ctx;
+        }
+
+        function stopTipRotation(textElId) {
+            const ctx = window._tipCtx[textElId];
+            if (!ctx) return;
+            if (ctx.interval) clearInterval(ctx.interval);
+            delete window._tipCtx[textElId];
+        }
+
+        function _slideToNext(el, newText) {
+            // 1) 현재 텍스트 — 위로 페이드 아웃
+            el.classList.add('slide-out');
+            setTimeout(() => {
+                // 2) 텍스트 교체 + 아래에서 시작 위치 (transition 끔)
+                el.classList.remove('slide-out');
+                el.classList.add('slide-in-start');
+                el.textContent = newText;
+                // 3) 두 프레임 뒤 시작 위치 해제 → 자연스럽게 제자리로 슬라이드
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        el.classList.remove('slide-in-start');
+                    });
+                });
+            }, 400);   // CSS transition 시간과 일치
+        }
+
         // ── Selection progress overlay helpers ─────────────
         let selStepTimers = [];
         function showSelOverlay(steps, estimatedMs, title, sub, labels) {
@@ -1521,6 +1687,7 @@
                 }
             });
             overlay.classList.add('show');
+            startTipRotation('selTipText');   // feature/loading-tips
 
             activateStep(stepEls[0]);
             const stepDuration = estimatedMs / steps;
@@ -1552,6 +1719,7 @@
                 if (s.style.display !== 'none') completeStep(s);
             });
             setTimeout(() => overlay.classList.remove('show'), 600);
+            stopTipRotation('selTipText');   // feature/loading-tips
         }
 
         async function runSelection() {
@@ -1864,6 +2032,7 @@
 
             overlay.classList.add('show');
             overlay.setAttribute('aria-hidden', 'false');
+            startTipRotation('pirTipText');   // feature/loading-tips
 
             // Step transitions: step 1 = 0~40% of time, step 2 = 40~100%
             pirStepTimers.forEach(clearTimeout);
@@ -1917,6 +2086,7 @@
             setTimeout(() => {
                 overlay.classList.remove('show');
                 overlay.setAttribute('aria-hidden', 'true');
+                stopTipRotation('pirTipText');   // feature/loading-tips
                 // Reset for next run
                 fill.style.width = '0%';
                 pct.textContent = '0%';
