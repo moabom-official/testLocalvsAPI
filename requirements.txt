@@ -1,19 +1,19 @@
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-psycopg2-binary==2.9.9
-httpx==0.25.2
-requests==2.33.1
-python-dotenv==1.0.0
-jinja2==3.1.2
-youtube-transcript-api==0.6.1
-yt-dlp==2026.3.17
-textblob==0.17.1
-reportlab==4.0.7
-anthropic==0.23.1
-openai>=1.50.0
-markdown==3.5.1
-langgraph>=0.2.0
-langchain-core>=0.3.0
-langchain-openai>=0.2.0,<1.0.0
-emoji>=2.0.0
-google-api-python-client>=2.0.0
+# =========================================================================
+# 비교 도구 (testLocalvsAPI) 의존성 — 운영 코드 의존성은 제거됨.
+# =========================================================================
+
+# API 분류기 (OptimizedBatchClassifier — GPT-4.1 via RunYourAI)
+langchain-openai>=0.2
+
+# YouTube Data API v3 (댓글 fetch + 영상 검색)
+google-api-python-client>=2.100
+
+# .env 자동 로드
+python-dotenv>=1.0
+
+# Local 분류기 (KLUE-RoBERTa-large) — CUDA 12.x 의 경우 별도:
+#   pip install torch --index-url https://download.pytorch.org/whl/cu121
+torch>=2.1
+transformers>=4.40
+sentencepiece
+numpy

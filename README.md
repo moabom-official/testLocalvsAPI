@@ -1,120 +1,62 @@
-# Moabom Prototype
+# testLocalvsAPI
 
-유튜브 테크 제품 리뷰 영상을 수집해 자막과 댓글을 분석하고, 리뷰어와 소비자 의견을 비교한 통합 보고서를 생성하는 FastAPI 서비스.
+댓글 분류기 backend 두 가지를 같은 댓글 셋으로 비교하는 도구.
 
-## 동작 흐름
-
-```
-제품 등록 → YouTube 영상/댓글 수집 → 자막 추출 → LLM 보고서 3종 생성
-                                                ├─ 자막 기반 리뷰어 분석
-                                                ├─ 댓글 기반 소비자 반응
-                                                └─ 통합 분석 (의견 일치도 %)
-```
+| Backend | 모델 |
+|---|---|
+| **API** | GPT-4.1 (openai/gpt-4.1-2025-04-14) via RunYourAI |
+| **Local** | KLUE-RoBERTa-large 3-class (자체 학습, test macro F1 0.917) |
 
 ## 빠른 시작
 
-### 1. 사전 준비
+```bash
+git clone https://github.com/moabom-official/testLocalvsAPI.git
+cd testLocalvsAPI
 
-- Python 3.12+
-- Docker Desktop
-- API 키 2개:
-  - [YouTube Data API v3](https://console.cloud.google.com/apis/credentials)
-  - [Groq Console](https://console.groq.com/keys)
-
-### 2. 환경 설정
-
-```powershell
-cd Moabom_Prototype
-
-python -m venv .venv
-.venv\Scripts\Activate.ps1
+# 의존성
 pip install -r requirements.txt
+
+# 환경변수
+cp .env.example .env
+# RUNYOURAI_API_KEY, YOUTUBE_API_KEY 채우기
+
+# 학습된 모델 가중치 배포 (별도)
+# → local_classifier/artifacts/3_labels/klue__roberta-large/model/best/
+
+# 비교 실행
+python -m scripts.benchmark.run_agent_comparison --product "갤럭시 S25"
 ```
 
-`.env` 파일에 API 키를 입력합니다 (DATABASE_URL은 docker 사용 시 기본값 그대로 두면 됩니다):
+자세한 사용법 / 모델 정보 / 트러블슈팅:
+
+> **→ [scripts/benchmark/README.md](scripts/benchmark/README.md)**
+
+## 리포 구조
 
 ```
-YOUTUBE_API_KEY=...
-GROQ_API_KEY=...
+testLocalvsAPI/
+├── scripts/benchmark/
+│   ├── run_agent_comparison.py   # ⭐ 제품명 입력 → 자동 비교
+│   ├── compare_classifiers.py    # video_id 지정 비교
+│   ├── agent_helpers.py          # fetch/preprocess/select (sync.py 소량 추출)
+│   └── README.md                 # 상세 가이드
+├── comment_filtering_agent/      # 7-step 댓글 필터 agent (운영 동일)
+│   ├── classifiers/              # API 분류기 (OptimizedBatchClassifier)
+│   ├── filters/                  # 규칙 필터
+│   └── services/                 # YouTube 댓글 수집
+├── local_classifier/             # KLUE-RoBERTa 학습 + 추론
+│   ├── classifier.py             # 추론 wrapper + VR 키워드 매칭
+│   ├── keywords.py               # PRODUCT_ASPECT_KEYWORDS
+│   └── train.py / evaluate.py
+├── requirements.txt
+└── .env.example
 ```
 
-### 3. 실행
+## 운영 코드 의존성 0
 
-```powershell
-docker compose up -d postgres   # PostgreSQL 컨테이너 기동
-python main.py                  # FastAPI 서버 (기본 :8000)
-```
+비교 도구는 운영 본체 (FastAPI / DB / templates / video_selection_agent / regression 등)에 의존하지 않음. 단일 리포로 충분.
 
-브라우저에서 http://localhost:8000/products 접속.
+-  가 운영  의 필요 로직만 자체 복제
+-  와  는 self-contained 패키지
 
-### 4. 종료
-
-```powershell
-# 서버: Ctrl+C
-docker compose stop postgres   # DB 컨테이너 정지 (데이터 유지)
-docker compose down -v         # 데이터까지 완전 삭제
-```
-
-## 프로젝트 구조
-
-```
-Moabom_Prototype/
-├── main.py                       # FastAPI 진입점
-├── scripts/                      # 운영 본체
-│   ├── config.py                 #   환경변수 로딩
-│   ├── api/                      #   FastAPI 라우터 (products / videos / sync)
-│   ├── database/                 #   PostgreSQL 연결 / 스키마 / 쿼리 헬퍼
-│   ├── youtube/                  #   YouTube API + yt-dlp 자막 추출
-│   ├── analysis/                 #   감정분석 / 제품 관련도 필터
-│   ├── reports/                  #   Groq Llama 보고서 생성 + PDF 출력
-│   └── utils/                    #   LLM 프롬프트 템플릿
-├── templates/                    # Jinja2 HTML
-├── comment_filtering_agent/      # 차세대 댓글 필터 Agent (개발 중, 운영 미연결)
-├── app/  services/  dags/  llm/  # 병렬 리팩터링/실험 모듈 (운영 미연결)
-├── docs/                         # 설계 문서, 분석 보고서, 과제 기획서
-├── docker-compose.yml            # PostgreSQL 컨테이너 정의
-├── Dockerfile                    # FastAPI 앱 이미지
-└── requirements.txt              # Python 의존성
-```
-
-## 주요 환경변수 (.env)
-
-| 키 | 설명 | 기본값 |
-|---|---|---|
-| `DATABASE_URL` | PostgreSQL 연결 문자열 | `postgresql://postgres:postgres@localhost:5432/techdb` |
-| `YOUTUBE_API_KEY` | YouTube Data API v3 키 | (필수) |
-| `GROQ_API_KEY` | Groq API 키 | (필수) |
-| `GROQ_MODEL` | Llama 모델명 | `llama-3.3-70b-versatile` |
-| `PORT` | FastAPI 포트 | `8000` |
-
-## 기술 스택
-
-- **Backend**: FastAPI, uvicorn
-- **DB**: PostgreSQL 15 (psycopg2)
-- **외부 API**: YouTube Data API v3, Groq (Llama 3.3 70B)
-- **자막**: yt-dlp + requests (json3 / vtt 직접 파싱)
-- **PDF**: ReportLab + 맑은 고딕
-
-## 데이터베이스 스키마
-
-서버 시작 시 [scripts/database/schema.py](scripts/database/schema.py)가 자동 생성합니다.
-
-- `tech_products` — 등록한 제품
-- `videos` — 제품별 수집된 영상
-- `comments` / `comment_sentiments` — 댓글 + 감정 라벨
-- `video_transcripts` — 자막 캐시
-- `video_reports` — LLM 생성 보고서 3종 캐시
-
-## 트러블슈팅
-
-| 증상 | 해결 |
-|---|---|
-| `connection refused` | `docker compose up -d postgres` 실행 |
-| `ModuleNotFoundError` | venv 활성화 / `pip install -r requirements.txt` |
-| YouTube 403 | API 키 또는 일일 할당량(10,000 units) 확인 |
-| Groq `model_not_found` | `.env`의 `GROQ_MODEL`을 [최신 지원 모델](https://console.groq.com/docs/models)로 변경 |
-| 포트 8000 충돌 | `python main.py 8001` |
-
-## 참고 문서
-
-- [docs/COMMENT_FILTERING_AGENT_DESIGN.md](docs/COMMENT_FILTERING_AGENT_DESIGN.md) — 차세대 댓글 필터 Agent 설계
+> 운영 본체에 backend swap 적용은 [Moabom_Prototype 의 APIvsLOCAL 브랜치](https://github.com/moabom-official/Moabom_Prototype/tree/APIvsLOCAL) 참고.

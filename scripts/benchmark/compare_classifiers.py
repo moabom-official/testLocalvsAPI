@@ -56,8 +56,8 @@ def fetch_and_select(video_id: str, product_name: str, max_comments: int) -> lis
     reply_count / published_ts. (sync.py 가 select 단계로 넘기는 candidate
     스키마와 동일.)
     """
-    from scripts.api.sync import (
-        YOUTUBE_API_KEY,
+    import os
+    from scripts.benchmark.agent_helpers import (
         RAW_COMMENT_FETCH_LIMIT,
         MAX_COMMENT_CHARS,
         _preprocess_comments,
@@ -68,6 +68,7 @@ def fetch_and_select(video_id: str, product_name: str, max_comments: int) -> lis
     from comment_filtering_agent.filters.rule_based_filter import RuleBasedFilter
     from comment_filtering_agent.filters.models import RuleConfig
 
+    YOUTUBE_API_KEY = os.environ.get("YOUTUBE_API_KEY", "")
     if not YOUTUBE_API_KEY:
         raise RuntimeError("YOUTUBE_API_KEY 환경변수 필수.")
 
@@ -345,7 +346,7 @@ def main() -> None:
         print("[error] 후보 댓글 0건. 비교 중단.")
         return
 
-    texts = [c.get("comment_text", c.get("text", "")) for c in candidates]
+    texts = [c.get("comment_text") or c.get("text") or "" for c in candidates]
 
     api_bench = bench_api(texts) if not args.skip_api else None
     local_bench = bench_local(texts) if not args.skip_local else None

@@ -1,3 +1,0 @@
-# 개발/테스트 전용 의존성 (운영 requirements.txt 와 분리).
-# 보고서 양식 회귀 안전망(regression/) 테스트 실행용.
-pytest>=7.4,<9
