@@ -4,8 +4,14 @@ Conforms to ``BaseCommentClassifier`` from
 ``comment_filtering_agent.classifiers.classifier_interface`` so the cascade
 router can swap it for the existing API classifier with zero pipeline changes.
 
-Outputs 4-class labels: PRODUCT_OPINION / VIDEO_REACTION / QUESTION / NOISE.
-NOISE 는 양성 클래스로 직접 학습됨 (softmax + argmax 단순 분류).
+Outputs 3-class labels: PRODUCT_OPINION / VIDEO_REACTION / QUESTION.
+구 NOISE / CHATTER / OFF_TOPIC 는 모두 VIDEO_REACTION 으로 흡수되어 학습.
+
+VR 로 분류된 댓글은 후처리로 ``mentioned_product_features`` 를 채워준다
+(``local_classifier.keywords.PRODUCT_ASPECT_KEYWORDS`` 기반 substring 매칭).
+이는 agent.py 의 ``_handle_video_reaction`` 가 features >= 2 면 ANALYZE
+승격하는 로직을 살리기 위함. API 분류기 (GPT-4.1) 는 프롬프트로 자동
+채워지지만 Local 은 분류만 하므로 명시적 후처리 필요.
 """
 from __future__ import annotations
 
@@ -15,6 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from local_classifier import config as C
+from local_classifier.keywords import extract_mentioned_features
 
 logger = logging.getLogger(__name__)
 
@@ -57,17 +64,32 @@ class LocalRobertaClassifier:
             self.model_path, self.device, self.use_bf16,
         )
 
-    def _to_result(self, label_id: int, confidence: float, latency_ms: float):
+    def _to_result(
+        self,
+        label_id: int,
+        confidence: float,
+        latency_ms: float,
+        text: str = "",
+    ):
         from comment_filtering_agent.classifiers.classifier_interface import (
             ClassificationResult,
         )
         label = C.ID2LABEL[int(label_id)]
+
+        # VR 로 분류된 댓글에 한해 제품 속성 키워드 추출.
+        # agent.py 의 _handle_video_reaction 가 features >= 2 면 ANALYZE 승격.
+        # 다른 라벨 (PO/Q) 은 이미 ANALYZE/AUXILIARY_STORE 라 매칭 불필요.
+        if label == "VIDEO_REACTION" and text:
+            mentioned = extract_mentioned_features(text)
+        else:
+            mentioned = []
+
         return ClassificationResult(
             label=label,
             confidence=float(confidence),
             rationale_short=f"local roberta (conf {confidence:.2f})",
             needs_recheck=(confidence < C.ROUTER_TAU_HIGH),
-            mentioned_product_features=[],
+            mentioned_product_features=mentioned,
             is_product_related=(label in {"PRODUCT_OPINION", "QUESTION"}),
             classifier_used="local-roberta",
             latency_ms=float(latency_ms),
@@ -97,7 +119,7 @@ class LocalRobertaClassifier:
         preds, confs = self._predict([comment])
         lat = (time.time() - t0) * 1000
         self._record(lat, 1)
-        return self._to_result(preds[0], confs[0], lat)
+        return self._to_result(preds[0], confs[0], lat, text=comment)
 
     def classify_batch(self, comments: list[str]):
         if not comments:
@@ -107,7 +129,10 @@ class LocalRobertaClassifier:
         lat = (time.time() - t0) * 1000
         per = lat / len(comments)
         self._record(lat, len(comments))
-        return [self._to_result(p, c, per) for p, c in zip(preds, confs)]
+        return [
+            self._to_result(p, c, per, text=t)
+            for t, p, c in zip(comments, preds, confs)
+        ]
 
     def _record(self, latency_ms: float, n: int) -> None:
         prev_n = self.stats["total_calls"]
