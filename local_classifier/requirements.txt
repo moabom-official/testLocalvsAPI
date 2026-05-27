@@ -1,0 +1,12 @@
+# Pin loosely — pick CUDA build of torch per server.
+# On A40 (CUDA 12.x) install with:
+#   pip install torch --index-url https://download.pytorch.org/whl/cu121
+torch>=2.1
+transformers>=4.40
+sentencepiece
+numpy
+
+# mine_noise.py only (GPT-4.1 teacher via RunYourAI 게이트웨이 마이닝).
+# 학습/추론 자체에는 불필요.
+langchain-openai>=0.2
+google-api-python-client>=2.100   # --mode youtube 에서 YouTube Data API v3 호출

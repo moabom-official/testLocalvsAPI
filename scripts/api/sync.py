@@ -368,10 +368,19 @@ def process_comments_with_agent(video_id, product_name):
     ))
 
     from comment_filtering_agent.analyzers.models import AnalyzerConfig
-    classifier = OptimizedBatchClassifier(
-        batch_size=CLASSIFICATION_BATCH_SIZE,
-        confidence_threshold=0.75,
-    )
+    # CLASSIFIER_BACKEND 환경변수로 API (GPT-4.1) vs Local (KLUE-RoBERTa) swap.
+    # 운영 기본은 "api" — local 채택 시 환경변수 "local" 명시.
+    classifier_backend = os.environ.get("CLASSIFIER_BACKEND", "api").lower()
+    if classifier_backend == "local":
+        from local_classifier.classifier import LocalRobertaClassifier
+        classifier = LocalRobertaClassifier(use_gpu=True)
+        print(f"[AGENT] CLASSIFIER_BACKEND=local  model={classifier.model_path}")
+    else:
+        classifier = OptimizedBatchClassifier(
+            batch_size=CLASSIFICATION_BATCH_SIZE,
+            confidence_threshold=0.75,
+        )
+        print(f"[AGENT] CLASSIFIER_BACKEND=api  GPT-4.1 via RunYourAI")
 
     agent = AgentDecisionEngine()
 
