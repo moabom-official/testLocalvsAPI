@@ -148,7 +148,7 @@ def run_comparison(
     if not candidates:
         raise SystemExit("[error] 후보 댓글 0건 (댓글 비활성 또는 fetch 실패)")
 
-    texts = [c.get("comment_text", c.get("text", "")) for c in candidates]
+    texts = [c.get("comment_text") or c.get("text") or "" for c in candidates]
 
     # 3) 분류 — backend 별
     api_bench = None if skip_api else bench_api(texts)
@@ -157,7 +157,7 @@ def run_comparison(
     # 4) 댓글별 결과 dict 구성
     rows = []
     for i, c in enumerate(candidates):
-        text = c.get("comment_text", c.get("text", ""))
+        text = c.get("comment_text") or c.get("text") or ""
         row = {
             "rank": i + 1,
             "comment_id": c.get("comment_id"),

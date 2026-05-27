@@ -50,12 +50,19 @@ if str(REPO_ROOT) not in sys.path:
 # ---------------------------------------------------------------------------
 
 def fetch_and_select(video_id: str, product_name: str, max_comments: int) -> list[dict]:
-    """sync.process_comments_with_agent 의 Step 1~4 를 재현 (DB write 없이)."""
+    """sync.process_comments_with_agent 의 Step 1~4 를 재현 (DB write 없이).
+
+    반환: 각 원소는 평면 dict — comment_id / comment_text / like_count /
+    reply_count / published_ts. (sync.py 가 select 단계로 넘기는 candidate
+    스키마와 동일.)
+    """
     from scripts.api.sync import (
         YOUTUBE_API_KEY,
         RAW_COMMENT_FETCH_LIMIT,
+        MAX_COMMENT_CHARS,
         _preprocess_comments,
         _select_comments_multicriteria,
+        _to_timestamp,
     )
     from comment_filtering_agent.services.comment_collector import YouTubeCommentCollector
     from comment_filtering_agent.filters.rule_based_filter import RuleBasedFilter
@@ -74,24 +81,41 @@ def fetch_and_select(video_id: str, product_name: str, max_comments: int) -> lis
     print("[2] Preprocess (dedup + flags)...")
     rows, _diag = _preprocess_comments(raw, video_id)
     print(f"    preprocessed: {len(rows)}")
+    if not rows:
+        return []
 
-    print("[3] Rule filter (PASS only)...")
+    print("[3] Rule filter (PASS only) + 스키마 변환...")
     rule_filter = RuleBasedFilter(config=RuleConfig(
         enable_url_check=False,
         enable_duplicate_check=False,
         max_repeated_char_ratio=0.7,
     ))
-    rule_passed: list[dict] = []
+    # sync.py 의 candidate_comments 와 같은 평면 dict 로 변환.
+    # _select_comments_multicriteria 가 요구하는 키: comment_text, published_ts, like_count, reply_count, comment_id
+    candidates: list[dict] = []
     for i, row in enumerate(rows):
-        text = row.get("comment_text") or row.get("text") or ""
-        res = rule_filter.filter_single(text, index=i)
-        if res.is_passed:
-            rule_passed.append(row)
-    print(f"    rule passed: {len(rule_passed)}")
+        comment_text = row.get("text_cleaned") or str(row.get("text") or "").strip()
+        if not comment_text:
+            continue
+        res = rule_filter.filter_single(comment_text, index=i)
+        if not res.is_passed:
+            continue
+        candidates.append({
+            "comment_id": row["comment_id"],
+            "comment_text": comment_text[:MAX_COMMENT_CHARS],
+            "like_count": int(row.get("like_count") or 0),
+            "reply_count": int(row.get("reply_count") or 0),
+            "published_ts": _to_timestamp(row.get("published_at")),
+        })
+    print(f"    rule passed: {len(candidates)}")
+    if not candidates:
+        return []
 
     print("[4] Multi-Criteria selection (top by like / reply / length / new)...")
-    selected, _stats = _select_comments_multicriteria(rule_passed, product_name)
-    selected = selected[:max_comments]
+    entries, _stats = _select_comments_multicriteria(candidates, product_name)
+    # entries 는 [{"item": <candidate row>, "hit_count": ..., "sources": [...], "secondary_score": ...}]
+    # 우리 비교 스크립트는 평면 row 가 필요하므로 unwrap.
+    selected = [e["item"] for e in entries[:max_comments]]
     print(f"    selected: {len(selected)}")
     return selected
 
@@ -99,6 +123,19 @@ def fetch_and_select(video_id: str, product_name: str, max_comments: int) -> lis
 # ---------------------------------------------------------------------------
 # Backend 별 분류 + 메트릭 수집
 # ---------------------------------------------------------------------------
+
+def _label_to_str(label) -> str:
+    """ClassificationResult.label 이 enum (CommentLabel) 일 수도 str 일 수도 있음.
+
+    - API (comment_filtering_agent.classifiers.models.ClassificationResult):
+      label = CommentLabel(Enum) → .value 로 string.
+    - Local (comment_filtering_agent.classifiers.classifier_interface.ClassificationResult):
+      label = str → 그대로.
+    """
+    if label is None:
+        return ""
+    return label.value if hasattr(label, "value") else str(label)
+
 
 def bench_api(texts: list[str]) -> dict:
     """OptimizedBatchClassifier (RunYourAI GPT-4.1)."""
@@ -116,7 +153,7 @@ def bench_api(texts: list[str]) -> dict:
         "model": os.environ.get("RUNYOURAI_MODEL", "openai/gpt-4.1-2025-04-14"),
         "elapsed_s": elapsed,
         "results": [
-            {"label": r.label, "confidence": float(r.confidence)}
+            {"label": _label_to_str(r.label), "confidence": float(r.confidence)}
             for r in results
         ],
     }
@@ -136,7 +173,7 @@ def bench_local(texts: list[str]) -> dict:
         "model": "klue/roberta-large (3-class)",
         "elapsed_s": elapsed,
         "results": [
-            {"label": r.label, "confidence": float(r.confidence)}
+            {"label": _label_to_str(r.label), "confidence": float(r.confidence)}
             for r in results
         ],
         "model_stats": clf.get_stats(),
