@@ -2,13 +2,93 @@
 
 댓글 분류기 backend 두 가지를 같은 댓글 셋으로 비교하는 CLI.
 
-| Backend | 모델 | 위치 |
-|---|---|---|
-| **API** | GPT-4.1 (RunYourAI 게이트웨이) | 외부 API |
-| **Local** | KLUE-RoBERTa-large 3-class | 자체 학습 + 호스팅 |
+| Backend | 모델 | 위치 | 추가 의존성 |
+|---|---|---|---|
+| **API** | GPT-4.1 (`openai/gpt-4.1-2025-04-14`) via RunYourAI 게이트웨이 | 외부 API | `RUNYOURAI_API_KEY` |
+| **Local** | KLUE-RoBERTa-large 3-class (자체 학습) | 디스크 (가중치 파일 ~1.3 GB) | 모델 디렉토리 배포 |
 
 운영 댓글 파이프라인의 분류 단계만 두 번 (각 backend) 돌려서 결과를 비교.
 DB 에 쓰지 않음 (read-only).
+
+## ⭐ 학습된 Local 모델 정보
+
+| 항목 | 값 |
+|---|---|
+| **base 모델** | `klue/roberta-large` (340M params, KLUE 팀) |
+| **출력 라벨** | 3-class — `PRODUCT_OPINION` / `VIDEO_REACTION` / `QUESTION` |
+| **라벨 통합** | 구 `NOISE` / `CHATTER` / `OFF_TOPIC` 모두 `VIDEO_REACTION` 으로 흡수 |
+| **학습 hyperparameter** | lr 1e-5 / 4 epoch / batch 32 / bf16 / class+conf weighted CE |
+| **학습 데이터** | GPT-4.1 teacher 라벨 6,375건 (운영 export) |
+| **검증 성능** | test macro F1 **0.917**, accuracy 0.916, n=1114 |
+| **VR → ANALYZE 승격** | `mentioned_product_features ≥ 2` 시 자동 승격 (키워드 매칭 후처리) |
+
+### 모델 가중치 다운로드 위치 ★
+
+리포에 가중치는 포함되지 **않음** (`.gitignore`). 별도 배포 필요.
+
+**정확한 경로**:
+```
+local_classifier/artifacts/3_labels/klue__roberta-large/model/best/
+                  ─────────  ─────────────  ─────────────────────────
+                  LABEL_SCHEME  MODEL_SLUG  (best 폴더 통째로)
+```
+
+**필수 파일 (7개, 통째로 옮길 것)**:
+
+| 파일 | 크기 | 역할 |
+|---|---:|---|
+| `model.safetensors` | **~1.3 GB** | ⭐ 학습된 가중치 |
+| `config.json` | ~1 KB | 모델 구조 (`num_labels=3`, `id2label`) |
+| `tokenizer.json` | ~1.5 MB | tokenizer fast |
+| `tokenizer_config.json` | ~1 KB | tokenizer 설정 |
+| `vocab.txt` | ~750 KB | KLUE vocab |
+| `special_tokens_map.json` | ~500 B | `[CLS]` `[SEP]` 등 |
+| `training_config.json` | ~1 KB | 학습 메타 (best_f1, epoch, lr) |
+
+### 학습 머신 → 운영 머신 배포 명령
+
+```bash
+# 운영 머신에서 실행
+mkdir -p local_classifier/artifacts/3_labels/klue__roberta-large/model
+
+# 옵션 1) scp — 가장 단순
+scp -r user@trainer:/PATH/to/Moabom_Prototype/local_classifier/artifacts/3_labels/klue__roberta-large/model/best \
+       local_classifier/artifacts/3_labels/klue__roberta-large/model/
+
+# 옵션 2) rsync — 재시도 안전 + 진행률
+rsync -avz --progress \
+    user@trainer:/PATH/to/Moabom_Prototype/local_classifier/artifacts/3_labels/klue__roberta-large/model/best/ \
+    local_classifier/artifacts/3_labels/klue__roberta-large/model/best/
+
+# 옵션 3) tar — 네트워크 약할 때
+# 학습 머신:
+tar -czf model_3class.tar.gz \
+    local_classifier/artifacts/3_labels/klue__roberta-large/model/best/
+# 다운로드 후 운영 머신:
+tar -xzf model_3class.tar.gz
+```
+
+배포 후 검증:
+```bash
+ls -lh local_classifier/artifacts/3_labels/klue__roberta-large/model/best/
+# model.safetensors 1.3GB 보여야 함
+
+python -c "
+from local_classifier.classifier import LocalRobertaClassifier
+clf = LocalRobertaClassifier(use_gpu=False)
+print('loaded from:', clf.model_path)
+print(clf.classify('발열이 심해요').label)
+"
+# → PRODUCT_OPINION
+```
+
+### 다른 경로에 두고 싶으면
+
+환경변수 `LOCAL_CLASSIFIER_OUTPUT` 으로 override:
+```bash
+export LOCAL_CLASSIFIER_OUTPUT=/data/models/moabom
+# → /data/models/moabom/3_labels/klue__roberta-large/model/best/
+```
 
 ---
 
@@ -40,29 +120,9 @@ cp .env.example .env
 
 ### 1-3. 학습된 Local 모델 가중치 배포
 
-Local backend 만 쓸 경우 모델 가중치 (~1.3GB) 가 필요. **git 에 포함되지 않음**.
+상단의 **⭐ 학습된 Local 모델 정보** 섹션 참고. 정확한 경로 + 다운로드 명령어 + 검증 방법 다 거기 있음.
 
-```
-local_classifier/artifacts/3_labels/klue__roberta-large/model/best/
-├── model.safetensors      (~1.3 GB) ★
-├── config.json
-├── tokenizer.json
-├── tokenizer_config.json
-├── vocab.txt
-├── special_tokens_map.json
-└── training_config.json
-```
-
-학습한 머신에서 운영으로 옮기는 예:
-```bash
-# 학습 머신 → 운영 머신
-scp -r user@trainer:/PATH/local_classifier/artifacts/3_labels \
-       ./local_classifier/artifacts/
-# 검증
-ls -lh local_classifier/artifacts/3_labels/klue__roberta-large/model/best/
-```
-
-> API 만 비교할 거면 (`--skip-local`) 가중치 불필요.
+> API 만 비교할 거면 (`--skip-local`) 가중치 불필요 — 1-3 단계 건너뛰기 가능.
 
 ---
 
