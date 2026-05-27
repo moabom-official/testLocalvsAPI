@@ -82,12 +82,9 @@ def fetch_and_select(video_id: str, product_name: str, max_comments: int) -> lis
         max_repeated_char_ratio=0.7,
     ))
     rule_passed: list[dict] = []
-    for row in rows:
-        try:
-            res = rule_filter.filter_comment(row["comment_text"])
-        except KeyError:
-            # row schema fallback
-            res = rule_filter.filter_comment(row.get("text", ""))
+    for i, row in enumerate(rows):
+        text = row.get("comment_text") or row.get("text") or ""
+        res = rule_filter.filter_single(text, index=i)
         if res.is_passed:
             rule_passed.append(row)
     print(f"    rule passed: {len(rule_passed)}")
